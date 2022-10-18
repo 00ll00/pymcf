@@ -2,6 +2,7 @@ from typing import List
 
 from pymcf.operations import Operation
 from pymcf.project import Project
+from pymcf import logger
 
 
 class MCFContext:
@@ -28,21 +29,31 @@ class MCFContext:
     def __exit__(self, exc_type, exc_val, exc_tb):
         MCFContext._current = self.last
 
-    def new_file(self):
-        name = self.name if self.nfiles == 0 else self.name + '_' + str(self.nfiles)
-        self.file_stack.append(MCFFile(name))
-        self.nfiles += 1
+    @staticmethod
+    def new_file():
+        curr = MCFContext._current
+        name = curr.name if curr.nfiles == 0 else curr.name + '_' + str(curr.nfiles)
+        curr.file_stack.append(MCFFile(name))
+        logger.debug(f"> {name} started.")
+        curr.nfiles += 1
 
     @staticmethod
     def finish_file():
         curr = MCFContext._current
+        logger.debug(f"< {curr.top.name} finished.")
         curr.top.finish()
         curr.finished.append(curr.file_stack.pop())
 
+    # noinspection PyMethodParameters
+    @staticmethod
+    def last_finished():
+        curr = MCFContext._current
+        return curr.finished[-1]
+
+    # noinspection PyMethodParameters
     @property
     def top(self):
-        if len(self.file_stack) == 0:
-            self.new_file()
+        assert len(self.file_stack) > 0
         return self.file_stack[-1]
 
     @staticmethod
@@ -52,6 +63,7 @@ class MCFContext:
         :param op: mcfunction operation
         """
         MCFContext._current.top.append_op(op)
+        logger.debug(f"    + {MCFContext._current.top.name}: {op}")
 
     @staticmethod
     def INIT_SCB():

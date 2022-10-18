@@ -40,7 +40,7 @@ class mcfunction:
                 raise RuntimeError(f"Entry point mcfunction cannot have arguments: {func}")
             self.name = func.__qualname__
             self.make_generator(func)
-            return self.factory
+            return self.generate
         else:
             self.as_factory(*args, **kwargs)
 
@@ -53,14 +53,16 @@ class mcfunction:
     def get_index(self, *args, **kwargs) -> int:
         pass
 
-    def factory(self, *args, **kwargs) -> Any:
+    def generate(self, *args, **kwargs) -> Any:
         idx = self.get_index(*args, **kwargs)
         if self.ep and idx is not None:
             logger.warning("Enter point mcfunction should not have index.")
         ctx_name = self.name + '.' + idx if idx is not None else self.name
         with MCFContext(ctx_name):
             logger.info(f"generating mcfunction group: {ctx_name}")
+            MCFContext.new_file()
             res = self.generator(*args, **kwargs)  # call mcfunction generator
+            MCFContext.finish_file()
         if not self.ep:
             CallFunctionOp(ctx_name)
         return res

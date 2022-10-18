@@ -9,10 +9,11 @@ from pymcf.operations import Operation
 
 class ScoreSetValueOp(Operation):
 
-    def __init__(self, score, value: int):
-        super().__init__()
+    def __init__(self, score, value: int, offline: bool = False):
         self.score: Score = score
         self.value: int = value
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"scoreboard players set {self.score} {self.value}"
@@ -20,9 +21,10 @@ class ScoreSetValueOp(Operation):
 
 class ScoreGetValueOp(Operation):
 
-    def __init__(self, score):
-        super().__init__()
+    def __init__(self, score, offline: bool = False):
         self.score: Score = score
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"scoreboard players get {self.score}"
@@ -30,10 +32,11 @@ class ScoreGetValueOp(Operation):
 
 class ScoreAddValueOp(Operation):
 
-    def __init__(self, score, value: int):
-        super().__init__()
+    def __init__(self, score, value: int, offline: bool = False):
         self.target: Score = score
         self.value: int = value
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"scoreboard players add {self.target} {self.value}"
@@ -41,10 +44,11 @@ class ScoreAddValueOp(Operation):
 
 class ScoreSubValueOp(Operation):
 
-    def __init__(self, score, value: int):
-        super().__init__()
+    def __init__(self, score, value: int, offline: bool = False):
         self.target: Score = score
         self.value: int = value
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"scoreboard players remove {self.target} {self.value}"
@@ -52,9 +56,10 @@ class ScoreSubValueOp(Operation):
 
 class ScoreResetValueOp(Operation):
 
-    def __init__(self, score):
-        super().__init__()
+    def __init__(self, score, offline: bool = False):
         self.target: Score = score
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"scoreboard players reset {self.target}"
@@ -62,10 +67,11 @@ class ScoreResetValueOp(Operation):
 
 class ScoreCopyOp(Operation):
 
-    def __init__(self, target, source):
-        super().__init__()
+    def __init__(self, target, source, offline: bool = False):
         self.target: Score = target
         self.source: Score = source
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"scoreboard players operation {self.target} = {self.source}"
@@ -73,10 +79,11 @@ class ScoreCopyOp(Operation):
 
 class ScoreMinOp(Operation):
 
-    def __init__(self, left, right):
-        super().__init__()
+    def __init__(self, left, right, offline: bool = False):
         self.left: Score = left
         self.right: Score = right
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"scoreboard players operation {self.left} < {self.right}"
@@ -84,10 +91,11 @@ class ScoreMinOp(Operation):
 
 class ScoreMaxOp(Operation):
 
-    def __init__(self, left, right):
-        super().__init__()
+    def __init__(self, left, right, offline: bool = False):
         self.left: Score = left
         self.right: Score = right
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"scoreboard players operation {self.left} > {self.right}"
@@ -95,10 +103,11 @@ class ScoreMaxOp(Operation):
 
 class ScoreAddScoreOp(Operation):
 
-    def __init__(self, target, source):
-        super().__init__()
+    def __init__(self, target, source, offline: bool = False):
         self.target: Score = target
         self.source: Score = source
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"scoreboard players operation {self.target} += {self.source}"
@@ -106,10 +115,11 @@ class ScoreAddScoreOp(Operation):
 
 class ScoreSubScoreOp(Operation):
 
-    def __init__(self, target, source):
-        super().__init__()
+    def __init__(self, target, source, offline: bool = False):
         self.target: Score = target
         self.source: Score = source
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"scoreboard players operation {self.target} -= {self.source}"
@@ -117,10 +127,11 @@ class ScoreSubScoreOp(Operation):
 
 class ScoreMulScoreOp(Operation):
 
-    def __init__(self, target, source):
-        super().__init__()
+    def __init__(self, target, source, offline: bool = False):
         self.target: Score = target
         self.source: Score = source
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"scoreboard players operation {self.target} *= {self.source}"
@@ -128,10 +139,11 @@ class ScoreMulScoreOp(Operation):
 
 class ScoreDivScoreOp(Operation):
 
-    def __init__(self, target, source):
-        super().__init__()
+    def __init__(self, target, source, offline: bool = False):
         self.target: Score = target
         self.source: Score = source
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"scoreboard players operation {self.target} /= {self.source}"
@@ -139,10 +151,11 @@ class ScoreDivScoreOp(Operation):
 
 class ScoreModScoreOp(Operation):
 
-    def __init__(self, target, source):
-        super().__init__()
+    def __init__(self, target, source, offline: bool = False):
         self.target: Score = target
         self.source: Score = source
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"scoreboard players operation {self.target} %= {self.source}"
@@ -150,10 +163,11 @@ class ScoreModScoreOp(Operation):
 
 class ScoreSwapScoreOp(Operation):
 
-    def __init__(self, target, source):
-        super().__init__()
+    def __init__(self, target, source, offline: bool = False):
         self.target: Score = target
         self.source: Score = source
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"scoreboard players operation {self.target} >< {self.source}"
@@ -161,11 +175,12 @@ class ScoreSwapScoreOp(Operation):
 
 class ScoreEQScoreOp(Operation):
 
-    def __init__(self, res, left, right):
-        super().__init__()
+    def __init__(self, res, left, right, offline: bool = False):
         self.res: Score = res
         self.left: Score = left
         self.right: Score = right
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"execute store result score {self.res} if score {self.left} = {self.right}"
@@ -173,11 +188,12 @@ class ScoreEQScoreOp(Operation):
 
 class ScoreGTScoreOp(Operation):
 
-    def __init__(self, res, left, right):
-        super().__init__()
+    def __init__(self, res, left, right, offline: bool = False):
         self.res: Score = res
         self.left: Score = left
         self.right: Score = right
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"execute store result score {self.res} if score {self.left} > {self.right}"
@@ -185,11 +201,12 @@ class ScoreGTScoreOp(Operation):
 
 class ScoreGEScoreOp(Operation):
 
-    def __init__(self, res, left, right):
-        super().__init__()
+    def __init__(self, res, left, right, offline: bool = False):
         self.res: Score = res
         self.left: Score = left
         self.right: Score = right
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"execute store result score {self.res} if score {self.left} >= {self.right}"
@@ -197,11 +214,12 @@ class ScoreGEScoreOp(Operation):
 
 class ScoreLTScoreOp(Operation):
 
-    def __init__(self, res, left, right):
-        super().__init__()
+    def __init__(self, res, left, right, offline: bool = False):
         self.res: Score = res
         self.left: Score = left
         self.right: Score = right
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"execute store result score {self.res} if score {self.left} < {self.right}"
@@ -209,11 +227,12 @@ class ScoreLTScoreOp(Operation):
 
 class ScoreLEScoreOp(Operation):
 
-    def __init__(self, res, left, right):
-        super().__init__()
+    def __init__(self, res, left, right, offline: bool = False):
         self.res: Score = res
         self.left: Score = left
         self.right: Score = right
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"execute store result score {self.res} if score {self.left} <= {self.right}"
@@ -221,11 +240,12 @@ class ScoreLEScoreOp(Operation):
 
 class ScoreEQValueOp(Operation):
 
-    def __init__(self, res, score, value):
-        super().__init__()
+    def __init__(self, res, score, value, offline: bool = False):
         self.res: Score = res
         self.score: Score = score
-        self.value: Score = value
+        self.value: int = value
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"execute store result score {self.res} if score {self.score} matches {self.value}"
@@ -233,11 +253,12 @@ class ScoreEQValueOp(Operation):
 
 class ScoreGTValueOp(Operation):
 
-    def __init__(self, res, score, value):
-        super().__init__()
+    def __init__(self, res, score, value, offline: bool = False):
         self.res: Score = res
         self.score: Score = score
         self.value: Score = value
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"execute store result score {self.res} if score {self.score} matches {self.value + 1}.."
@@ -245,11 +266,12 @@ class ScoreGTValueOp(Operation):
 
 class ScoreGEValueOp(Operation):
 
-    def __init__(self, res, score, value):
-        super().__init__()
+    def __init__(self, res, score, value, offline: bool = False):
         self.res: Score = res
         self.score: Score = score
         self.value: Score = value
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"execute store result score {self.res} if score {self.score} matches {self.value}.."
@@ -257,11 +279,12 @@ class ScoreGEValueOp(Operation):
 
 class ScoreLTValueOp(Operation):
 
-    def __init__(self, res, score, value):
-        super().__init__()
+    def __init__(self, res, score, value, offline: bool = False):
         self.res: Score = res
         self.score: Score = score
         self.value: Score = value
+
+        super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"execute store result score {self.res} if score {self.score} matches ..{self.value - 1}"
@@ -269,14 +292,43 @@ class ScoreLTValueOp(Operation):
 
 class ScoreLEValueOp(Operation):
 
-    def __init__(self, res, score, value):
-        super().__init__()
+    def __init__(self, res, score, value, offline: bool = False):
         self.res: Score = res
         self.score: Score = score
         self.value: Score = value
 
+        super().__init__(offline)
+
     def gen_code(self, mcver: MCVer) -> str:
         return f"execute store result score {self.res} if score {self.score} matches ..{self.value}"
+
+
+class IfScoreRunOp(Operation):
+
+    def __init__(self, score, action: Operation, offline: bool = False):
+        assert action.offline
+
+        self.score = score
+        self.action = action
+
+        super().__init__(offline)
+
+    def gen_code(self, mcver: MCVer) -> str:
+        return f"execute if {self.score} matches 1.. run {self.action.gen_code(mcver)}"
+
+
+class IfNotScoreRunOp(Operation):
+
+    def __init__(self, score, action: Operation, offline: bool = False):
+        assert action.offline
+
+        self.score = score
+        self.action = action
+
+        super().__init__(offline)
+
+    def gen_code(self, mcver: MCVer) -> str:
+        return f"execute unless {self.score} matches 1.. run {self.action.gen_code(mcver)}"
 
 
 class ScoreObj:
@@ -293,7 +345,6 @@ with MCFContext.INIT_SCB():
 
 
 class Score(InGameData):
-
     _consts = {}
 
     def __init__(self,
@@ -301,6 +352,7 @@ class Score(InGameData):
                  entity: Optional[ScoreEntity] = None,
                  objective: Optional[ScoreObj] = None
                  ):
+        super().__init__()
         self.entity = entity if entity is not None else ScoreEntity.new_sys_dummy()
         self.objective = objective if objective is not None else SYS_SCORE_OBJ
         self.identifier = self.entity.name + ' ' + self.objective.name

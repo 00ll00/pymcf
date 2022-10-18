@@ -24,11 +24,12 @@ class Project:
         proj = Project.INSTANCE
         proj.name = name
         proj.mc_version = mc_version if mc_version is not None else MCVer.JE_1_19_2
+        if output_dir is not None and output_dir[-1] not in {'\\', '/'}:
+            output_dir += '\\'
         proj.output_dir = output_dir if output_dir is not None else os.getcwd() + '\\' + name + '\\'
 
-        if os.path.exists(proj.output_dir):
-            shutil.rmtree(proj.output_dir)
-        os.mkdir(proj.output_dir)
+        if not os.path.exists(proj.output_dir):
+            os.mkdir(proj.output_dir)
 
         logging.info(f"Project {proj.name} initialized, for minecraft {proj.mc_version}.")
         logging.info(f"Output directory set to {proj.output_dir}.")

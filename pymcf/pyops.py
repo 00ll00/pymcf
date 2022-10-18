@@ -132,9 +132,20 @@ class PyOps(Enum):
     DICT_UPDATE = dis.opmap['DICT_UPDATE']
 
 
+ALL = set(PyOps)
+
 JREL = set(op for op in PyOps if op.value in dis.hasjrel) - {PyOps.FOR_ITER}
 JABS = set(op for op in PyOps if op.value in dis.hasjabs)
 JMP = JREL | JABS
+
+JMP_IF = {
+    PyOps.POP_JUMP_IF_FALSE,
+    PyOps.POP_JUMP_IF_TRUE,
+    PyOps.JUMP_IF_FALSE_OR_POP,
+    PyOps.JUMP_IF_TRUE_OR_POP,
+}
+
+NORMAL_OPS = ALL - JMP - {PyOps.FOR_ITER, PyOps.RETURN_VALUE}
 
 if __name__ == '__main__':
     for op in dis.opmap:
