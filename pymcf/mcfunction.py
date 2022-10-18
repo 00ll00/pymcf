@@ -1,3 +1,4 @@
+import sys
 from types import FunctionType
 from typing import Any, Set
 
@@ -14,9 +15,6 @@ class mcfunction:
     Make mcfunction from marked function
     """
 
-    _load = None
-    _tick = None
-
     def __init__(self, func=None, **kwargs):
         # if func is not None, mean this decorator is used like:
         # @mcfunction
@@ -28,21 +26,29 @@ class mcfunction:
 
         self.name = None
         self.generator = None
-        self.as_factory = None
+        self.factory = None
+        self.from_frame = None
 
         if func is not None:
-            self.as_factory = self.__call__(func)
+            self.factory = self.__call__(func)
+            self.from_frame = sys._getframe(1)
 
     def __call__(self, *args, **kwargs):
-        if len(args) == 1 and len(kwargs) == 0 and isinstance(args[0], FunctionType) and self.as_factory is None:
+        """
+        if input is a function, build a generator and return the factory function;
+        else invoke generator factory with given args.
+        """
+        if len(args) == 1 and len(kwargs) == 0 and isinstance(args[0], FunctionType) and self.factory is None:
             func = args[0]
+            self.from_frame = sys._getframe(1)
             if self.ep and (func.__code__.co_argcount > 0 or func.__code__.co_kwonlyargcount > 0):
                 raise RuntimeError(f"Entry point mcfunction cannot have arguments: {func}")
             self.name = func.__qualname__
             self.make_generator(func)
+            self.proj.add_mcf(self)
             return self.generate
         else:
-            self.as_factory(*args, **kwargs)
+            return self.factory(*args, **kwargs)
 
     def make_generator(self, func):
         pyc = PyCode(func.__code__)
@@ -54,15 +60,18 @@ class mcfunction:
         pass
 
     def generate(self, *args, **kwargs) -> Any:
+        """
+        the factory function to generate parametrized mcfunction.
+        """
+        self.generator.__globals__.update(self.from_frame.f_locals)
         idx = self.get_index(*args, **kwargs)
         if self.ep and idx is not None:
             logger.warning("Enter point mcfunction should not have index.")
         ctx_name = self.name + '.' + idx if idx is not None else self.name
         with MCFContext(ctx_name):
-            logger.info(f"generating mcfunction group: {ctx_name}")
             MCFContext.new_file()
             res = self.generator(*args, **kwargs)  # call mcfunction generator
-            MCFContext.finish_file()
+            MCFContext.exit_file()
         if not self.ep:
             CallFunctionOp(ctx_name)
         return res
@@ -70,13 +79,9 @@ class mcfunction:
     # noinspection PyMethodParameters
     @staticproperty
     def load():
-        if mcfunction._load is None:
-            mcfunction._load = mcfunction(tags={"load"}, is_entry_point=True)
-        return mcfunction._load
+        return mcfunction(tags={"load"}, is_entry_point=True)
 
     # noinspection PyMethodParameters
     @staticproperty
     def tick():
-        if mcfunction._tick is None:
-            mcfunction._tick = mcfunction(tags={"tick"}, is_entry_point=True)
-        return mcfunction._tick
+        return mcfunction(tags={"tick"}, is_entry_point=True)

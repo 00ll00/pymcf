@@ -1,14 +1,11 @@
 import dis
-import random
-import sys
 from dis import Instruction
-from enum import Enum
-from types import FunctionType, CodeType
-from typing import List, Optional, Dict, Iterator, Any, Tuple, Set
+from types import CodeType
+from typing import List, Optional, Dict, Any, Set
 
-from datas import Score
 from pymcf.datas.datas import InGameData
-from pymcf.code_helpers import convert_assign, finish_file, new_file, if_true_run_last_file, if_false_run_last_file
+from pymcf.code_helpers import convert_assign, finish_file, new_file, if_true_run_last_file, if_false_run_last_file, \
+    convert_return, load_return_value
 from pymcf.operations import raw
 from pymcf.pyops import PyOps, JMP, JABS, NORMAL_OPS, JMP_IF, JREL
 from util import ListReader
@@ -37,13 +34,16 @@ class PyCode:
         code = bytearray()
         lnotab = bytearray()
         last_off = 0
-        last_line = self.co_firstlineno
+        last_line = self.co_firstlineno - 1  # TODO why CodeType auto increase line number by 1
         for instr in instrs:
             code.append(instr.opcode)
             code.append(instr.arg)
             if instr.line_code is not None:
                 lnotab.append(instr.offset - last_off)
-                lnotab.append(instr.line_code - last_line)
+                if instr.line_code > last_line:
+                    lnotab.append(instr.line_code - last_line)
+                else:
+                    lnotab.append(256 + instr.line_code - last_line)
                 last_off = instr.offset
                 last_line = instr.line_code
         code = bytes(code)
@@ -70,7 +70,7 @@ class PyCode:
 
     def add_name(self, obj: Any, name: str = None) -> int:
         if name is None:
-            name = "<obj_" + str(id(obj)) + ">"
+            name = "<obj_" + hex(id(obj)) + ">"
         if name not in self.co_names:
             self.co_names.append(name)
             self.globals[name] = obj
@@ -101,7 +101,7 @@ class Instr:
         self.line_code = line_code
         self.is_jmp_target = is_jmp_target
 
-        self._jmp_target: Optional[Instr] = None
+        self._jmp_target: Optional[Instr | AbstractCodeBlock] = None
         self.jmp_from: Set[Instr] = set()
 
     def __hash__(self):
@@ -161,7 +161,7 @@ class Instr:
         return f"Instr[{self.offset}]: {self.op.name}, {self.arg}"
 
 
-class CodeBlock:
+class AbstractCodeBlock:
 
     def __init__(self, pyc: PyCode, reader: ListReader[Instr], offset: int, end: int = -1):
         self.reader = reader
@@ -170,9 +170,9 @@ class CodeBlock:
         self.end: int = end
 
         self.jmp_from: Set[Instr] = set()
-        self.subs: List[CodeBlock] = []
+        self.subs: List[AbstractCodeBlock] = []
 
-        self.parent: Optional[CodeBlock] = None
+        self.parent: Optional[AbstractCodeBlock] = None
 
     def add_sub(self, sub):
         self.subs.append(sub)
@@ -242,7 +242,7 @@ class CodeBlock:
         return self._repr_(0)
 
 
-class CodeBlockList(CodeBlock):
+class CodeBlockList(AbstractCodeBlock):
     """
     top level CodeBlock witch contains a list of CodeBlock.
     """
@@ -263,8 +263,6 @@ class CodeBlockList(CodeBlock):
                     if jmp_pair.op in JMP - JMP_IF:  # if - else - final
                         final = jmp_pair.jmp_target.offset
                         sub = CodeIfElse(pyc, instr, jmp_pair, reader, offset, final)
-                    elif jmp_pair.op is PyOps.RETURN_VALUE:  # if - return - else
-                        sub = CodeIfReturn(pyc, reader.back(), offset, jmp_pair.offset + 2)
                     else:  # if - final
                         sub = CodeIf(pyc, instr, reader, offset, jmp_pair.offset + 2)
                 case op if op in JMP:
@@ -272,6 +270,8 @@ class CodeBlockList(CodeBlock):
                     break  # consider a single jmp as a jumped else
                 case PyOps.RETURN_VALUE:
                     sub = CodeReturn(pyc, instr, reader, offset, end)
+                case PyOps.RAISE_VARARGS:
+                    sub = CodeRaise(pyc, instr, reader, offset, end)
             self.add_sub(sub)
             offset += sub.size
 
@@ -307,12 +307,26 @@ class CodeBlockList(CodeBlock):
 
     def get_instrs(self) -> List[Instr]:
         self._convert_instr()
+        self.add_sub(
+            CodeChain(
+                self.pyc,
+                ListReader((
+                    Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(load_return_value)),
+                    Instr(PyOps.CALL_FUNCTION, 0),
+                    Instr(PyOps.RETURN_VALUE)
+                )),
+                self.offset + self.size,
+                end=-1,
+                no_convert=True
+            )
+        )
         self._compute_offset(self.offset)
-        self._compute_jmp_pos()
+        while self._compute_jmp_pos():
+            self._compute_offset(self.offset)
         return self._get_instrs()
 
 
-class CodeChain(CodeBlock):
+class CodeChain(AbstractCodeBlock):
     """
     Basic chain logic code bock.
     """
@@ -415,14 +429,39 @@ class CodeChain(CodeBlock):
 
     def _compute_jmp_pos(self) -> bool:
         res = False
-        for instr in self.subs:
+        i = 0
+        ext_num = 0
+        while i < len(self.subs):
+            instr = self.subs[i]
             if instr.jmp_target is not None:
                 if instr.is_jabs:
                     pos = instr.jmp_target.offset // 2
                 else:
                     pos = (instr.jmp_target.offset - instr.offset) // 2 - 1
                 instr.arg = pos
-                res = res or pos >= 2**8
+                exts = gen_ext(instr)
+                if len(exts) != ext_num:
+                    res = True
+                    if len(exts) == 0:
+                        for jf in self.subs[i - ext_num].jmp_from:
+                            jf.set_jmp_targ(instr)
+                    else:
+                        for jf in self.subs[i - ext_num].jmp_from:
+                            jf.set_jmp_targ(exts[0])
+                    for _ in range(ext_num):
+                        self.subs.pop(i - ext_num)
+                    for ext in reversed(exts):
+                        self.subs.insert(i - ext_num, ext)
+                    i = i - ext_num + len(exts)
+                else:
+                    for j in range(ext_num):
+                        self.subs[i - ext_num + j].arg = exts[j].arg
+
+            if instr.op is PyOps.EXTENDED_ARG:
+                ext_num += 1
+            else:
+                ext_num = 0
+            i += 1
         return res
 
     def _get_instrs(self) -> List[Instr]:
@@ -437,7 +476,7 @@ class CodeChain(CodeBlock):
         return res
 
 
-class CodeIfElse(CodeBlock):
+class CodeIfElse(AbstractCodeBlock):
     """
     if - else - final
     """
@@ -572,19 +611,11 @@ class CodeIfElse(CodeBlock):
         jmp5.set_jmp_targ(self.next)
         self.add_sub(after_if)
 
-    def _compute_jmp_pos(self):
-        super(CodeIfElse, self)._compute_jmp_pos()
-        if self.instr_if.is_jrel:
-            self.instr_if.arg = (self.blocks_else.offset - self.instr_if.offset) // 2 - 1
-        else:
-            self.instr_if.arg = self.blocks_else.offset // 2
-        if self.instr_else.is_jrel:
-            self.instr_else.arg = (self.end - self.instr_else.offset) // 2 - 1
-        else:
-            self.instr_else.arg = self.end // 2
+        self.instr_if.set_jmp_targ(self.blocks_else)
+        self.instr_else.set_jmp_targ(self.next)
 
 
-class CodeIf(CodeBlock):
+class CodeIf(AbstractCodeBlock):
     """
     if - final
     """
@@ -661,26 +692,12 @@ class CodeIf(CodeBlock):
         jmp2.set_jmp_targ(self.next)
         self.add_sub(after_if)
 
-    def _compute_jmp_pos(self):
-        super(CodeIf, self)._compute_jmp_pos()
-        if self.instr_if.op in JREL:
-            self.instr_if.arg = (self.blocks_if.end - self.instr_if.offset) // 2 - 1
-        else:
-            self.instr_if.arg = self.blocks_if.end // 2
+        self.instr_if.set_jmp_targ(self.next)
 
 
-class CodeIfReturn(CodeBlock):
+class CodeReturn(AbstractCodeBlock):
     """
-    if - target - else
-    """
-
-    def __init__(self, pyc: PyCode, reader: ListReader[Instr], offset: int, end: int = -1):
-        super().__init__(pyc, reader, offset, end)
-
-
-class CodeReturn(CodeBlock):
-    """
-    return
+    return ...
     """
 
     def __init__(self, pyc: PyCode, instr_ret: Instr, reader: ListReader[Instr], offset: int, end: int = -1):
@@ -692,13 +709,57 @@ class CodeReturn(CodeBlock):
         block_ret = CodeChain(
             pyc,
             ListReader((
-                self.instr_ret,
+                Instr(PyOps.LOAD_GLOBAL, pyc.add_name(convert_return)),
+                Instr(PyOps.ROT_TWO),
+                Instr(PyOps.CALL_FUNCTION, 1),
+                Instr(PyOps.POP_TOP)
             )),
             offset,
             end=-1,
             no_convert=True
         )
         self.add_sub(block_ret)
+
+        for jf in self.instr_ret.jmp_from:
+            jf.set_jmp_targ(block_ret)
+
+        # CPython compiler seems would not generate bytecode after `return`. leave this here anyway.
+        while (instr := reader.try_read()) is not None:
+            if instr.is_jmp_target:
+                reader.back()
+                break
+
+
+class CodeRaise(AbstractCodeBlock):
+    """
+    raise ... | assert ...
+    """
+
+    def __init__(self, pyc: PyCode, instr_raise: Instr, reader: ListReader[Instr], offset: int, end: int = -1):
+        super().__init__(pyc, reader, offset, end)
+
+        assert instr_raise.op is PyOps.RAISE_VARARGS
+        self.instr_raise = instr_raise
+
+        block_raise = CodeChain(
+            pyc,
+            ListReader((
+                Instr(PyOps.POP_TOP),  # just pop exception object for now
+            )),
+            offset,
+            end=-1,
+            no_convert=True
+        )
+        self.add_sub(block_raise)
+
+        for jf in self.instr_raise.jmp_from:
+            jf.set_jmp_targ(block_raise)
+
+        # CPython compiler seems would not generate bytecode after `raise`. leave this here anyway.
+        while (instr := reader.try_read()) is not None:
+            if instr.is_jmp_target:
+                reader.back()
+                break
 
 
 def gen_ext(instr: Instr) -> List[Instr]:

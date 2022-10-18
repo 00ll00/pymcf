@@ -1,9 +1,10 @@
 import logging
 import os
-import shutil
-from typing import Dict, Optional
+from typing import Optional
+
 from pymcf.mcversions import MCVer
 from pymcf.util import staticproperty
+from pymcf import logger
 
 
 class Project:
@@ -14,10 +15,10 @@ class Project:
         self.mc_version: MCVer = None
         self.output_dir: str = None
 
-        self.mcf_load = set()
-        self.mcf_tick = set()
+        self.generated = False
 
         self.ctxs = {}
+        self.mcfs = {}
 
     @staticmethod
     def init(name: str, mc_version: Optional[MCVer] = None, output_dir: Optional[str] = None):
@@ -38,6 +39,22 @@ class Project:
         from pymcf.context import MCFContext
         ctx: MCFContext
         self.ctxs[ctx.name] = ctx
+
+    def add_mcf(self, mcf):
+        self.mcfs[mcf.name] = mcf
+
+    @staticmethod
+    def generate():
+        inst: Project = Project.INSTANCE
+        if inst.generated:
+            logger.warn("project already generated, skipped second build.")
+            return
+        inst.generated = True
+        for mcf in inst.mcfs.values():
+            if mcf.ep:
+                mcf.generate()
+        for ctx in inst.ctxs.values():
+            ctx.gen_files()
 
     def __repr__(self):
         return f"Project: {self.name} (mcv: {self.mc_version})"

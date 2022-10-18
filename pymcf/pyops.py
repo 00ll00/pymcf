@@ -145,7 +145,7 @@ JMP_IF = {
     PyOps.JUMP_IF_TRUE_OR_POP,
 }
 
-NORMAL_OPS = ALL - JMP - {PyOps.FOR_ITER, PyOps.RETURN_VALUE}
+NORMAL_OPS = ALL - JMP - {PyOps.FOR_ITER, PyOps.RETURN_VALUE, PyOps.RAISE_VARARGS}
 
 if __name__ == '__main__':
     for op in dis.opmap:

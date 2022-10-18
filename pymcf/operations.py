@@ -20,6 +20,7 @@ class Operation:
     def __repr__(self):
         return self.gen_code(MCVer.JE_1_19_2)
 
+
 class InsertRawOp(Operation):
 
     def __init__(self, code: str, offline: bool = False):

@@ -340,7 +340,7 @@ class ScoreObj:
         return self.name
 
 
-with MCFContext.INIT_SCB():
+with MCFContext.INIT_SCB:
     SYS_SCORE_OBJ = ScoreObj("system")
 
 
@@ -357,14 +357,16 @@ class Score(InGameData):
         self.objective = objective if objective is not None else SYS_SCORE_OBJ
         self.identifier = self.entity.name + ' ' + self.objective.name
 
-        if isinstance(value, int):
-            ScoreSetValueOp(self, value)
-        elif isinstance(value, Score):
-            ScoreCopyOp(self, value)
-        elif value is None:
-            pass  # don't initialize score while value is None
-        else:
-            ScoreSetValueOp(self, int(value))
+        if not MCFContext.in_context:
+            with MCFContext.INIT_SCORE:
+                if isinstance(value, int):
+                    ScoreSetValueOp(self, value)
+                elif isinstance(value, Score):
+                    ScoreCopyOp(self, value)
+                elif value is None:
+                    pass  # don't initialize score while value is None
+                else:
+                    ScoreSetValueOp(self, int(value))
 
     def __str__(self) -> str:
         return self.identifier
@@ -381,7 +383,7 @@ class Score(InGameData):
         :return: a const score
         """
         if value not in Score._consts:
-            with MCFContext.INIT_SCORE():
+            with MCFContext.INIT_SCORE:
                 Score._consts[value] = Score(value, ScoreEntity("$const_" + str(value)), SYS_SCORE_OBJ)
         return Score._consts[value]
 
