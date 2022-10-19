@@ -4,8 +4,8 @@ from types import CodeType
 from typing import List, Optional, Dict, Any, Set
 
 from pymcf.datas.datas import InGameData
-from pymcf.code_helpers import convert_assign, finish_file, new_file, if_true_run_last_file, if_false_run_last_file, \
-    convert_return, load_return_value
+from pymcf.code_helpers import convert_assign, exit_file, new_file, if_true_run_last_file, if_false_run_last_file, \
+    convert_return, load_return_value, if_true_run_current_file, if_false_run_current_file
 from pymcf.operations import raw
 from pymcf.pyops import PyOps, JMP, JABS, NORMAL_OPS, JMP_IF, JREL
 from util import ListReader
@@ -34,7 +34,7 @@ class PyCode:
         code = bytearray()
         lnotab = bytearray()
         last_off = 0
-        last_line = self.co_firstlineno - 1  # TODO why CodeType auto increase line number by 1
+        last_line = self.co_firstlineno + 1  # TODO why CodeType auto increase line number by 1
         for instr in instrs:
             code.append(instr.opcode)
             code.append(instr.arg)
@@ -102,7 +102,7 @@ class Instr:
         self.is_jmp_target = is_jmp_target
 
         self._jmp_target: Optional[Instr | AbstractCodeBlock] = None
-        self.jmp_from: Set[Instr] = set()
+        self.jmp_froms: Set[Instr] = set()
 
     def __hash__(self):
         return hash(self.op) ^ hash(self.arg) ^ hash(self.offset)
@@ -119,9 +119,14 @@ class Instr:
 
     def set_jmp_targ(self, target):
         if self._jmp_target is not None:
-            self._jmp_target.jmp_from.remove(self)
+            self._jmp_target.jmp_froms.remove(self)
         self._jmp_target = target
-        target.jmp_from.add(self)
+        target.jmp_froms.add(self)
+
+    @property
+    def jmp_from(self):
+        assert len(self.jmp_froms) == 1
+        return self.jmp_froms.__iter__().__next__()
 
     @property
     def jmp_target(self):
@@ -163,13 +168,14 @@ class Instr:
 
 class AbstractCodeBlock:
 
-    def __init__(self, pyc: PyCode, reader: ListReader[Instr], offset: int, end: int = -1):
+    def __init__(self, pyc: PyCode, reader: ListReader[Instr], offset: int, end: int = -1, base_size: int = 0):
         self.reader = reader
         self.pyc: PyCode = pyc
         self.offset: int = offset
         self.end: int = end
+        self.base_size: int = base_size
 
-        self.jmp_from: Set[Instr] = set()
+        self.jmp_froms: Set[Instr] = set()
         self.subs: List[AbstractCodeBlock] = []
 
         self.parent: Optional[AbstractCodeBlock] = None
@@ -177,6 +183,11 @@ class AbstractCodeBlock:
     def add_sub(self, sub):
         self.subs.append(sub)
         sub.parent = self
+
+    @property
+    def jmp_from(self):
+        assert len(self.jmp_froms) == 1
+        return self.jmp_froms.__iter__().__next__()
 
     @property
     def first_chain(self):
@@ -205,7 +216,8 @@ class AbstractCodeBlock:
         """
         byte size of this block
         """
-        return sum(sub.size for sub in self.subs) if len(self.subs) > 0 else 0
+        res = sum(sub.size for sub in self.subs)
+        return res if res > self.base_size else self.base_size
 
     def _convert_instr(self):
         for sub in self.subs:
@@ -259,11 +271,20 @@ class CodeBlockList(AbstractCodeBlock):
                 case op if op in NORMAL_OPS:
                     sub = CodeChain(pyc, reader.back(), offset, end)
                 case op if op in JMP_IF:
+                    instr_next = reader[instr.offset//2 + 1]
                     jmp_pair = reader[instr.jmp_target.offset//2 - 1]
-                    if jmp_pair.op in JMP - JMP_IF:  # if - else - final
+
+                    # while ...
+                    if len(instr_next.jmp_froms) == 1 and jmp_pair.offset >= instr_next.jmp_from.offset > instr_next.offset:
+                        sub = CodeWhile(pyc, instr, instr_next.jmp_from, reader, offset, jmp_pair.offset)
+
+                    # if - else - final
+                    elif jmp_pair.op in JMP - JMP_IF:
                         final = jmp_pair.jmp_target.offset
                         sub = CodeIfElse(pyc, instr, jmp_pair, reader, offset, final)
-                    else:  # if - final
+
+                    # if - final
+                    else:
                         sub = CodeIf(pyc, instr, reader, offset, jmp_pair.offset + 2)
                 case op if op in JMP:
                     reader.back()
@@ -299,7 +320,7 @@ class CodeBlockList(AbstractCodeBlock):
         while instr := reader.try_read():
             if instr.op is PyOps.EXTENDED_ARG:
                 reader.remove(instr)
-                for jf in instr.jmp_from:
+                for jf in instr.jmp_froms:
                     jf.set_jmp_targ(reader.now())
 
         reader.reset()
@@ -396,6 +417,11 @@ class CodeChain(AbstractCodeBlock):
                         self.subs.insert(i + 1, Instr(PyOps.LOAD_NAME, self.pyc.add_name(convert_assign)))
                         self.subs.insert(i + 2, Instr(PyOps.ROT_THREE))
                         self.subs.insert(i + 3, Instr(PyOps.CALL_FUNCTION, 2))
+                    case PyOps.STORE_ATTR:
+                        self.subs.insert(i, Instr(PyOps.LOAD_ATTR, curr.arg))
+                        self.subs.insert(i + 1, Instr(PyOps.LOAD_NAME, self.pyc.add_name(convert_assign)))
+                        self.subs.insert(i + 2, Instr(PyOps.ROT_THREE))
+                        self.subs.insert(i + 3, Instr(PyOps.CALL_FUNCTION, 2))
                     # TODO
                     # case PyOps.STORE_ATTR:
                     #     self.instructions.insert(i, Instr(PyOps.LOAD_ATTR, curr.arg))
@@ -420,7 +446,7 @@ class CodeChain(AbstractCodeBlock):
                     i += 1
                     ext.offset = offset
                     offset += 2
-                for jf in instr.jmp_from:
+                for jf in instr.jmp_froms:
                     jf.set_jmp_targ(exts[0])
             instr.offset = offset
             offset += 2
@@ -443,10 +469,10 @@ class CodeChain(AbstractCodeBlock):
                 if len(exts) != ext_num:
                     res = True
                     if len(exts) == 0:
-                        for jf in self.subs[i - ext_num].jmp_from:
+                        for jf in self.subs[i - ext_num].jmp_froms:
                             jf.set_jmp_targ(instr)
                     else:
-                        for jf in self.subs[i - ext_num].jmp_from:
+                        for jf in self.subs[i - ext_num].jmp_froms:
                             jf.set_jmp_targ(exts[0])
                     for _ in range(ext_num):
                         self.subs.pop(i - ext_num)
@@ -483,7 +509,7 @@ class CodeIfElse(AbstractCodeBlock):
 
     def __init__(self, pyc: PyCode, instr_if: Instr, instr_else: Instr, reader: ListReader[Instr], offset: int,
                  end: int = -1):
-        super().__init__(pyc, reader, offset, end)
+        super().__init__(pyc, reader, offset, end, 4)
 
         assert instr_if.op in JMP_IF
         assert instr_else.op in JMP - JMP_IF
@@ -491,6 +517,8 @@ class CodeIfElse(AbstractCodeBlock):
         self.instr_else = instr_else
         self.is_ingame_var = pyc.add_var()
         self.origin_var = pyc.add_var()
+
+        self.if_true = self.instr_if.op in {PyOps.POP_JUMP_IF_FALSE, PyOps.JUMP_IF_FALSE_OR_POP}
 
         # block if
         offset += 2
@@ -505,10 +533,9 @@ class CodeIfElse(AbstractCodeBlock):
         self.blocks_else = CodeBlockList(pyc, reader, offset, else_end)
         self.add_sub(self.blocks_else)
 
-        if reader.can_read() and (jmp := reader.read()).op in {PyOps.JUMP_FORWARD, PyOps.JUMP_ABSOLUTE}:
+        if reader.can_read() and (jmp := reader.now()).op in {PyOps.JUMP_FORWARD, PyOps.JUMP_ABSOLUTE}:
             assert jmp.jmp_target is self.instr_else.jmp_target
             self.instr_else.set_jmp_targ(self)
-            reader.back()
 
     def _convert_instr(self):
         super(CodeIfElse, self)._convert_instr()
@@ -518,8 +545,6 @@ class CodeIfElse(AbstractCodeBlock):
         # before if
         before_instrs = ListReader((
             Instr(PyOps.DUP_TOP),
-            Instr(PyOps.STORE_FAST, self.origin_var),
-            Instr(PyOps.DUP_TOP),
             Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(InGameData)),
             Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(isinstance)),
             Instr(PyOps.ROT_THREE),
@@ -527,10 +552,12 @@ class CodeIfElse(AbstractCodeBlock):
             Instr(PyOps.DUP_TOP),
             Instr(PyOps.STORE_FAST, self.is_ingame_var),
     jmp1 := Instr(PyOps.POP_JUMP_IF_TRUE, +3),
+
             self.instr_if,
     jmp2 := Instr(PyOps.JUMP_FORWARD, +3 or +4),
-            Instr(PyOps.POP_TOP),
-    tag1 := Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(new_file)),
+
+    tag1 := Instr(PyOps.STORE_FAST, self.origin_var),
+            Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(new_file)),
             Instr(PyOps.CALL_FUNCTION, 0),
     tag2 := Instr(PyOps.POP_TOP)
         ))
@@ -554,10 +581,10 @@ class CodeIfElse(AbstractCodeBlock):
             ListReader((
                 Instr(PyOps.LOAD_FAST, self.is_ingame_var),
         jmp3 := Instr(PyOps.POP_JUMP_IF_FALSE, +8),
-                Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(finish_file)),
+                Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(exit_file)),
                 Instr(PyOps.CALL_FUNCTION, 0),
                 Instr(PyOps.POP_TOP),
-                Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(if_true_run_last_file)),
+                Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(if_true_run_last_file) if self.if_true else self.pyc.add_name(if_false_run_last_file)),
                 Instr(PyOps.LOAD_FAST, self.origin_var),
                 Instr(PyOps.CALL_FUNCTION, 1),
                 Instr(PyOps.POP_TOP),
@@ -572,7 +599,7 @@ class CodeIfElse(AbstractCodeBlock):
         before_else = CodeChain(
             self.pyc,
             ListReader((
-        tag3 := Instr(PyOps.LOAD_FAST, self.is_ingame_var),
+                Instr(PyOps.LOAD_FAST, self.is_ingame_var),
         jmp4 := Instr(PyOps.POP_JUMP_IF_TRUE, +2),
                 self.instr_else,
         tag4 := Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(new_file)),  # new mcfunction file for branch
@@ -583,7 +610,7 @@ class CodeIfElse(AbstractCodeBlock):
             end=-1,
             no_convert=True
         )
-        jmp3.set_jmp_targ(tag3)
+        jmp3.set_jmp_targ(before_else)
         jmp4.set_jmp_targ(tag4)
         self.add_sub(before_else)
 
@@ -596,10 +623,10 @@ class CodeIfElse(AbstractCodeBlock):
             ListReader((
                 Instr(PyOps.LOAD_FAST, self.is_ingame_var),
         jmp5 := Instr(PyOps.POP_JUMP_IF_FALSE, +8),
-                Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(finish_file)),
+                Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(exit_file)),
                 Instr(PyOps.CALL_FUNCTION, 0),
                 Instr(PyOps.POP_TOP),
-                Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(if_false_run_last_file)),
+                Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(if_false_run_last_file) if self.if_true else self.pyc.add_name(if_true_run_last_file)),
                 Instr(PyOps.LOAD_FAST, self.origin_var),
                 Instr(PyOps.CALL_FUNCTION, 1),
                 Instr(PyOps.POP_TOP),
@@ -621,12 +648,14 @@ class CodeIf(AbstractCodeBlock):
     """
 
     def __init__(self, pyc: PyCode, instr_if: Instr, reader: ListReader[Instr], offset: int, end: int = -1):
-        super().__init__(pyc, reader, offset, end)
+        super().__init__(pyc, reader, offset, end, 2)
 
         assert instr_if.op in JMP_IF
         self.instr_if = instr_if
         self.is_ingame_var = pyc.add_var()
         self.origin_var = pyc.add_var()
+
+        self.if_true = self.instr_if.op in {PyOps.POP_JUMP_IF_FALSE, PyOps.JUMP_IF_FALSE_OR_POP}
 
         offset += 1
         self.blocks_if = CodeBlockList(pyc, reader, offset,
@@ -639,16 +668,7 @@ class CodeIf(AbstractCodeBlock):
         self.subs.clear()
 
         # before if
-        match self.instr_if.op:
-            case op if op in {PyOps.POP_JUMP_IF_TRUE, PyOps.POP_JUMP_IF_FALSE}:
-                off = 4
-            case op if op in {PyOps.JUMP_IF_TRUE_OR_POP, PyOps.JUMP_IF_FALSE_OR_POP}:
-                off = 3
-            case _:
-                raise RuntimeError("unhandled jump operation")
         before_instrs = ListReader((
-            Instr(PyOps.DUP_TOP),
-            Instr(PyOps.STORE_FAST, self.origin_var),
             Instr(PyOps.DUP_TOP),
             Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(InGameData)),
             Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(isinstance)),
@@ -656,16 +676,25 @@ class CodeIf(AbstractCodeBlock):
             Instr(PyOps.CALL_FUNCTION, 2),
             Instr(PyOps.DUP_TOP),
             Instr(PyOps.STORE_FAST, self.is_ingame_var),
+
     jmp1 := Instr(PyOps.POP_JUMP_IF_TRUE, +3),
             self.instr_if,
-            Instr(PyOps.JUMP_FORWARD, off),
-            Instr(PyOps.POP_TOP),
-    tag1 := Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(new_file)),
+
+    jmp2 := Instr(PyOps.JUMP_FORWARD, +3 or +4),
+    tag1 := Instr(PyOps.STORE_FAST, self.origin_var),
+            Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(new_file)),
             Instr(PyOps.CALL_FUNCTION, 0),
-            Instr(PyOps.POP_TOP)
+    tag2 := Instr(PyOps.POP_TOP)
         ))
         before_if = CodeChain(self.pyc, before_instrs, 0, end=-1, no_convert=True)
         jmp1.set_jmp_targ(tag1)
+        match self.instr_if.op:
+            case op if op in {PyOps.POP_JUMP_IF_TRUE, PyOps.POP_JUMP_IF_FALSE}:
+                jmp2.set_jmp_targ(self.blocks_if)
+            case op if op in {PyOps.JUMP_IF_TRUE_OR_POP, PyOps.JUMP_IF_FALSE_OR_POP}:
+                jmp2.set_jmp_targ(tag2)
+            case _:
+                raise RuntimeError("unhandled jump operation")
         self.add_sub(before_if)
 
         # if
@@ -677,10 +706,10 @@ class CodeIf(AbstractCodeBlock):
             ListReader((
                 Instr(PyOps.LOAD_FAST, self.is_ingame_var),
         jmp2 := Instr(PyOps.POP_JUMP_IF_FALSE, +8),
-                Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(finish_file)),
+                Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(exit_file)),
                 Instr(PyOps.CALL_FUNCTION, 0),
                 Instr(PyOps.POP_TOP),
-                Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(if_true_run_last_file)),
+                Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(if_true_run_last_file) if self.if_true else self.pyc.add_name(if_false_run_last_file)),
                 Instr(PyOps.LOAD_FAST, self.origin_var),
                 Instr(PyOps.CALL_FUNCTION, 1),
                 Instr(PyOps.POP_TOP),
@@ -695,39 +724,147 @@ class CodeIf(AbstractCodeBlock):
         self.instr_if.set_jmp_targ(self.next)
 
 
+class CodeWhile(AbstractCodeBlock):
+    """
+    while ...
+    """
+
+    def __init__(self, pyc: PyCode, instr_while: Instr, instr_loop: Instr, reader: ListReader[Instr], offset: int,
+                 end: int = -1):
+        super().__init__(pyc, reader, offset, end, 4)
+
+        self.instr_while = instr_while
+        self.instr_loop = instr_loop
+        self.is_ingame_var = pyc.add_var()
+        self.ingame_var = pyc.add_var()
+
+        self.while_true = self.instr_while.op in {PyOps.POP_JUMP_IF_FALSE, PyOps.JUMP_IF_FALSE_OR_POP}
+        self.loop_true = self.instr_loop.op in {PyOps.POP_JUMP_IF_TRUE, PyOps.JUMP_IF_TRUE_OR_POP}
+
+        offset += 2
+        self.blocks_loop = CodeBlockList(pyc, reader, offset, self.instr_loop.offset)
+        self.add_sub(self.blocks_loop)
+        reader.skip()
+        offset += self.blocks_loop.size + 2
+
+        if self.instr_while.jmp_target.offset > self.instr_loop.offset + 2:
+            self.remaining = CodeBlockList(pyc, reader, offset, self.instr_while.jmp_target.offset)
+            self.add_sub(self.remaining)
+        else:
+            self.remaining = None
+
+    def _convert_instr(self):
+        super(CodeWhile, self)._convert_instr()
+
+        self.subs.clear()
+
+        # before while
+        before_instrs = ListReader((
+            Instr(PyOps.DUP_TOP),
+            Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(InGameData)),
+            Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(isinstance)),
+            Instr(PyOps.ROT_THREE),
+            Instr(PyOps.CALL_FUNCTION, 2),
+            Instr(PyOps.DUP_TOP),
+            Instr(PyOps.STORE_FAST, self.is_ingame_var),
+    jmp1 := Instr(PyOps.POP_JUMP_IF_TRUE, +3),
+
+            self.instr_while,
+    jmp2 := Instr(PyOps.JUMP_FORWARD, +3 or +4),
+
+    tag1 := Instr(PyOps.STORE_FAST, self.ingame_var),
+            Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(new_file)),
+            Instr(PyOps.CALL_FUNCTION, 0),
+    tag2 := Instr(PyOps.POP_TOP)
+        ))
+        before_while = CodeChain(self.pyc, before_instrs, 0, end=-1, no_convert=True)
+        jmp1.set_jmp_targ(tag1)
+        match self.instr_while.op:
+            case op if op in {PyOps.POP_JUMP_IF_TRUE, PyOps.POP_JUMP_IF_FALSE}:
+                jmp2.set_jmp_targ(self.blocks_loop)
+            case op if op in {PyOps.JUMP_IF_TRUE_OR_POP, PyOps.JUMP_IF_FALSE_OR_POP}:
+                jmp2.set_jmp_targ(tag2)
+            case _:
+                raise RuntimeError("unhandled jump operation")
+        self.instr_while.set_jmp_targ(self.next)
+        self.add_sub(before_while)
+
+        # while
+        self.add_sub(self.blocks_loop)
+
+        # after loop
+        after_instrs = ListReader((
+            Instr(PyOps.DUP_TOP),
+            Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(InGameData)),
+            Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(isinstance)),
+            Instr(PyOps.ROT_THREE),
+            Instr(PyOps.CALL_FUNCTION, 2),
+    jmp3 := Instr(PyOps.POP_JUMP_IF_TRUE, +4),
+            Instr(PyOps.POP_TOP),
+
+            self.instr_loop,
+    jmp4 := Instr(PyOps.JUMP_FORWARD, +12 or +13),
+
+    tag3 := Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(if_true_run_current_file) if self.loop_true else self.pyc.add_name(if_false_run_current_file)),
+            Instr(PyOps.ROT_TWO),
+            Instr(PyOps.CALL_FUNCTION, 1),
+            Instr(PyOps.POP_TOP),
+            Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(exit_file)),
+            Instr(PyOps.CALL_FUNCTION, 0),
+            Instr(PyOps.POP_TOP),
+
+            Instr(PyOps.LOAD_FAST,  self.is_ingame_var),
+    jmp5 := Instr(PyOps.POP_JUMP_IF_FALSE, +4),
+            Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(if_true_run_last_file) if self.loop_true else self.pyc.add_name(if_false_run_last_file)),
+            Instr(PyOps.LOAD_FAST, self.ingame_var),
+            Instr(PyOps.CALL_FUNCTION, 1),
+    tag4 := Instr(PyOps.POP_TOP)
+        ))
+        after_loop = CodeChain(self.pyc, after_instrs, 0, end=-1, no_convert=True)
+        jmp3.set_jmp_targ(tag3)
+        jmp5.set_jmp_targ(self.next)
+        match self.instr_while.op:
+            case op if op in {PyOps.POP_JUMP_IF_TRUE, PyOps.POP_JUMP_IF_FALSE}:
+                jmp4.set_jmp_targ(self.next)
+            case op if op in {PyOps.JUMP_IF_TRUE_OR_POP, PyOps.JUMP_IF_FALSE_OR_POP}:
+                jmp4.set_jmp_targ(tag4)
+            case _:
+                raise RuntimeError("unhandled jump operation")
+        self.instr_loop.set_jmp_targ(self.blocks_loop)
+        self.add_sub(after_loop)
+
+        if self.remaining is not None:
+            self.add_sub(self.remaining)
+
+
 class CodeReturn(AbstractCodeBlock):
     """
     return ...
     """
 
     def __init__(self, pyc: PyCode, instr_ret: Instr, reader: ListReader[Instr], offset: int, end: int = -1):
-        super().__init__(pyc, reader, offset, end)
+        super().__init__(pyc, reader, offset, end, 2)
 
         assert instr_ret.op is PyOps.RETURN_VALUE
         self.instr_ret = instr_ret
 
+    def _convert_instr(self):
         block_ret = CodeChain(
-            pyc,
+            self.pyc,
             ListReader((
-                Instr(PyOps.LOAD_GLOBAL, pyc.add_name(convert_return)),
+                Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(convert_return)),
                 Instr(PyOps.ROT_TWO),
                 Instr(PyOps.CALL_FUNCTION, 1),
                 Instr(PyOps.POP_TOP)
             )),
-            offset,
+            self.offset,
             end=-1,
             no_convert=True
         )
         self.add_sub(block_ret)
 
-        for jf in self.instr_ret.jmp_from:
+        for jf in self.instr_ret.jmp_froms:
             jf.set_jmp_targ(block_ret)
-
-        # CPython compiler seems would not generate bytecode after `return`. leave this here anyway.
-        while (instr := reader.try_read()) is not None:
-            if instr.is_jmp_target:
-                reader.back()
-                break
 
 
 class CodeRaise(AbstractCodeBlock):
@@ -736,30 +873,25 @@ class CodeRaise(AbstractCodeBlock):
     """
 
     def __init__(self, pyc: PyCode, instr_raise: Instr, reader: ListReader[Instr], offset: int, end: int = -1):
-        super().__init__(pyc, reader, offset, end)
+        super().__init__(pyc, reader, offset, end, 2)
 
         assert instr_raise.op is PyOps.RAISE_VARARGS
         self.instr_raise = instr_raise
 
+    def _convert_instr(self):
         block_raise = CodeChain(
-            pyc,
+            self.pyc,
             ListReader((
                 Instr(PyOps.POP_TOP),  # just pop exception object for now
             )),
-            offset,
+            self.offset,
             end=-1,
             no_convert=True
         )
         self.add_sub(block_raise)
 
-        for jf in self.instr_raise.jmp_from:
+        for jf in self.instr_raise.jmp_froms:
             jf.set_jmp_targ(block_raise)
-
-        # CPython compiler seems would not generate bytecode after `raise`. leave this here anyway.
-        while (instr := reader.try_read()) is not None:
-            if instr.is_jmp_target:
-                reader.back()
-                break
 
 
 def gen_ext(instr: Instr) -> List[Instr]:

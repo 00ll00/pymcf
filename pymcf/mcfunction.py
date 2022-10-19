@@ -69,9 +69,7 @@ class mcfunction:
             logger.warning("Enter point mcfunction should not have index.")
         ctx_name = self.name + '.' + idx if idx is not None else self.name
         with MCFContext(ctx_name):
-            MCFContext.new_file()
             res = self.generator(*args, **kwargs)  # call mcfunction generator
-            MCFContext.exit_file()
         if not self.ep:
             CallFunctionOp(ctx_name)
         return res

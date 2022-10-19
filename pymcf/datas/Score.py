@@ -396,7 +396,8 @@ class Score(InGameData):
         if isinstance(value, int):
             ScoreSetValueOp(self, value)
         elif isinstance(value, Score):
-            ScoreCopyOp(self, value)
+            if value.identifier != self.identifier:
+                ScoreCopyOp(self, value)
         elif value is None:
             ScoreResetValueOp(self)
         else:
@@ -405,9 +406,9 @@ class Score(InGameData):
     def __lt__(self, other):
         res = Score()
         if isinstance(other, Score):
-            ScoreEQScoreOp(res, self, other)
+            ScoreLTScoreOp(res, self, other)
         else:
-            ScoreEQValueOp(res, self, int(other))
+            ScoreLTValueOp(res, self, int(other))
         return res
 
     def __le__(self, other):

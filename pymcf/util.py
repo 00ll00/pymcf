@@ -59,3 +59,5 @@ class ListReader(Generic[T]):
     def remove(self, instr):
         self.list.remove(instr)
 
+    def __repr__(self):
+        return f"[{self.i}-{len(self.list)}]: {self.now()}"

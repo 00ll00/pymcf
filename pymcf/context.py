@@ -28,8 +28,12 @@ class MCFContext:
         logger.info(f">> compiling context: {self.name}")
         self.last = MCFContext._current
         MCFContext._current = self
+        MCFContext.new_or_last()  # if main file of this context exists, load it
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.exit_file()
+        if len(self.file_stack) > 0:
+            logger.warning(f"{len(self.file_stack)} files remaining: {self.file_stack}")
         logger.info(f"<< exit context: {self.name}")
         MCFContext._current = self.last
 
@@ -43,16 +47,26 @@ class MCFContext:
             mcf_file.gen()
 
     @staticmethod
+    def new_or_last():
+        curr = MCFContext._current
+        if len(curr.files) > 0:
+            curr.file_stack.append(curr.files.pop())
+            logger.info(f" > reopen file: {MCFContext.current_file().name}")
+        else:
+            MCFContext.new_file()
+
+    @staticmethod
     def new_file():
         curr = MCFContext._current
         name = curr.name if curr.nfiles == 0 else curr.name + '_' + str(curr.nfiles)
-        curr.file_stack.append(MCFFile(name))
         logger.info(f" > collecting file: {name}")
+        curr.file_stack.append(MCFFile(name))
         curr.nfiles += 1
 
     @staticmethod
     def exit_file():
         curr = MCFContext._current
+        logger.info(f" < exit file: {MCFContext.current_file().name}")
         curr.files.append(curr.file_stack.pop())
 
     @staticmethod
@@ -60,10 +74,11 @@ class MCFContext:
         curr = MCFContext._current
         return curr.files[-1]
 
-    @property
-    def top(self):
-        assert len(self.file_stack) > 0
-        return self.file_stack[-1]
+    @staticmethod
+    def current_file():
+        curr = MCFContext._current
+        assert len(curr.file_stack) > 0
+        return curr.file_stack[-1]
 
     @staticmethod
     def append_op(op: Operation):
@@ -71,8 +86,8 @@ class MCFContext:
         append one operation to current file of current context
         :param op: mcfunction operation
         """
-        MCFContext._current.top.append_op(op)
-        logger.debug(f"    + {MCFContext._current.top.name}: {op}")
+        MCFContext.current_file().append_op(op)
+        logger.debug(f"    + {MCFContext.current_file().name}: {op}")
 
     @staticmethod
     def assign_return_value(value: Any):  # TODO
@@ -122,3 +137,6 @@ class MCFFile:
         with open(self.proj.output_dir + self.name + ".mcfunction", 'w') as f:
             for op in self.operations:
                 f.write(op.gen_code(self.proj.mc_version) + '\n')
+
+    def __repr__(self):
+        return f"MCFFile: {self.name}"

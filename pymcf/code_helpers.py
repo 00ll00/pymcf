@@ -22,7 +22,7 @@ def new_file():
     MCFContext.new_file()
 
 
-def finish_file():
+def exit_file():
     MCFContext.exit_file()
 
 
@@ -40,6 +40,20 @@ def if_false_run_last_file(var: InGameData):
         raise RuntimeError()
 
 
+def if_true_run_current_file(var: InGameData):
+    if type(var) == Score:
+        IfScoreRunOp(var, CallFunctionOp(MCFContext.current_file().name, offline=True))
+    else:
+        raise RuntimeError()
+
+
+def if_false_run_current_file(var: InGameData):
+    if type(var) == Score:
+        IfNotScoreRunOp(var, CallFunctionOp(MCFContext.current_file().name, offline=True))
+    else:
+        raise RuntimeError()
+
+
 def convert_return(value: Any):
     MCFContext.assign_return_value(value)
     return value
@@ -47,3 +61,7 @@ def convert_return(value: Any):
 
 def load_return_value():
     return MCFContext.get_return_value()
+
+
+def add_score() -> Score:
+    return Score()
