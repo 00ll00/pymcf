@@ -44,7 +44,7 @@ class Project:
         self.mcfs[mcf.name] = mcf
 
     @staticmethod
-    def generate():
+    def build():
         inst: Project = Project.INSTANCE
         if inst.generated:
             logger.warn("project already generated, skipped second build.")

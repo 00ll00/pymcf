@@ -45,3 +45,13 @@ class CallFunctionOp(Operation):
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"function {self.func_full_name}"
+
+
+class ExecuteOp(Operation):
+
+    def __init__(self, op: Operation, offline: bool = False):
+        self.op = op
+        super().__init__(offline)
+
+    def gen_code(self, mcver: MCVer) -> str:
+        return self.op.gen_code(mcver)

@@ -5,7 +5,7 @@ from typing import Any, Set
 from pymcf import logger
 from pymcf.operations import CallFunctionOp
 from pymcf.project import Project
-from pymcf.codes import PyCode
+from pymcf.codes import CodeTypeRewriter
 from pymcf.context import MCFContext
 from pymcf.util import staticproperty
 
@@ -51,7 +51,7 @@ class mcfunction:
             return self.factory(*args, **kwargs)
 
     def make_generator(self, func):
-        pyc = PyCode(func.__code__)
+        pyc = CodeTypeRewriter(func.__code__)
         glb = func.__globals__.copy()
         glb.update(pyc.globals)
         self.generator = FunctionType(pyc.codetype, glb)
@@ -68,7 +68,7 @@ class mcfunction:
         if self.ep and idx is not None:
             logger.warning("Enter point mcfunction should not have index.")
         ctx_name = self.name + '.' + idx if idx is not None else self.name
-        with MCFContext(ctx_name):
+        with MCFContext(ctx_name, tags=self.tags, is_enter_point=self.ep):
             res = self.generator(*args, **kwargs)  # call mcfunction generator
         if not self.ep:
             CallFunctionOp(ctx_name)

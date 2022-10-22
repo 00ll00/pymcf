@@ -303,45 +303,69 @@ class ScoreLEValueOp(Operation):
         return f"execute store result score {self.res} if score {self.score} matches ..{self.value}"
 
 
-class IfScoreRunOp(Operation):
+class IfScoreGEValueRunOp(Operation):
 
-    def __init__(self, score, action: Operation, offline: bool = False):
+    def __init__(self, score, value: int, action: Operation, offline: bool = False):
         assert action.offline
 
         self.score = score
+        self.value = value
         self.action = action
 
         super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
-        return f"execute if {self.score} matches 1.. run {self.action.gen_code(mcver)}"
+        return f"execute if {self.score} matches {self.value}.. run {self.action.gen_code(mcver)}"
 
 
-class IfNotScoreRunOp(Operation):
+class IfScoreLTValueRunOp(Operation):
 
-    def __init__(self, score, action: Operation, offline: bool = False):
+    def __init__(self, score, value: int, action: Operation, offline: bool = False):
         assert action.offline
 
         self.score = score
+        self.value = value
         self.action = action
 
         super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
-        return f"execute unless {self.score} matches 1.. run {self.action.gen_code(mcver)}"
+        return f"execute unless {self.score} matches {self.value}.. run {self.action.gen_code(mcver)}"
 
 
-class ScoreObj:
+class DefScoreBoardOp(Operation):
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, scb_type: str = "dummy", display=None, offline: bool = False):
         self.name = name
+        self.type = scb_type
+        self.display = display
+
+        super().__init__(offline)
+
+    def gen_code(self, mcver: MCVer) -> str:
+        return f"scoreboard object add {self.name} {self.type}"
+
+
+class Scoreboard:
+
+    def __init__(self, name: str, scb_type: str = "dummy"):
+        self.name = name
+        self.type = scb_type
+
+        def _init_():
+            DefScoreBoardOp(self.name, self.type)
+
+        if not MCFContext.in_context:
+            with MCFContext.INIT_STORE:
+                _init_()
+        else:
+            _init_()
 
     def __str__(self):
         return self.name
 
 
-with MCFContext.INIT_SCB:
-    SYS_SCORE_OBJ = ScoreObj("system")
+SYS_SCORE_OBJ = Scoreboard("system")
 
 
 class Score(InGameData):
@@ -350,23 +374,31 @@ class Score(InGameData):
     def __init__(self,
                  value: Optional[int | Any] = None,
                  entity: Optional[ScoreEntity] = None,
-                 objective: Optional[ScoreObj] = None
+                 objective: Optional[Scoreboard] = None
                  ):
         super().__init__()
-        self.entity = entity if entity is not None else ScoreEntity.new_sys_dummy()
+        self.entity = entity if entity is not None else ScoreEntity.new_dummy()
         self.objective = objective if objective is not None else SYS_SCORE_OBJ
         self.identifier = self.entity.name + ' ' + self.objective.name
 
+        def _init_():
+            if isinstance(value, int):
+                ScoreSetValueOp(self, value)
+            elif isinstance(value, Score):
+                ScoreCopyOp(self, value)
+            elif value is None:
+                pass  # don't initialize score while value is None
+            else:
+                ScoreSetValueOp(self, int(value))
+
         if not MCFContext.in_context:
             with MCFContext.INIT_SCORE:
-                if isinstance(value, int):
-                    ScoreSetValueOp(self, value)
-                elif isinstance(value, Score):
-                    ScoreCopyOp(self, value)
-                elif value is None:
-                    pass  # don't initialize score while value is None
-                else:
-                    ScoreSetValueOp(self, int(value))
+                _init_()
+        else:
+            _init_()
+
+    def __hash__(self):
+        return self.identifier.__hash__()
 
     def __str__(self) -> str:
         return self.identifier

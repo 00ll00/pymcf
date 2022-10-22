@@ -1,4 +1,4 @@
-from typing import TypeVar, List, Iterator, Iterable, Generic, Optional
+from typing import TypeVar, Iterable, Generic, Optional
 
 
 class staticproperty:
@@ -38,6 +38,9 @@ class ListReader(Generic[T]):
         res = self.list[self.i]
         self.i += 1
         return res
+
+    def seek(self, offset: int = 0):
+        return self.list[self.i + offset] if self.i + offset in range(len(self.list)) else None
 
     def now(self) -> T:
         return self.list[self.i]

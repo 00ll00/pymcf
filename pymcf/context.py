@@ -1,4 +1,4 @@
-from typing import List, Any
+from typing import List, Any, Set, Optional, Dict
 
 from pymcf.operations import Operation
 from pymcf.project import Project
@@ -11,12 +11,14 @@ class MCFContext:
     _ctx_init_scb = None
     _ctx_init_score = None
 
-    def __init__(self, name: str, generator=None):
+    def __init__(self, name: str, tags: Optional[Set[str]] = None, is_enter_point: bool = False, single_file: bool = False):
         from pymcf.project import Project
         self.name = name
-        self.generator = generator
+        self.tags = tags if tags is not None else set()
+        self.ep = is_enter_point
+        self.sf = single_file
         self.nfiles = 0
-        self.files = []
+        self.files: List[MCFFile] = []
         self.file_stack = []
         self.return_value = None
         self.proj: Project = Project.INSTANCE
@@ -26,14 +28,17 @@ class MCFContext:
 
     def __enter__(self):
         logger.info(f">> compiling context: {self.name}")
+        if len(self.file_stack) == 0 and self.sf:
+            self._new_or_last_file()
         self.last = MCFContext._current
         MCFContext._current = self
-        MCFContext.new_or_last()  # if main file of this context exists, load it
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.exit_file()
         if len(self.file_stack) > 0:
-            logger.warning(f"{len(self.file_stack)} files remaining: {self.file_stack}")
+            if self.sf:
+                self.exit_file()
+            else:
+                logger.warning(f"{len(self.file_stack)} files remaining: {self.file_stack}")
         logger.info(f"<< exit context: {self.name}")
         MCFContext._current = self.last
 
@@ -46,28 +51,27 @@ class MCFContext:
         for mcf_file in self.files:
             mcf_file.gen()
 
-    @staticmethod
-    def new_or_last():
-        curr = MCFContext._current
-        if len(curr.files) > 0:
-            curr.file_stack.append(curr.files.pop())
-            logger.info(f" > reopen file: {MCFContext.current_file().name}")
+    def _new_or_last_file(self):
+        if len(self.files) > 0:
+            self.file_stack.append(self.files.pop())
+            logger.info(f" > reopen file: {self.file_stack[-1].name}")
         else:
-            MCFContext.new_file()
+            MCFContext.new_file(self)
 
     @staticmethod
-    def new_file():
-        curr = MCFContext._current
+    def new_file(ctx=None):
+        curr = MCFContext._current if ctx is None else ctx
         name = curr.name if curr.nfiles == 0 else curr.name + '_' + str(curr.nfiles)
         logger.info(f" > collecting file: {name}")
-        curr.file_stack.append(MCFFile(name))
+        curr.file_stack.append(MCFFile(name, curr.nfiles == 0))
         curr.nfiles += 1
 
     @staticmethod
     def exit_file():
         curr = MCFContext._current
-        logger.info(f" < exit file: {MCFContext.current_file().name}")
-        curr.files.append(curr.file_stack.pop())
+        file = curr.file_stack.pop()
+        logger.info(f" < exit file: {file.name}")
+        curr.files.append(file)
 
     @staticmethod
     def last_file():
@@ -79,6 +83,12 @@ class MCFContext:
         curr = MCFContext._current
         assert len(curr.file_stack) > 0
         return curr.file_stack[-1]
+
+    @staticmethod
+    def outer_file():
+        curr = MCFContext._current
+        assert len(curr.file_stack) > 1
+        return curr.file_stack[-2]
 
     @staticmethod
     def append_op(op: Operation):
@@ -109,25 +119,29 @@ class MCFContext:
 
     # noinspection PyMethodParameters
     @staticproperty
-    def INIT_SCB():
+    def INIT_STORE():
         if MCFContext._ctx_init_scb is None:
-            MCFContext._ctx_init_scb = MCFContext("sys.init_scoreboard")
+            MCFContext._ctx_init_scb = MCFContext("sys.init_store", tags={"load"}, is_enter_point=True, single_file=True)
         return MCFContext._ctx_init_scb
 
     # noinspection PyMethodParameters
     @staticproperty
     def INIT_SCORE():
         if MCFContext._ctx_init_score is None:
-            MCFContext._ctx_init_score = MCFContext("sys.init_score")
+            MCFContext._ctx_init_score = MCFContext("sys.init_score", tags={"load"}, is_enter_point=True, single_file=True)
         return MCFContext._ctx_init_score
 
 
 class MCFFile:
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, is_entry_point: bool = False):
+        self.ep = is_entry_point
         self.name = name
         self.proj: Project = Project.INSTANCE
         self.operations: List[Operation] = []
+
+        self._calls: Dict[Operation, MCFFile] = {}
+        self._callers: Dict[Operation, MCFFile] = {}
 
     def append_op(self, op: Operation):
         self.operations.append(op)
