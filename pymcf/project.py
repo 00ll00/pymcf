@@ -11,7 +11,7 @@ class Project:
     _instance = None
 
     def __init__(self):
-        self.name: str = None
+        self.namespace: str = None
         self.mc_version: MCVer = None
         self.output_dir: str = None
 
@@ -21,18 +21,16 @@ class Project:
         self.mcfs = {}
 
     @staticmethod
-    def init(name: str, mc_version: Optional[MCVer] = None, output_dir: Optional[str] = None):
+    def init(namespace: str, mc_version: Optional[MCVer] = None, output_dir: Optional[str] = None):
         proj = Project.INSTANCE
-        proj.name = name
+        proj.namespace = namespace
         proj.mc_version = mc_version if mc_version is not None else MCVer.JE_1_19_2
-        if output_dir is not None and output_dir[-1] not in {'\\', '/'}:
-            output_dir += '\\'
-        proj.output_dir = output_dir if output_dir is not None else os.getcwd() + '\\' + name + '\\'
+        proj.output_dir = (output_dir if output_dir is not None else os.getcwd()) + '\\' + namespace + "\\functions\\"
 
         if not os.path.exists(proj.output_dir):
             os.mkdir(proj.output_dir)
 
-        logging.info(f"Project {proj.name} initialized, for minecraft {proj.mc_version}.")
+        logging.info(f"Project {proj.namespace} initialized, for minecraft {proj.mc_version}.")
         logging.info(f"Output directory set to {proj.output_dir}.")
 
     def add_ctx(self, ctx):
@@ -57,7 +55,12 @@ class Project:
             ctx.gen_files()
 
     def __repr__(self):
-        return f"Project: {self.name} (mcv: {self.mc_version})"
+        return f"Project: {self.namespace} (mcv: {self.mc_version})"
+
+    # noinspection PyMethodParameters
+    @staticproperty
+    def namespace() -> str:
+        return Project._instance.namespace
 
     # noinspection PyMethodParameters
     @staticproperty

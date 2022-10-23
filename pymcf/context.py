@@ -3,7 +3,7 @@ from typing import List, Any, Set, Optional, Dict
 from pymcf.operations import Operation
 from pymcf.project import Project
 from pymcf import logger
-from util import staticproperty
+from pymcf.util import staticproperty
 
 
 class MCFContext:

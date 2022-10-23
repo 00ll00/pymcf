@@ -1,3 +1,4 @@
+from pymcf.project import Project
 from pymcf.mcversions import MCVer
 
 
@@ -44,7 +45,7 @@ class CallFunctionOp(Operation):
         super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
-        return f"function {self.func_full_name}"
+        return f"function {Project.namespace}:{self.func_full_name}"  # TODO specify namespace
 
 
 class ExecuteOp(Operation):

@@ -3,15 +3,16 @@ from dis import Instruction
 from types import CodeType
 from typing import List, Optional, Dict, Any, Set
 
-import breaklevel
+from pymcf import breaklevel
+from pymcf.context import MCFContext
 from pymcf.datas.Score import Score, ScoreEntity
 from pymcf.datas.datas import InGameData
 from pymcf.code_helpers import convert_assign, exit_file, new_file, convert_return, load_return_value, \
     gen_run_last_file_while, gen_run_curr_file_while, gen_set_score, gen_run_last_file, gen_run_outer_file_while, \
-    gen_run_outer_file, gen_set_score_value_while
+    gen_run_outer_file, gen_set_score_value_while, gen_exit_files_until
 from pymcf.operations import raw
 from pymcf.pyops import PyOps, JMP, JABS, NORMAL_OPS, JMP_IF, JREL, JMP_ALWAYS
-from util import ListReader
+from pymcf.util import ListReader
 
 
 class CodeTypeRewriter:
@@ -194,6 +195,8 @@ class AbstractCodeBlock:
         self._brk_flag: Optional[Score] = None
         self._brk_flags: Set[Score] = set()
         self._brk_level: int = breaklevel.NONE
+        self._brk_handler: AbstractCodeBlock = None
+        self.is_ingame_var = None
 
         self.parent: Optional[AbstractCodeBlock] = None
 
@@ -215,9 +218,19 @@ class AbstractCodeBlock:
         """
         return self._brk_flags.copy()
 
-    def make_brk_flag(self, level: int):
+    def make_break_handler(self, level: int, have_code=True):
         self._brk_flag = new_brk()
         self._brk_level = level
+        if have_code:
+            self._brk_handler = CodeChain(
+                self.pyc,
+                ListReader((
+                    Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(gen_exit_files_until(MCFContext.current_file()))),
+                    Instr(PyOps.CALL_FUNCTION, 0),
+                    Instr(PyOps.POP_TOP)
+                )),
+                0, end=-1, no_convert=True, as_file=False, dbg_name="compile time break handler"
+            )
 
     def on_break(self, level: int) -> Score:
         """
@@ -231,6 +244,24 @@ class AbstractCodeBlock:
             brk = self.parent.on_break(level)
         self._brk_flags.add(brk)
         return brk
+
+    def get_is_ingame_var(self, level: int) -> int:
+        """
+        get last break acceptable block's is_ingame_var
+        """
+        if level <= self._brk_level and self.is_ingame_var is not None:
+            return self.is_ingame_var
+        else:
+            return self.parent.get_is_ingame_var(level)
+
+    def get_brk_handler(self, level: int) -> "AbstractCodeBlock":
+        """
+        get last break acceptable block's _brk_handler
+        """
+        if level <= self._brk_level and self._brk_handler is not None:
+            return self._brk_handler
+        else:
+            return self.parent.get_brk_handler(level)
 
     def append_call_last_with_flag_check(self):
         self.final_subs.append(
@@ -290,7 +321,8 @@ class AbstractCodeBlock:
         """
         byte size of this block
         """
-        res = sum(sub.size for sub in self.final_subs)
+        subs = self.final_subs if len(self.final_subs) > 0 else self.subs
+        res = sum(sub.size for sub in subs)
         return res if res > self.base_size else self.base_size
 
     def _insert_new_file(self):
@@ -427,7 +459,7 @@ class CodeBlockList(AbstractCodeBlock):
                             sub = CodeWhile(pyc, instr, instr_next.jmp_from, reader, offset, jmp_pair.offset + 2)
 
                         # if - else - final
-                        elif jmp_pair.op in JMP_ALWAYS and jmp_pair.jmp_target.offset < end:
+                        elif jmp_pair.op in JMP_ALWAYS and instr.offset <= jmp_pair.jmp_target.offset < end:
                             final = jmp_pair.jmp_target.offset
                             sub = CodeIfElse(pyc, instr, jmp_pair, reader, offset, final)
 
@@ -435,12 +467,12 @@ class CodeBlockList(AbstractCodeBlock):
                         else:
                             sub = CodeIf(pyc, instr, reader, offset, jmp_pair.offset + 2)
                 case op if op in JMP:
-                    if self.offset < instr.jmp_target.offset <= end and end >= 0:
+                    if offset < instr.jmp_target.offset <= end and end >= 0:
                         reader.back()
                         break  # consider a single jmp as a jumped else TODO: break and continue
                     elif 0 <= end < instr.jmp_target.offset:  # break
                         sub = CodeBreak(pyc, instr, reader, offset, instr.offset + 2)
-                    elif instr.jmp_target.offset < self.offset:  # continue
+                    elif instr.jmp_target.offset < offset:  # continue
                         sub = CodeContinue(pyc, instr, reader, offset, instr.offset + 2)
                     else:
                         raise RuntimeError("unhandled jump")
@@ -496,7 +528,8 @@ class CodeBlockList(AbstractCodeBlock):
         # build cbl
         reader.reset()
         cbl = CodeBlockList(pyc, reader, 0)
-        cbl.make_brk_flag(breaklevel.RETURN)
+        cbl.make_break_handler(breaklevel.RETURN, have_code=False)
+
         return cbl
 
     def get_instrs(self) -> List[Instr]:
@@ -561,7 +594,10 @@ class CodeChain(AbstractCodeBlock):
 
     @property
     def size(self) -> int:
-        return len(self.final_subs) * 2
+        if len(self.final_subs) > 0:
+            return len(self.final_subs) * 2
+        else:
+            return len(self.subs) * 2
 
     @property
     def first_chain(self):
@@ -844,7 +880,7 @@ class CodeIf(AbstractCodeBlock):
 
         self.if_true = self.instr_if.op in {PyOps.POP_JUMP_IF_FALSE, PyOps.JUMP_IF_FALSE_OR_POP}
 
-        offset += 1
+        offset += 2
         self.blocks_if = CodeBlockList(pyc, reader, offset, instr_if.jmp_target.offset, dbg_name="blocks if")
         self.add_sub(self.blocks_if)
 
@@ -910,7 +946,7 @@ class CodeWhile(AbstractCodeBlock):
 
         assert self.as_file
 
-        self.make_brk_flag(breaklevel.BREAK)
+        self.make_break_handler(breaklevel.BREAK)
 
         self.instr_while = instr_while
         self.instr_loop = instr_loop
@@ -998,13 +1034,28 @@ class CodeWhile(AbstractCodeBlock):
         after_loop = CodeChain(self.pyc, after_instrs, 0, end=-1, no_convert=True, as_file=False, dbg_name="after loop")
         self.add_final_sub_and_convert(after_loop)
 
+        # break handler
+        self.add_final_sub_and_convert(
+            CodeChain(
+                self.pyc,
+                ListReader((
+            jmp7 := Instr(PyOps.JUMP_FORWARD, ),
+                )),
+                0, end=-1, no_convert=True, as_file=False, dbg_name="skip break handler"
+            )
+        )
+        self.add_final_sub_and_convert(self._brk_handler)
+
         if self.remaining is not None:
             self.add_final_sub_and_convert(self.remaining)
+            jmp7.set_jmp_targ(self.remaining)
 
         self._insert_exit_file()
 
-        self.instr_while.set_jmp_targ(self.last)
+        if self.remaining is None:
+            jmp7.set_jmp_targ(self.last)
 
+        self.instr_while.set_jmp_targ(self.last)
         jmp6.set_jmp_targ(self.last)
 
 
@@ -1146,29 +1197,32 @@ class CodeBreakIf(AbstractCodeBlock):
 
         self._insert_ingamedata_check()
 
-        self.add_sub(
+        self.add_final_sub_and_convert(
             CodeChain(
                 self.pyc,
                 ListReader((
-            jmp1 := Instr(PyOps.POP_JUMP_IF_FALSE, ),
+                    jmp1 := Instr(PyOps.POP_JUMP_IF_FALSE, ),
 
                     # ingame codes
                     Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(gen_set_score_value_while(self.on_break(breaklevel.BREAK), breaklevel.BREAK, self.if_true))),
                     Instr(PyOps.CALL_FUNCTION, 1),
                     Instr(PyOps.POP_TOP),
-            jmp3 := Instr(PyOps.JUMP_FORWARD, ),
+                    jmp3 := Instr(PyOps.JUMP_FORWARD, ),
 
+                    tag1 := Instr(PyOps.LOAD_GLOBAL, self.get_is_ingame_var(breaklevel.BREAK)),  # is current loop ingame
+                    Instr(PyOps.POP_JUMP_IF_TRUE),
                     self.instr_if,
-            jmp2 := Instr(PyOps.JUMP_FORWARD, ),
-            tag0 := Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(gen_set_score(self.on_break(breaklevel.BREAK), breaklevel.BREAK))),
+
+                    jmp2 := Instr(PyOps.JUMP_FORWARD, ),
+                    tag0 := Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(gen_set_score(self.on_break(breaklevel.BREAK), breaklevel.BREAK))),
                     Instr(PyOps.CALL_FUNCTION, 0),
                     Instr(PyOps.POP_TOP),
-            jmp4 := Instr(PyOps.JUMP_ABSOLUTE, )
+                    jmp4 := Instr(PyOps.JUMP_ABSOLUTE, )
                 )),
                 0, end=-1, no_convert=True, as_file=False, dbg_name="break if"
             )
         )
-        jmp1.set_jmp_targ(self.instr_if)
+        jmp1.set_jmp_targ(tag1)
         jmp4.set_jmp_targ(self.instr_if.jmp_target)
         self.instr_if.set_jmp_targ(tag0)
 
@@ -1201,7 +1255,7 @@ class CodeContinueIf(AbstractCodeBlock):
 
         self._insert_ingamedata_check()
 
-        self.add_sub(
+        self.add_final_sub_and_convert(
             CodeChain(
                 self.pyc,
                 ListReader((
@@ -1255,7 +1309,7 @@ class CodeBreak(AbstractCodeBlock):
         if self.as_file:
             self._insert_new_file()
 
-        self.add_sub(
+        self.add_final_sub_and_convert(
             CodeChain(
                 self.pyc,
                 ListReader((
@@ -1269,6 +1323,8 @@ class CodeBreak(AbstractCodeBlock):
                 0, end=-1, no_convert=True, as_file=False, dbg_name="break"
             )
         )
+
+        self.instr_jmp.set_jmp_targ(self.get_brk_handler(breaklevel.BREAK))
 
         if self.as_file:
             self._insert_exit_file()
@@ -1294,7 +1350,7 @@ class CodeContinue(AbstractCodeBlock):
         if self.as_file:
             self._insert_new_file()
 
-        self.add_sub(
+        self.add_final_sub_and_convert(
             CodeChain(
                 self.pyc,
                 ListReader((

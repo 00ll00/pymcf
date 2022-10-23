@@ -315,7 +315,7 @@ class IfScoreGEValueRunOp(Operation):
         super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
-        return f"execute if {self.score} matches {self.value}.. run {self.action.gen_code(mcver)}"
+        return f"execute if score {self.score} matches {self.value}.. run {self.action.gen_code(mcver)}"
 
 
 class IfScoreLTValueRunOp(Operation):
@@ -330,7 +330,7 @@ class IfScoreLTValueRunOp(Operation):
         super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
-        return f"execute unless {self.score} matches {self.value}.. run {self.action.gen_code(mcver)}"
+        return f"execute unless score {self.score} matches {self.value}.. run {self.action.gen_code(mcver)}"
 
 
 class DefScoreBoardOp(Operation):
@@ -343,7 +343,7 @@ class DefScoreBoardOp(Operation):
         super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
-        return f"scoreboard object add {self.name} {self.type}"
+        return f"scoreboard objectives add {self.name} {self.type}"
 
 
 class Scoreboard:
