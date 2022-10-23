@@ -27,6 +27,10 @@ def exit_file():
     MCFContext.exit_file()
 
 
+def get_current_file():
+    return MCFContext.current_file
+
+
 def gen_exit_files_until(current: MCFFile):
     def f():
         while MCFContext.current_file() is not current:
