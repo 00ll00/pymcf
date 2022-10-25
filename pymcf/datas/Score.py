@@ -405,7 +405,7 @@ class Score(InGameData):
 
     @property
     def json(self):
-        return {"score": {"name": self.entity.name, "objective": self.objective.name}}
+        return f"""{{"score": {{"name": "{self.entity.name}", "objective": "{self.objective.name}" }} }}"""  # TODO json text
 
     @staticmethod
     def const(value: int):

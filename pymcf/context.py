@@ -74,18 +74,18 @@ class MCFContext:
         curr.files.append(file)
 
     @staticmethod
-    def last_file():
+    def last_file() -> "MCFFile":
         curr = MCFContext._current
         return curr.files[-1]
 
     @staticmethod
-    def current_file():
+    def current_file() -> "MCFFile":
         curr = MCFContext._current
         assert len(curr.file_stack) > 0
         return curr.file_stack[-1]
 
     @staticmethod
-    def outer_file():
+    def outer_file() -> "MCFFile":
         curr = MCFContext._current
         assert len(curr.file_stack) > 1
         return curr.file_stack[-2]

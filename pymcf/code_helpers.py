@@ -1,7 +1,7 @@
 from typing import Any, Callable, Set
 
 from pymcf import breaklevel
-from pymcf.datas.Score import IfScoreGEValueRunOp, IfScoreLTValueRunOp, ScoreCopyOp, ScoreSetValueOp
+from pymcf.datas.Score import IfScoreGEValueRunOp, IfScoreLTValueRunOp, ScoreSetValueOp
 from pymcf.datas.datas import InGameData
 from pymcf.operations import CallFunctionOp, ExecuteOp
 from pymcf.context import MCFContext, MCFFile
@@ -31,9 +31,10 @@ def get_current_file():
     return MCFContext.current_file()
 
 
-def exit_files_until(current: MCFFile):
+def exit_and_call_files_until(current: MCFFile):
     while MCFContext.current_file() is not current:
         MCFContext.exit_file()
+        CallFunctionOp(MCFContext.last_file().name)
 
 
 def gen_run_file_on_condition(file_getter: Callable[[], MCFFile], on_true: bool, brk_flags: Set[Score],
