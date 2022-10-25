@@ -64,3 +64,6 @@ class ListReader(Generic[T]):
 
     def __repr__(self):
         return f"[{self.i}-{len(self.list)}]: {self.now()}"
+
+
+EmptyReader = ListReader(())

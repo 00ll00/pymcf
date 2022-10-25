@@ -9,10 +9,10 @@ from pymcf.datas.Score import Score, ScoreEntity
 from pymcf.datas.datas import InGameData
 from pymcf.code_helpers import convert_assign, exit_file, new_file, convert_return, load_return_value, \
     gen_run_last_file_while, gen_run_curr_file_while, gen_set_score, gen_run_last_file, gen_run_outer_file_while, \
-    gen_run_outer_file, gen_set_score_value_while, gen_exit_files_until, get_current_file
+    gen_run_outer_file, gen_set_score_value_while, exit_files_until, get_current_file
 from pymcf.operations import raw
 from pymcf.pyops import PyOps, JMP, JABS, NORMAL_OPS, JMP_IF, JREL, JMP_ALWAYS
-from pymcf.util import ListReader
+from pymcf.util import ListReader, EmptyReader
 
 
 class CodeTypeRewriter:
@@ -315,6 +315,15 @@ class AbstractCodeBlock:
         subs = self.final_subs if len(self.final_subs) > 0 else self.subs
         res = sum(sub.size for sub in subs)
         return res if res > self.base_size else self.base_size
+
+    def _insert_print_instrs(self):
+        return (
+            Instr(PyOps.DUP_TOP),
+            Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(print)),
+            Instr(PyOps.ROT_TWO),
+            Instr(PyOps.CALL_FUNCTION, 1),
+            Instr(PyOps.POP_TOP)
+        )
 
     def _insert_new_file(self):
         if self.as_file:
@@ -1209,7 +1218,7 @@ class CodeBreakIf(AbstractCodeBlock):
     tag0 := CodeBreak(
                 self.pyc,
         jmp2 := Instr(PyOps.JUMP_ABSOLUTE, ),
-                ListReader(()),
+                EmptyReader,
                 0, end=-1, as_file=True, dbg_name="inner break"
             ),
             add_call=False
@@ -1283,7 +1292,7 @@ class CodeContinueIf(AbstractCodeBlock):
             tag0 := CodeContinue(
                 self.pyc,
                 jmp2 := Instr(PyOps.JUMP_ABSOLUTE, ),
-                ListReader(()),
+                EmptyReader,
                 0, end=-1, as_file=True, dbg_name="inner continue"
             ),
             add_call=False
@@ -1342,28 +1351,24 @@ class CodeBreak(AbstractCodeBlock):
             jmp1 := Instr(PyOps.POP_JUMP_IF_TRUE, ),
 
                     # exit to out loop
-                    Instr(PyOps.LOAD_FAST, self.get_is_ingame_var(self._brk_level)),
-            jmp2 := Instr(PyOps.POP_JUMP_IF_TRUE, ),
+                    Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(exit_files_until)),
                     Instr(PyOps.LOAD_FAST, self.get_loop_file(self._brk_level)),
                     Instr(PyOps.CALL_FUNCTION, 1),
                     Instr(PyOps.POP_TOP),
                     self.instr_jmp,
 
                     # ingame codes
-            tag2 := Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(gen_set_score(self.on_break(self._brk_level), self._brk_level))),
-                    Instr(PyOps.CALL_FUNCTION, 1),
+            tag1 := Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(gen_set_score(self.on_break(self._brk_level), self._brk_level))),
+                    Instr(PyOps.CALL_FUNCTION, 0),
                     Instr(PyOps.POP_TOP),
                 )),
                 0, end=-1, no_convert=True, as_file=False, dbg_name="break"
             )
         )
-        jmp2.set_jmp_targ(tag2)
+        jmp1.set_jmp_targ(tag1)
 
         if self.as_file:
             self._insert_exit_file()
-            jmp1.set_jmp_targ(self.last)
-        else:
-            jmp1.set_jmp_targ(self.next)
 
 
 class CodeContinue(AbstractCodeBlock):
@@ -1392,17 +1397,26 @@ class CodeContinue(AbstractCodeBlock):
             CodeChain(
                 self.pyc,
                 ListReader((
-                    # ingame codes
-                    Instr(PyOps.LOAD_GLOBAL,
-                          self.pyc.add_name(gen_set_score(self.on_break(self._brk_level), self._brk_level))),
+                    # check ingame
+                    Instr(PyOps.LOAD_FAST, self.get_is_ingame_var(self._brk_level)),
+            jmp1 := Instr(PyOps.POP_JUMP_IF_TRUE, ),
+
+                    # exit to out loop
+                    Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(exit_files_until)),
+                    Instr(PyOps.LOAD_FAST, self.get_loop_file(self._brk_level)),
                     Instr(PyOps.CALL_FUNCTION, 1),
                     Instr(PyOps.POP_TOP),
+                    self.instr_jmp,
 
-                    self.instr_jmp
+                    # ingame codes
+            tag1 := Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(gen_set_score(self.on_break(self._brk_level), self._brk_level))),
+                    Instr(PyOps.CALL_FUNCTION, 0),
+                    Instr(PyOps.POP_TOP),
                 )),
                 0, end=-1, no_convert=True, as_file=False, dbg_name="continue"
             )
         )
+        jmp1.set_jmp_targ(tag1)
 
         if self.as_file:
             self._insert_exit_file()

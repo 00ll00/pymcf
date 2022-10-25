@@ -28,14 +28,12 @@ def exit_file():
 
 
 def get_current_file():
-    return MCFContext.current_file
+    return MCFContext.current_file()
 
 
-def gen_exit_files_until(current: MCFFile):
-    def f():
-        while MCFContext.current_file() is not current:
-            MCFContext.exit_file()
-    return f
+def exit_files_until(current: MCFFile):
+    while MCFContext.current_file() is not current:
+        MCFContext.exit_file()
 
 
 def gen_run_file_on_condition(file_getter: Callable[[], MCFFile], on_true: bool, brk_flags: Set[Score],
