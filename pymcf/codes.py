@@ -9,7 +9,7 @@ from pymcf.datas.Score import Score, ScoreEntity
 from pymcf.datas.datas import InGameData
 from pymcf.code_helpers import convert_assign, exit_file, new_file, convert_return, load_return_value, \
     gen_run_last_file_while, gen_run_curr_file_while, gen_set_score, gen_run_last_file, exit_and_call_files_until, \
-    get_current_file, gen_run_outer_file_while
+    get_current_file, gen_run_outer_file_while, gen_run_outer_file
 from pymcf.operations import raw
 from pymcf.pyops import PyOps, JMP, JABS, NORMAL_OPS, JMP_IF, JREL, JMP_ALWAYS
 from pymcf.util import ListReader, EmptyReader
@@ -1157,34 +1157,30 @@ class CodeCompactedWhile(AbstractCodeLoop):
         jmp2.set_jmp_targ(self.blocks_loop)
         self.add_final_sub_and_convert(before_loop)
 
-        # while
+        # loop
         assert not self.blocks_loop.as_file
         self.add_final_sub_and_convert(self.blocks_loop, add_call=False)
 
         # after loop
         after_instrs = ListReader((
+            Instr(PyOps.LOAD_FAST, self.is_ingame_loop_var),
     jmp4 := Instr(PyOps.POP_JUMP_IF_TRUE, ),  # skip origin loop jump if ingame
 
             self.instr_loop,  # origin jump
-    jmp5 := Instr(PyOps.JUMP_FORWARD, ),  # skip ingame codes if not ingame
 
             # ingame codes
-    tag4 := Instr(PyOps.LOAD_CONST, self.pyc.add_const(gen_run_outer_file_while(self.loop_true, self.brk_flags, breaklevel.CONTINUE))),
-            Instr(PyOps.LOAD_FAST, self.ingame_var),
-            Instr(PyOps.CALL_FUNCTION, 1),
+    tag4 := Instr(PyOps.LOAD_CONST, self.pyc.add_const(gen_run_outer_file(self.brk_flags))),
+            Instr(PyOps.CALL_FUNCTION, 0),
             Instr(PyOps.POP_TOP),
             Instr(PyOps.LOAD_CONST, self.pyc.add_const(exit_file)),  # exit file (loop content)
             Instr(PyOps.CALL_FUNCTION, 0),
             Instr(PyOps.POP_TOP),
-
-    tag5 := Instr(PyOps.LOAD_FAST, self.is_ingame_loop_var),
-    jmp6 := Instr(PyOps.POP_JUMP_IF_FALSE, ),
-            Instr(PyOps.LOAD_CONST, self.pyc.add_const(gen_run_last_file(self.brk_flags))),
-            Instr(PyOps.CALL_FUNCTION, 0),
+            Instr(PyOps.LOAD_CONST, self.pyc.add_const(gen_run_last_file_while(self.loop_true, self.brk_flags, breaklevel.CONTINUE))),
+            Instr(PyOps.LOAD_FAST, self.ingame_var),
+            Instr(PyOps.CALL_FUNCTION, 1),
             Instr(PyOps.POP_TOP)
         ))
         jmp4.set_jmp_targ(tag4)
-        jmp5.set_jmp_targ(tag5)
         self.instr_loop.set_jmp_targ(self.block_condition)
 
         after_loop = CodeChain(self.pyc, after_instrs, 0, end=-1, no_convert=True, as_file=False, dbg_name="after loop")
@@ -1193,7 +1189,6 @@ class CodeCompactedWhile(AbstractCodeLoop):
         self._insert_exit_file()
 
         self.instr_while.set_jmp_targ(self.last)
-        jmp6.set_jmp_targ(self.last)
 
         # set loop block attribute
         self.tag_continue = self.block_condition
