@@ -10,6 +10,20 @@ class staticproperty:
         return self.func()
 
 
+class lazy:
+
+    def __init__(self, func):
+        self.func = func
+        self.loaded = False
+        self.value = None
+
+    def __call__(self, *args, **kwargs):
+        if not self.loaded:
+            self.loaded = True
+            self.value = self.func(*args, **kwargs)
+        return self.value
+
+
 T = TypeVar("T")
 
 

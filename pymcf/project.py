@@ -21,7 +21,7 @@ class Project:
         self.mcfs = {}
 
     @staticmethod
-    def init(namespace: str, mc_version: Optional[MCVer] = None, output_dir: Optional[str] = None):
+    def init(namespace: Optional[str] = "minecraft", mc_version: Optional[MCVer] = None, output_dir: Optional[str] = None):
         proj = Project.INSTANCE
         proj.namespace = namespace
         proj.mc_version = mc_version if mc_version is not None else MCVer.JE_1_19_2

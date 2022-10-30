@@ -6,10 +6,10 @@ from typing import List, Optional, Dict, Any, Set
 
 from pymcf import breaklevel
 from pymcf.datas.Score import Score, ScoreEntity
-from pymcf.datas.datas import InGameData
+from pymcf.datas.datas import InGameData, InGameIter
 from pymcf.code_helpers import convert_assign, exit_file, new_file, convert_return, load_return_value, \
     gen_run_last_file_while, gen_run_curr_file_while, gen_set_score, gen_run_last_file, exit_and_call_files_until, \
-    get_current_file, gen_run_outer_file_while, gen_run_outer_file
+    get_current_file, gen_run_outer_file
 from pymcf.operations import raw
 from pymcf.pyops import PyOps, JMP, JABS, NORMAL_OPS, JMP_IF, JREL, JMP_ALWAYS
 from pymcf.util import ListReader, EmptyReader
@@ -58,7 +58,7 @@ class CodeTypeRewriter:
             self.co_posonlyargcount,
             self.co_kwonlyargcount,
             len(self.co_varnames),
-            ct.co_stacksize + 10,  # TODO compute real stack size
+            ct.co_stacksize + 30,  # TODO compute real stack size
             ct.co_flags,
             code,
             tuple(self.co_consts),
@@ -72,7 +72,7 @@ class CodeTypeRewriter:
             tuple(self.co_cellvars)
         )
 
-    def add_name(self, obj: Any, name: str = None) -> int:
+    def add_global(self, obj: Any, name: str = None) -> int:
         if name is None:
             name = "<obj_" + hex(id(obj)) + ">"
         if name not in self.co_names:
@@ -93,6 +93,11 @@ class CodeTypeRewriter:
                 continue
             self.co_varnames.append(name)
         return self.co_varnames.index(name)
+
+    def add_name(self, name: str):
+        if name not in self.co_names:
+            self.co_names.append(name)
+        return self.co_names.index(name)
 
 
 class Instr:
@@ -308,7 +313,7 @@ class AbstractCodeBlock(ABC):
     def _insert_print_instrs(self):
         return (
             Instr(PyOps.DUP_TOP),
-            Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(print, "print")),
+            Instr(PyOps.LOAD_GLOBAL, self.pyc.add_global(print, "print")),
             Instr(PyOps.ROT_TWO),
             Instr(PyOps.CALL_FUNCTION, 1),
             Instr(PyOps.POP_TOP)
@@ -356,12 +361,32 @@ class AbstractCodeBlock(ABC):
                 self.pyc,
                 ListReader((
                     Instr(PyOps.DUP_TOP),
-                    Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(InGameData, "InGameData")),
-                    Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(isinstance, "isinstance")),
+                    Instr(PyOps.LOAD_GLOBAL, self.pyc.add_global(InGameData, "InGameData")),
+                    Instr(PyOps.LOAD_GLOBAL, self.pyc.add_global(isinstance, "isinstance")),
                     Instr(PyOps.ROT_THREE),
                     Instr(PyOps.CALL_FUNCTION, 2)
                 )),
                 0, -1, no_convert=True, as_file=False, dbg_name="check data ingame"
+            )
+        )
+
+    def _insert_ingameiter_check(self):
+        """
+        before:     TOS: origin iter
+
+        after:      TOS: ingame var     TOS1: origin iter
+        """
+        self.add_final_sub_and_convert(
+            CodeChain(
+                self.pyc,
+                ListReader((
+                    Instr(PyOps.DUP_TOP),
+                    Instr(PyOps.LOAD_GLOBAL, self.pyc.add_global(InGameIter, "InGameIter")),
+                    Instr(PyOps.LOAD_GLOBAL, self.pyc.add_global(isinstance, "isinstance")),
+                    Instr(PyOps.ROT_THREE),
+                    Instr(PyOps.CALL_FUNCTION, 2)
+                )),
+                0, -1, no_convert=True, as_file=False, dbg_name="check iter ingame"
             )
         )
 
@@ -462,7 +487,7 @@ class CodeBlockList(AbstractCodeBlock):
                 if next_jmp is not None:
                     # compacted while ...
                     while_pair = sorted(instr.jmp_froms, key=lambda i: i.offset, reverse=True)[0]
-                    if next_jmp.is_jmp_if and next_jmp.jmp_target.offset > while_pair.offset:
+                    if next_jmp.is_jmp_if and next_jmp.jmp_target.offset > while_pair.offset and while_pair.jmp_target.offset < while_pair.offset:
                         reader.back()
                         sub = CodeCompactedWhile(pyc, next_jmp, while_pair, reader, offset, while_pair.offset + 2)
                         self.add_sub(sub)
@@ -487,12 +512,12 @@ class CodeBlockList(AbstractCodeBlock):
                         if len(instr_next.jmp_froms) == 1 and jmp_pair.offset >= instr_next.jmp_from.offset > instr_next.offset:
                             sub = CodeWhile(pyc, instr, instr_next.jmp_from, reader, offset, jmp_pair.offset + 2)
 
-                        # if - else - final
-                        elif jmp_pair.op in JMP_ALWAYS and instr.offset <= jmp_pair.jmp_target.offset < end:
+                        # if - else - final | match - case
+                        elif jmp_pair.op in JMP_ALWAYS and instr.offset <= jmp_pair.jmp_target.offset and (end == -1 or jmp_pair.jmp_target.offset <= end):
                             final = jmp_pair.jmp_target.offset
                             sub = CodeIfElse(pyc, instr, jmp_pair, reader, offset, final)
 
-                        # if - final
+                        # if - final | match - case - return
                         else:
                             sub = CodeIf(pyc, instr, reader, offset, jmp_pair.offset + 2)
                 case op if op in JMP:
@@ -666,7 +691,7 @@ class CodeChain(AbstractCodeBlock):
                         case PyOps.STORE_FAST:
                             self.final_subs.extend((
                                 Instr(PyOps.LOAD_CONST, self.pyc.add_const(self.pyc.co_varnames[curr.arg])),
-                                Instr(PyOps.LOAD_GLOBAL, self.pyc.add_name(locals, "locals")),
+                                Instr(PyOps.LOAD_GLOBAL, self.pyc.add_global(locals, "locals")),
                                 Instr(PyOps.CALL_FUNCTION, 0),
                                 Instr(PyOps.CONTAINS_OP, 0),
                         jmp1 := Instr(PyOps.POP_JUMP_IF_FALSE, +5),
@@ -677,22 +702,23 @@ class CodeChain(AbstractCodeBlock):
                             ))
                             jmp1.set_jmp_targ(curr)
                         case PyOps.STORE_GLOBAL:
-                            self.subs.extend((
+                            self.final_subs.extend((
                                 Instr(PyOps.LOAD_GLOBAL, curr.arg),
                                 Instr(PyOps.LOAD_CONST, self.pyc.add_const(convert_assign)),
                                 Instr(PyOps.ROT_THREE),
                                 Instr(PyOps.CALL_FUNCTION, 2)
                             ))
                         case PyOps.STORE_ATTR:
-                            self.subs.extend((
+                            self.final_subs.extend((
+                                Instr(PyOps.DUP_TOP),
+                                Instr(PyOps.ROT_THREE),
                                 Instr(PyOps.LOAD_ATTR, curr.arg),
                                 Instr(PyOps.LOAD_CONST, self.pyc.add_const(convert_assign)),
                                 Instr(PyOps.ROT_THREE),
-                                Instr(PyOps.CALL_FUNCTION, 2)
+                                Instr(PyOps.CALL_FUNCTION, 2),
+                                Instr(PyOps.ROT_TWO)
                             ))
                         # TODO
-                        # case PyOps.STORE_ATTR:
-                        #     self.instructions.insert(i, Instr(PyOps.LOAD_ATTR, curr.arg))
                         # case PyOps.STORE_NAME:
                         #     self.instructions.insert(i, Instr(PyOps.LOAD_NAME, curr.arg))
                         # case PyOps.STORE_DEREF:
@@ -780,7 +806,7 @@ class CodeChain(AbstractCodeBlock):
 
 class CodeIfElse(AbstractCodeBlock):
     """
-    if - else - final
+    if - else - final | match - case
     """
 
     def __init__(self, pyc: CodeTypeRewriter, instr_if: Instr, instr_else: Instr, reader: ListReader[Instr], offset: int,
@@ -795,11 +821,14 @@ class CodeIfElse(AbstractCodeBlock):
         self.is_ingame_var = pyc.add_var()
         self.origin_var = pyc.add_var()
 
+        self.is_match = reader.seek().op in {PyOps.POP_TOP, PyOps.STORE_FAST}
+        self.matching_var = pyc.add_var()
+
         self.if_true = self.instr_if.op in {PyOps.POP_JUMP_IF_FALSE, PyOps.JUMP_IF_FALSE_OR_POP}
 
         # block if
         offset += 2
-        self.blocks_if = CodeBlockList(pyc, reader, offset, instr_else.offset, dbg_name="blocks if")
+        self.blocks_if = CodeBlockList(pyc, reader, offset, instr_else.offset, dbg_name=f"blocks if ({self.is_match=})")
         offset += self.blocks_if.size
         self.add_sub(self.blocks_if)
 
@@ -807,7 +836,7 @@ class CodeIfElse(AbstractCodeBlock):
         reader.skip()
         offset += 2
         else_end = instr_else.arg * 2 if instr_else.op in JABS else (instr_else.arg + 1) * 2 + instr_else.offset
-        self.blocks_else = CodeBlockList(pyc, reader, offset, else_end, dbg_name="blocks else")
+        self.blocks_else = CodeBlockList(pyc, reader, offset, else_end, dbg_name=f"blocks else ({self.is_match=})")
         self.add_sub(self.blocks_else)
 
         if reader.can_read() and (jmp := reader.now()).op in {PyOps.JUMP_FORWARD, PyOps.JUMP_ABSOLUTE}:
@@ -824,20 +853,23 @@ class CodeIfElse(AbstractCodeBlock):
 
         # before if
         before_instrs = ListReader((
-            Instr(PyOps.DUP_TOP),
-            Instr(PyOps.STORE_FAST, self.is_ingame_var),
+            Instr(PyOps.DUP_TOP),  # TOS: ingamevar  TOS1: ingamevar  TOS2: origin
+            Instr(PyOps.STORE_FAST, self.is_ingame_var),  # TOS: ingamevar  TOS1: origin
     jmp1 := Instr(PyOps.POP_JUMP_IF_TRUE, ),
 
             self.instr_if,
     jmp2 := Instr(PyOps.JUMP_FORWARD, ),
 
-    tag1 := Instr(PyOps.STORE_FAST, self.origin_var),
-    jmp3 := Instr(PyOps.JUMP_FORWARD, ),
-            Instr(PyOps.POP_TOP)
-        ))
+            # ingame codes
+    tag1 := Instr(PyOps.STORE_FAST, self.origin_var)) + ((
+
+            Instr(PyOps.DUP_TOP),
+            Instr(PyOps.STORE_FAST, self.matching_var),
+
+            ) if self.is_match else ())
+        )
         before_if = CodeChain(self.pyc, before_instrs, 0, end=-1, no_convert=True, as_file=False, dbg_name="before if")
         jmp1.set_jmp_targ(tag1)
-        jmp3.set_jmp_targ(self.blocks_if)
         jmp2.set_jmp_targ(self.blocks_if)
         self.add_final_sub_and_convert(before_if)
 
@@ -845,32 +877,28 @@ class CodeIfElse(AbstractCodeBlock):
         assert self.blocks_if.as_file
         self.add_final_sub_and_convert(self.blocks_if, add_call=False)
 
-        # after if
+        # after if and before else
         after_if = CodeChain(
             self.pyc,
             ListReader((
                 Instr(PyOps.LOAD_FAST, self.is_ingame_var),
-        jmp4 := Instr(PyOps.POP_JUMP_IF_FALSE, ),
-                Instr(PyOps.LOAD_CONST, self.pyc.add_const(gen_run_last_file_while(self.if_true, self.brk_flags))),
+        jmp4 := Instr(PyOps.POP_JUMP_IF_TRUE, ),
+
+                self.instr_else,
+
+                # ingame codes
+        tag4 := Instr(PyOps.LOAD_CONST, self.pyc.add_const(gen_run_last_file_while(self.if_true, self.brk_flags))),
                 Instr(PyOps.LOAD_FAST, self.origin_var),
                 Instr(PyOps.CALL_FUNCTION, 1),
-                Instr(PyOps.POP_TOP),
-            )), 0, end=-1, no_convert=True, as_file=False, dbg_name="after if"
-        )
-        self.add_final_sub_and_convert(after_if)
+                Instr(PyOps.POP_TOP)) + ((
 
-        # before else
-        before_else = CodeChain(
-            self.pyc,
-            ListReader((
-                Instr(PyOps.LOAD_FAST, self.is_ingame_var),
-        jmp5 := Instr(PyOps.POP_JUMP_IF_TRUE, ),
-                self.instr_else
-            )), 0, end=-1,  no_convert=True, as_file=False, dbg_name="before else"
+                Instr(PyOps.LOAD_FAST, self.matching_var),
+
+                ) if self.is_match else ())
+            ), 0, end=-1, no_convert=True, as_file=False, dbg_name="after if and before else"
         )
-        jmp4.set_jmp_targ(before_else)
-        jmp5.set_jmp_targ(self.blocks_else)
-        self.add_final_sub_and_convert(before_else)
+        jmp4.set_jmp_targ(tag4)
+        self.add_final_sub_and_convert(after_if)
 
         # else
         assert self.blocks_else.as_file
@@ -900,7 +928,7 @@ class CodeIfElse(AbstractCodeBlock):
 
 class CodeIf(AbstractCodeBlock):
     """
-    if - final
+    if - final | match - case - return
     """
 
     def __init__(self, pyc: CodeTypeRewriter, instr_if: Instr, reader: ListReader[Instr], offset: int, end: int = -1, as_file: bool = True, dbg_name=None):
@@ -912,10 +940,13 @@ class CodeIf(AbstractCodeBlock):
         self.is_ingame_var = pyc.add_var()
         self.origin_var = pyc.add_var()
 
+        self.matching_var = pyc.add_var()
+        self.is_match = reader.seek().op in {PyOps.POP_TOP, PyOps.STORE_FAST}
+
         self.if_true = self.instr_if.op in {PyOps.POP_JUMP_IF_FALSE, PyOps.JUMP_IF_FALSE_OR_POP}
 
         offset += 2
-        self.blocks_if = CodeBlockList(pyc, reader, offset, instr_if.jmp_target.offset, dbg_name="blocks if")
+        self.blocks_if = CodeBlockList(pyc, reader, offset, instr_if.jmp_target.offset, dbg_name=f"blocks if ({self.is_match=})")
         self.add_sub(self.blocks_if)
 
     def _convert_instr(self):
@@ -930,18 +961,20 @@ class CodeIf(AbstractCodeBlock):
         before_instrs = ListReader((
             Instr(PyOps.DUP_TOP),
             Instr(PyOps.STORE_FAST, self.is_ingame_var),
-
     jmp1 := Instr(PyOps.POP_JUMP_IF_TRUE, ),
-            self.instr_if,
 
+            self.instr_if,
     jmp2 := Instr(PyOps.JUMP_FORWARD, ),
-    tag1 := Instr(PyOps.STORE_FAST, self.origin_var),
-    jmp3 := Instr(PyOps.JUMP_FORWARD, ),
-            Instr(PyOps.POP_TOP)
-        ))
+
+    tag1 := Instr(PyOps.STORE_FAST, self.origin_var)) + ((
+
+            Instr(PyOps.DUP_TOP),
+            Instr(PyOps.STORE_FAST, self.matching_var)
+
+            ) if self.is_match else ())
+        )
         before_if = CodeChain(self.pyc, before_instrs, 0, end=-1, no_convert=True, as_file=False, dbg_name="before if")
         jmp1.set_jmp_targ(tag1)
-        jmp3.set_jmp_targ(self.blocks_if)
         jmp2.set_jmp_targ(self.blocks_if)
         self.add_final_sub_and_convert(before_if)
 
@@ -958,8 +991,12 @@ class CodeIf(AbstractCodeBlock):
                 Instr(PyOps.LOAD_CONST, self.pyc.add_const(gen_run_last_file_while(self.if_true, self.brk_flags))),
                 Instr(PyOps.LOAD_FAST, self.origin_var),
                 Instr(PyOps.CALL_FUNCTION, 1),
-                Instr(PyOps.POP_TOP),
-            )), 0, end=-1, no_convert=True, as_file=False, dbg_name="after if"
+                Instr(PyOps.POP_TOP)) + ((
+
+                Instr(PyOps.LOAD_FAST, self.matching_var),
+
+                ) if self.is_match else ())
+            ), 0, end=-1, no_convert=True, as_file=False, dbg_name="after if"
         )
         self.add_final_sub_and_convert(after_if)
 
@@ -1204,13 +1241,85 @@ class CodeFor(AbstractCodeLoop):
     def __init__(self, pyc: CodeTypeRewriter, instr_for: Instr, instr_loop: Instr, reader: ListReader[Instr], offset: int, end: int = -1, as_file: bool = True, dbg_name=None):
         super().__init__(pyc, reader, offset, end, 4, as_file=as_file, dbg_name=dbg_name)
 
+        assert self.as_file
+        assert instr_loop.op in JMP_ALWAYS
+
+        self.make_break_handler(breaklevel.BREAK)
+
         self.instr_for = instr_for
         self.instr_loop = instr_loop
 
-        # TODO
+        self.ingame_itr = pyc.add_var()
+
+        self.blocks_loop = CodeBlockList(pyc, reader, offset, instr_loop.offset, as_file=True, dbg_name="for loop")
+        self.add_sub(self.blocks_loop)
+
+        reader.skip()
 
     def _convert_instr(self):
-        pass
+
+        self.final_subs.clear()
+
+        self._insert_new_file()
+
+        self.add_final_sub_and_convert(
+            CodeChain(
+                self.pyc,
+                ListReader((
+                    Instr(PyOps.LOAD_CONST, self.pyc.add_const(get_current_file)),
+                    Instr(PyOps.CALL_FUNCTION, 0),
+                    Instr(PyOps.STORE_FAST, self.loop_file_var),
+                )),
+                0, end=-1, no_convert=True, as_file=False, dbg_name="set loop file"
+            )
+        )
+
+        self._insert_ingameiter_check()
+
+        # before loop
+        before_instrs = ListReader((
+            Instr(PyOps.DUP_TOP),
+            Instr(PyOps.STORE_FAST, self.is_ingame_loop_var),
+    jmp1 := Instr(PyOps.POP_JUMP_IF_TRUE, ),  # jump to ingame codes if ingame
+
+            self.instr_for,  # origin for iter instr
+    jmp2 := Instr(PyOps.JUMP_FORWARD, ),  # jump to loop
+
+            # ingmae codes
+    tag1 := Instr(PyOps.DUP_TOP),
+            Instr(PyOps.STORE_FAST, self.ingame_itr),  # store ingame iterator
+            Instr(PyOps.LOAD_METHOD, self.pyc.add_name("iter_init")),
+            Instr(PyOps.CALL_METHOD, 0),
+            Instr(PyOps.POP_TOP),
+
+            Instr(PyOps.LOAD_CONST, self.pyc.add_const(new_file)),  # enter iteration file
+            Instr(PyOps.CALL_FUNCTION, 0),
+            Instr(PyOps.POP_TOP),
+
+            Instr(PyOps.LOAD_FAST, self.ingame_itr),
+            Instr(PyOps.LOAD_METHOD, self.pyc.add_name("iter_next")),
+            Instr(PyOps.LOAD_GLOBAL, self.pyc.add_global(self._brk_flag)),
+            Instr(PyOps.CALL_METHOD, 1)
+        ))
+        self.add_final_sub_and_convert(CodeChain(self.pyc, before_instrs, 0, end=-1, no_convert=True, as_file=False, dbg_name="before loop"), add_call=False)
+        jmp1.set_jmp_targ(tag1)
+        jmp2.set_jmp_targ(self.blocks_loop)
+
+        # loop
+        self.brk_flags.add(self._brk_flag)
+        self.add_final_sub_and_convert(self.blocks_loop)
+
+        # after loop
+        after_instrs = ListReader((
+            Instr(PyOps.LOAD_CONST, self.pyc.add_const(new_file)),  # exit iteration file
+            Instr(PyOps.CALL_FUNCTION, 0),
+            Instr(PyOps.POP_TOP),
+
+            Instr(PyOps.LOAD_CONST, self.pyc.add_const(gen_run_last_file(self.brk_flags))),
+            Instr(PyOps.CALL_FUNCTION, 0),
+            Instr(PyOps.POP_TOP),
+        ))
+        self._insert_exit_file()
 
 
 class CodeBreakIf(AbstractCodeBlock):

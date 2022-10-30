@@ -45,7 +45,7 @@ class CallFunctionOp(Operation):
         super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
-        return f"function {Project.namespace}:{self.func_full_name}"  # TODO specify namespace
+        return f"function {Project.namespace}:{self.func_full_name}"
 
 
 class ExecuteOp(Operation):

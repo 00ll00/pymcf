@@ -1,10 +1,11 @@
 from typing import Optional, Any
 
 from pymcf.context import MCFContext
-from pymcf.datas.Entity import ScoreEntity
+from pymcf.datas.entity.Entity import ScoreEntity
 from pymcf.datas.datas import InGameData
 from pymcf.mcversions import MCVer
 from pymcf.operations import Operation
+from pymcf.util import staticproperty, lazy
 
 
 class ScoreSetValueOp(Operation):
@@ -364,8 +365,11 @@ class Scoreboard:
     def __str__(self):
         return self.name
 
-
-SYS_SCORE_OBJ = Scoreboard("system")
+    # noinspection PyMethodParameters
+    @staticproperty
+    @lazy
+    def SYS():
+        return Scoreboard("system")
 
 
 class Score(InGameData):
@@ -378,7 +382,7 @@ class Score(InGameData):
                  ):
         super().__init__()
         self.entity = entity if entity is not None else ScoreEntity.new_dummy()
-        self.objective = objective if objective is not None else SYS_SCORE_OBJ
+        self.objective = objective if objective is not None else Scoreboard.SYS
         self.identifier = self.entity.name + ' ' + self.objective.name
 
         def _init_():
@@ -396,6 +400,15 @@ class Score(InGameData):
                 _init_()
         else:
             _init_()
+
+    def is_same_type(self, other):
+        return True
+
+    def copy_to(self, other):
+        ScoreCopyOp(other, self)
+
+    def copy(self):
+        return Score(self)
 
     def __hash__(self):
         return self.identifier.__hash__()
@@ -416,7 +429,7 @@ class Score(InGameData):
         """
         if value not in Score._consts:
             with MCFContext.INIT_SCORE:
-                Score._consts[value] = Score(value, ScoreEntity("$const_" + str(value)), SYS_SCORE_OBJ)
+                Score._consts[value] = Score(value, ScoreEntity("$const_" + str(value)), Scoreboard.SYS)
         return Score._consts[value]
 
     def set(self, value):
@@ -436,7 +449,7 @@ class Score(InGameData):
             ScoreSetValueOp(self, int(value))
 
     def __lt__(self, other):
-        res = Score()
+        res = Score(0)
         if isinstance(other, Score):
             ScoreLTScoreOp(res, self, other)
         else:
@@ -444,7 +457,7 @@ class Score(InGameData):
         return res
 
     def __le__(self, other):
-        res = Score()
+        res = Score(0)
         if isinstance(other, Score):
             ScoreLEScoreOp(res, self, other)
         else:
@@ -452,7 +465,7 @@ class Score(InGameData):
         return res
 
     def __gt__(self, other):
-        res = Score()
+        res = Score(0)
         if isinstance(other, Score):
             ScoreGTScoreOp(res, self, other)
         else:
@@ -460,7 +473,7 @@ class Score(InGameData):
         return res
 
     def __ge__(self, other):
-        res = Score()
+        res = Score(0)
         if isinstance(other, Score):
             ScoreGEScoreOp(res, self, other)
         else:
@@ -468,7 +481,7 @@ class Score(InGameData):
         return res
 
     def __eq__(self, other):
-        res = Score()
+        res = Score(0)
         if isinstance(other, Score):
             ScoreEQScoreOp(res, self, other)
         else:
