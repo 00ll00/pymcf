@@ -1,7 +1,8 @@
-from typing import Optional, Any
+from abc import ABC
+from collections import defaultdict
+from typing import Optional, Any, Dict
 
 from pymcf.context import MCFContext
-from pymcf.datas.entity.Entity import ScoreEntity
 from pymcf.datas.datas import InGameData
 from pymcf.mcversions import MCVer
 from pymcf.operations import Operation
@@ -348,6 +349,7 @@ class DefScoreBoardOp(Operation):
 
 
 class Scoreboard:
+    _dummy_count = 0
 
     def __init__(self, name: str, scb_type: str = "dummy"):
         self.name = name
@@ -365,11 +367,54 @@ class Scoreboard:
     def __str__(self):
         return self.name
 
+    @staticmethod
+    def new_dummy():
+        Scoreboard._dummy_count += 1
+        return Scoreboard(f"dummy_{Scoreboard._dummy_count}")
+
     # noinspection PyMethodParameters
     @staticproperty
     @lazy
     def SYS():
-        return Scoreboard("system")
+        return Scoreboard("sys")
+
+
+class ScoreContainer(ABC):
+
+    def __init__(self, identifier):
+        self.__scores: Dict[str, Score] = {}
+        self.identifier = identifier
+
+    def _set_score_(self, k: str, v):
+        if k not in self.__scores:
+            self.__scores[k] = Score(entity=self, objective=Scoreboard(k))
+        self.__scores[k].set(v)
+
+    def _get_score_(self, k: str) -> "Score":
+        return self.__scores[k]
+
+    def _has_score_(self, k: str) -> bool:
+        return k in self.__scores
+
+
+class ScoreDummy(ScoreContainer):
+    """
+    work like an entity, but for scoreboard only
+    """
+    __group_count = defaultdict(int)
+
+    def __init__(self, name: str):
+        from pymcf.datas.entity.Entity import Name
+        super(ScoreDummy, self).__init__(Name(name))
+
+    @staticmethod
+    def new_var(group: str = "var"):
+        ScoreDummy.__group_count[group] += 1
+        return ScoreDummy(f'${group}_' + str(ScoreDummy.__group_count[group]))
+
+    @staticmethod
+    def const(value: int):
+        return ScoreDummy(f'$const_{"n" if value < 0 else ""}{abs(value)}')
 
 
 class Score(InGameData):
@@ -377,13 +422,17 @@ class Score(InGameData):
 
     def __init__(self,
                  value: Optional[int | Any] = None,
-                 entity: Optional[ScoreEntity] = None,
+                 entity: Optional[ScoreContainer] = None,
                  objective: Optional[Scoreboard] = None
                  ):
         super().__init__()
-        self.entity = entity if entity is not None else ScoreEntity.new_dummy()
-        self.objective = objective if objective is not None else Scoreboard.SYS
-        self.identifier = self.entity.name + ' ' + self.objective.name
+        if entity is None:
+            self.entity = ScoreDummy.new_var()
+            self.objective = Scoreboard.SYS if objective is None else objective
+        else:
+            self.entity = entity
+            self.objective = Scoreboard.new_dummy() if objective is None else objective
+        self.identifier = str(self.entity.identifier) + ' ' + self.objective.name
 
         def _init_():
             if isinstance(value, int):
@@ -401,13 +450,10 @@ class Score(InGameData):
         else:
             _init_()
 
-    def is_same_type(self, other):
-        return True
-
-    def copy_to(self, other):
+    def _transfer_to_(self, other):
         ScoreCopyOp(other, self)
 
-    def copy(self):
+    def _copy_(self):
         return Score(self)
 
     def __hash__(self):
@@ -418,7 +464,7 @@ class Score(InGameData):
 
     @property
     def json(self):
-        return f"""{{"score": {{"name": "{self.entity.name}", "objective": "{self.objective.name}" }} }}"""  # TODO json text
+        return f"""{{"score": {{"name": "{self.entity.identifier}", "objective": "{self.objective.name}" }} }}"""  # TODO json text
 
     @staticmethod
     def const(value: int):
@@ -429,7 +475,7 @@ class Score(InGameData):
         """
         if value not in Score._consts:
             with MCFContext.INIT_SCORE:
-                Score._consts[value] = Score(value, ScoreEntity("$const_" + str(value)), Scoreboard.SYS)
+                Score._consts[value] = Score(value, ScoreDummy("$const_" + str(value)), Scoreboard.SYS)
         return Score._consts[value]
 
     def set(self, value):

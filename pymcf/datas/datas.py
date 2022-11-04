@@ -2,36 +2,71 @@ from abc import abstractmethod, ABC
 from typing import Iterator, TypeVar, final, Generic
 
 
-class InGameData(ABC):
+class InGameObj(ABC):
     """
-    indicate a data object is an in game data container.
+    base of all in game class.
+
+    only InGameObj, Tuple[InGameObj, ... ] and None can be returned by mcfunction.
     """
 
+    def _compatible_to_(self, other) -> bool:
+        """
+        different type could have compatible structure, e.g. Score and NbtInt
+        """
+        return type(self) is type(other)
+
     @abstractmethod
-    def is_same_type(self, other):
+    def _transfer_to_(self, other):
+        """
+        for mcfunction passing arguments.
+
+        use **mcfunction operations** to copy value of `self` to `other`.
+
+        `other` is compatible `self`.
+        """
         ...
 
     @abstractmethod
-    def copy_to(self, other):
+    def _copy_(self):
         """
-        for mcfunction passing arguments
-        """
-        ...
-
-    @abstractmethod
-    def copy(self):
-        """
-        make a copy of self. copy should have same type of self.
+        make an arg receiver of self. copy should compatible to self.
 
         for mcfunction transfer result.
         """
         ...
 
 
+class InGameData(InGameObj, ABC):
+    """
+    indicate a data object is an in game data container.
+    """
+    ...
+
+
+class InGameEntity(InGameObj, ABC):
+    """
+    indicate a class is an in game entity class.
+    """
+
+    def __init__(self, identifier):
+        self.identifier = identifier
+
+    @abstractmethod
+    def __enter__(self):
+        ...
+
+    @abstractmethod
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        ...
+
+    def _compatible_to_(self, other):
+        return type(other) is InGameEntity
+
+
 T = TypeVar("T", bound=InGameData)
 
 
-class InGameIter(Generic[T], Iterator[T], ABC):
+class InGameIter(Generic[T], Iterator[T], InGameObj, ABC):
     """
     indicate an iterator is an in game iterator.
 
@@ -58,3 +93,6 @@ class InGameIter(Generic[T], Iterator[T], ABC):
         if iter reach end, set brk_flag  breaklevel.BREAK.
         """
         ...
+
+    def _compatible_to_(self, other):
+        return type(self) == type(other)

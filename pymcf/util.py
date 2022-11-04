@@ -56,6 +56,9 @@ class ListReader(Generic[T]):
     def seek(self, offset: int = 0):
         return self.list[self.i + offset] if self.i + offset in range(len(self.list)) else None
 
+    def at(self, index: int):
+        return self.list[index]
+
     def now(self) -> T:
         return self.list[self.i]
 

@@ -5,7 +5,7 @@ from types import CodeType
 from typing import List, Optional, Dict, Any, Set
 
 from pymcf import breaklevel
-from pymcf.datas.Score import Score, ScoreEntity
+from pymcf.datas.Score import Score, ScoreDummy
 from pymcf.datas.datas import InGameData, InGameIter
 from pymcf.code_helpers import convert_assign, exit_file, new_file, convert_return, load_return_value, \
     gen_run_last_file_while, gen_run_curr_file_while, gen_set_score, gen_run_last_file, exit_and_call_files_until, \
@@ -166,6 +166,10 @@ class Instr:
     @property
     def is_jmp_if(self) -> bool:
         return self.op in JMP_IF
+
+    @property
+    def is_jmp_always(self) -> bool:
+        return self.op in JMP_ALWAYS
 
     def __eq__(self, other):
         if isinstance(other, Instr):
@@ -465,7 +469,7 @@ class CodeBlockList(AbstractCodeBlock):
     top level CodeBlock witch contains a list of CodeBlock.
     """
 
-    def __init__(self, pyc: CodeTypeRewriter, reader: ListReader[Instr], offset: int, end: int = -1, as_file: bool = True, dbg_name=None):
+    def __init__(self, pyc: CodeTypeRewriter, reader: ListReader[Instr], offset: int, end: int = -1, ignore_jumpers=(), as_file: bool = True, dbg_name=None):
         super().__init__(pyc, reader, offset, end, as_file=as_file, dbg_name=dbg_name)
 
         while instr := reader.try_read():
@@ -473,7 +477,7 @@ class CodeBlockList(AbstractCodeBlock):
                 reader.back()
                 break
             sub = None
-            if instr.is_jmp_target:
+            if instr.is_jmp_target and not all(j in ignore_jumpers for j in instr.jmp_froms):
                 i = 1
                 while next_jmp := reader.seek(i):
                     if next_jmp.offset >= end >= 0:
@@ -485,18 +489,33 @@ class CodeBlockList(AbstractCodeBlock):
                         break
 
                 if next_jmp is not None:
-                    # compacted while ...
-                    while_pair = sorted(instr.jmp_froms, key=lambda i: i.offset, reverse=True)[0]
-                    if next_jmp.is_jmp_if and next_jmp.jmp_target.offset > while_pair.offset and while_pair.jmp_target.offset < while_pair.offset:
-                        reader.back()
-                        sub = CodeCompactedWhile(pyc, next_jmp, while_pair, reader, offset, while_pair.offset + 2)
-                        self.add_sub(sub)
-                        offset += sub.size
-                        continue
+
+                    while_pair = reader.at(next_jmp.jmp_target.offset//2 - 1)
+                    if next_jmp.is_jmp_if \
+                            and next_jmp.jmp_target.offset > while_pair.offset > while_pair.jmp_target.offset:
+                        if while_pair.is_jmp_always:
+                            # compacted while ...
+                            sub = CodeCompactedWhile(pyc, next_jmp, while_pair, reader, offset, while_pair.offset + 2)
+                            self.add_sub(sub)
+                            offset += sub.size
+                            continue
+                        else:
+                            # normal while with continue jump
+                            reader.back()
+                            jmp_cnt = tuple(j for j in instr.jmp_froms if next_jmp.offset < j.offset < while_pair.offset)
+                            blocks_cond = CodeBlockList(pyc, reader, offset, next_jmp.offset, ignore_jumpers=jmp_cnt+ignore_jumpers, as_file=True, dbg_name="while condition")
+                            self.add_sub(blocks_cond)
+                            offset += blocks_cond.size + 2
+                            reader.skip()
+
+                            sub = CodeWhile(pyc, next_jmp, while_pair, reader, offset, while_pair.offset + 2, blk_condition=blocks_cond)
+                            self.add_sub(sub)
+                            offset += sub.size
+                            continue
 
             match instr.op:
                 case op if op in NORMAL_OPS:
-                    sub = CodeChain(pyc, reader.back(), offset, end)
+                    sub = CodeChain(pyc, reader.back(), offset, end, ignore_jumpers=ignore_jumpers)
                 case op if op in JMP_IF:
                     if 0 <= end < instr.jmp_target.offset:
                         # break if
@@ -523,7 +542,7 @@ class CodeBlockList(AbstractCodeBlock):
                 case op if op in JMP:
                     if offset < instr.jmp_target.offset <= end and end >= 0:
                         reader.back()
-                        break  # consider a single jmp as a jumped else TODO: break and continue
+                        break  # consider a single jmp as a jumped else
                     elif 0 <= end < instr.jmp_target.offset:  # break
                         sub = CodeBreak(pyc, instr, reader, offset, instr.offset + 2)
                     elif instr.jmp_target.offset < offset:  # continue
@@ -623,7 +642,7 @@ class CodeChain(AbstractCodeBlock):
     Basic chain logic code bock.
     """
 
-    def __init__(self, pyc: CodeTypeRewriter, reader: ListReader[Instr], offset: int, end: int = -1, no_convert: bool = False, as_file: bool = True, dbg_name=None):
+    def __init__(self, pyc: CodeTypeRewriter, reader: ListReader[Instr], offset: int, end: int = -1, no_convert: bool = False, as_file: bool = True, ignore_jumpers=(), dbg_name=None):
         super().__init__(pyc, reader, offset, end, as_file=as_file, dbg_name=f"{dbg_name} <as_file: {as_file}>")
         self.subs: List[Instr] = []
         self.final_subs: List[Instr] = []
@@ -637,6 +656,7 @@ class CodeChain(AbstractCodeBlock):
                 instr.op in NORMAL_OPS and not (
                     instr.is_jmp_target and any(jf.offset > instr.offset for jf in instr.jmp_froms)
                     and not (end >= 0 and all(jf.offset >= end for jf in instr.jmp_froms))
+                    and not all(j in ignore_jumpers for j in instr.jmp_froms)
                 )
             ):
                 self.subs.append(instr)
@@ -718,7 +738,7 @@ class CodeChain(AbstractCodeBlock):
                                 Instr(PyOps.CALL_FUNCTION, 2),
                                 Instr(PyOps.ROT_TWO)
                             ))
-                        # TODO
+                        # TODO convert assignment instructions
                         # case PyOps.STORE_NAME:
                         #     self.instructions.insert(i, Instr(PyOps.LOAD_NAME, curr.arg))
                         # case PyOps.STORE_DEREF:
@@ -1012,7 +1032,7 @@ class CodeWhile(AbstractCodeLoop):
     """
 
     def __init__(self, pyc: CodeTypeRewriter, instr_while: Instr, instr_loop: Instr, reader: ListReader[Instr], offset: int,
-                 end: int = -1, as_file: bool = True, dbg_name=None):
+                 end: int = -1, blk_condition=None, as_file: bool = True, dbg_name=None):
         super().__init__(pyc, reader, offset, end, 4, as_file=as_file, dbg_name=dbg_name)
 
         assert self.as_file
@@ -1027,8 +1047,10 @@ class CodeWhile(AbstractCodeLoop):
         self.while_true = self.instr_while.op in {PyOps.POP_JUMP_IF_FALSE, PyOps.JUMP_IF_FALSE_OR_POP}
         self.loop_true = self.instr_loop.op in {PyOps.POP_JUMP_IF_TRUE, PyOps.JUMP_IF_TRUE_OR_POP}
 
+        self.blocks_condition = blk_condition
+
         offset += 2
-        self.blocks_loop = CodeBlockList(pyc, reader, offset, self.instr_loop.offset, as_file=False, dbg_name="loop body")
+        self.blocks_loop = CodeBlockList(pyc, reader, offset, self.instr_loop.offset, ignore_jumpers=(self.instr_loop,), as_file=False, dbg_name="loop body")
         self.add_sub(self.blocks_loop)
         reader.skip()
         offset += self.blocks_loop.size + 2
@@ -1126,7 +1148,7 @@ class CodeWhile(AbstractCodeLoop):
         jmp6.set_jmp_targ(self.last)
 
         # set loop block attribute
-        self.tag_continue = self.blocks_loop
+        self.tag_continue = self.blocks_condition
         self.tag_break = self.last
         self.bind_jumps()
 
@@ -1156,7 +1178,7 @@ class CodeCompactedWhile(AbstractCodeLoop):
 
         offset += self.block_condition.size + 2
         reader.skip()
-        self.blocks_loop = CodeBlockList(pyc, reader, offset, instr_loop.offset, as_file=False, dbg_name="loop body")
+        self.blocks_loop = CodeBlockList(pyc, reader, offset, instr_loop.offset, ignore_jumpers=(self.instr_loop,), as_file=False, dbg_name="loop body")
         self.add_sub(self.blocks_loop)
         reader.skip()
 
@@ -1679,4 +1701,4 @@ def gen_extended_arg(instr: Instr) -> List[Instr]:
 
 
 def new_brk() -> Score:
-    return Score(entity=ScoreEntity.new_dummy("brkflg"))
+    return Score(entity=ScoreDummy.new_var("brkflg"))

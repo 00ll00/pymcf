@@ -7,9 +7,11 @@ from pymcf.util import staticproperty, lazy
 
 
 class MCFContext:
-    _current = None
+    _current: "MCFContext" = None
     _ctx_init_scb = None
     _ctx_init_score = None
+
+    _total_entity_tag_num = 0
 
     def __init__(self, name: str, tags: Optional[Set[str]] = None, is_enter_point: bool = False, single_file: bool = False):
         from pymcf.project import Project
@@ -23,6 +25,8 @@ class MCFContext:
         self.return_value = None
         self.proj: Project = Project.INSTANCE
         self.proj.add_ctx(self)
+
+        self.entity_tags = []
 
         self.last = None
 
@@ -100,7 +104,7 @@ class MCFContext:
         logger.debug(f"    + {MCFContext.current_file().name}: {op}")
 
     @staticmethod
-    def assign_return_value(value: Any):  # TODO
+    def assign_return_value(value: Any):  # TODO check value structure same
         curr: MCFContext = MCFContext._current
         if curr.return_value is None:
             curr.return_value = value
@@ -112,6 +116,13 @@ class MCFContext:
     def get_return_value():
         curr: MCFContext = MCFContext._current
         return curr.return_value
+
+    @staticmethod
+    def new_entity_tag() -> str:
+        MCFContext._total_entity_tag_num += 1
+        tag = f"tag_{MCFContext._total_entity_tag_num}"
+        MCFContext._current.entity_tags.append(tag)
+        return tag
 
     def post_process(self):  # TODO build function call graph, check data overwriting, and optimize
         # logger.info(f"== post processing context: {self.name}")

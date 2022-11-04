@@ -1,8 +1,11 @@
+from abc import ABC
+
+from pymcf.datas.datas import InGameEntity
 from pymcf.project import Project
 from pymcf.mcversions import MCVer
 
 
-class Operation:
+class Operation(ABC):
     """
     base class of mcfunction operations.
 
@@ -14,6 +17,9 @@ class Operation:
         if not offline:
             from pymcf.context import MCFContext
             MCFContext.append_op(self)
+
+    def get_length(self, mcver: MCVer) -> int:
+        return 1
 
     def gen_code(self, mcver: MCVer) -> str:
         raise NotImplementedError()
@@ -46,6 +52,17 @@ class CallFunctionOp(Operation):
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"function {Project.namespace}:{self.func_full_name}"
+
+
+class CallMethodOp(Operation):
+
+    def __init__(self, self_var: InGameEntity, func_full_name: str, offline: bool = False):
+        self.self_var = self_var
+        self.func_full_name = func_full_name
+        super().__init__(offline)
+
+    def gen_code(self, mcver: MCVer) -> str:
+        return f"execute as {self.self_var.identifier} at @s rotated as @s run function {Project.namespace}:{self.func_full_name}"
 
 
 class ExecuteOp(Operation):
