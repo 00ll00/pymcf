@@ -27,9 +27,9 @@ class InGameObj(ABC):
         ...
 
     @abstractmethod
-    def _copy_(self):
+    def _new_from_(self) -> "InGameObj":
         """
-        make an arg receiver of self. copy should compatible to self.
+        make an arg receiver of reference. copy should be compatible to reference.
 
         for mcfunction transfer result.
         """
@@ -49,15 +49,18 @@ class InGameEntity(InGameObj, ABC):
     """
 
     def __init__(self, identifier):
-        self.identifier = identifier
+        self._identifier = identifier
 
     @abstractmethod
     def __enter__(self):
-        ...
+        self._identifier.__enter__()
 
     @abstractmethod
     def __exit__(self, exc_type, exc_val, exc_tb):
-        ...
+        self._identifier.__exit__(exc_type, exc_val, exc_tb)
+
+    def __str__(self):
+        return str(self._identifier)
 
     def _compatible_to_(self, other):
         return type(other) is InGameEntity

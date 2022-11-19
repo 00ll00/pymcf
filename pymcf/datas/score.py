@@ -4,6 +4,7 @@ from typing import Optional, Any, Dict
 
 from pymcf.context import MCFContext
 from pymcf.datas.datas import InGameData
+from pymcf.jsontext import IJsonText, JsonText, JsonTextComponent
 from pymcf.mcversions import MCVer
 from pymcf.operations import Operation
 from pymcf.util import staticproperty, lazy
@@ -382,19 +383,34 @@ class Scoreboard:
 class ScoreContainer(ABC):
 
     def __init__(self, identifier):
-        self.__scores: Dict[str, Score] = {}
-        self.identifier = identifier
+        self._identifier = identifier
+
+    class _Container:
+
+        def __init__(self, sc: "ScoreContainer"):
+            self._sc = sc
+
+        def __getattr__(self, item) -> "Score":
+            if item.startswith('_'):
+                return self.__dict__[item]
+            else:
+                return self._sc._get_score_(item)
+
+        def __setattr__(self, key: str, value):
+            if key.startswith('_'):
+                self.__dict__[key] = value
+            else:
+                self._sc._set_score_(key, value)
+
+    @property
+    def scores(self):
+        return ScoreContainer._Container(self)
 
     def _set_score_(self, k: str, v):
-        if k not in self.__scores:
-            self.__scores[k] = Score(entity=self, objective=Scoreboard(k))
-        self.__scores[k].set(v)
+        Score(entity=self, objective=Scoreboard(k)).set(v)
 
     def _get_score_(self, k: str) -> "Score":
-        return self.__scores[k]
-
-    def _has_score_(self, k: str) -> bool:
-        return k in self.__scores
+        return Score(entity=self, objective=Scoreboard(k))
 
 
 class ScoreDummy(ScoreContainer):
@@ -404,7 +420,7 @@ class ScoreDummy(ScoreContainer):
     __group_count = defaultdict(int)
 
     def __init__(self, name: str):
-        from pymcf.datas.entity.Entity import Name
+        from pymcf.datas.entity.entity import Name
         super(ScoreDummy, self).__init__(Name(name))
 
     @staticmethod
@@ -417,7 +433,7 @@ class ScoreDummy(ScoreContainer):
         return ScoreDummy(f'$const_{"n" if value < 0 else ""}{abs(value)}')
 
 
-class Score(InGameData):
+class Score(InGameData, IJsonText):
     _consts = {}
 
     def __init__(self,
@@ -432,7 +448,7 @@ class Score(InGameData):
         else:
             self.entity = entity
             self.objective = Scoreboard.new_dummy() if objective is None else objective
-        self.identifier = str(self.entity.identifier) + ' ' + self.objective.name
+        self.identifier = str(self.entity._identifier) + ' ' + self.objective.name
 
         def _init_():
             if isinstance(value, int):
@@ -445,7 +461,7 @@ class Score(InGameData):
                 ScoreSetValueOp(self, int(value))
 
         if not MCFContext.in_context:
-            with MCFContext.INIT_SCORE:
+            with MCFContext.INIT_VALUE:
                 _init_()
         else:
             _init_()
@@ -453,7 +469,7 @@ class Score(InGameData):
     def _transfer_to_(self, other):
         ScoreCopyOp(other, self)
 
-    def _copy_(self):
+    def _new_from_(self):
         return Score(self)
 
     def __hash__(self):
@@ -463,8 +479,8 @@ class Score(InGameData):
         return self.identifier
 
     @property
-    def json(self):
-        return f"""{{"score": {{"name": "{self.entity.identifier}", "objective": "{self.objective.name}" }} }}"""  # TODO json text
+    def json(self) -> JsonText:
+        return JsonTextComponent({"score": {"name": str(self.entity._identifier), "objective": self.objective.name}})
 
     @staticmethod
     def const(value: int):
@@ -474,7 +490,7 @@ class Score(InGameData):
         :return: a const score
         """
         if value not in Score._consts:
-            with MCFContext.INIT_SCORE:
+            with MCFContext.INIT_VALUE:
                 Score._consts[value] = Score(value, ScoreDummy("$const_" + str(value)), Scoreboard.SYS)
         return Score._consts[value]
 
@@ -623,3 +639,37 @@ class Score(InGameData):
             other = Score.const(int(other))
         ScoreModScoreOp(self, other)
         return self
+
+
+class Fixed(InGameData):
+    """
+    fixed point number TODO
+    """
+
+    def __init__(self,
+                 value: Optional[float | Any] = None,
+                 entity: Optional[ScoreContainer] = None,
+                 objective: Optional[Scoreboard] = None,
+                 score: Optional[Score] = None,
+                 scale: float = 1e3,
+                 ):
+        assert scale != 0
+        self.scale = scale
+        if score is None:
+            score = Score(int(value * scale), entity, objective)
+        else:
+            if scale != 1:
+                score *= int(scale)
+        self.score = score
+
+    def _transfer_to_(self, other: "Fixed"):
+        pass
+
+    def _new_from_(self) -> "Fixed":
+        return Fixed(scale=self.scale)
+
+    def __str__(self):
+        return str(self.score)
+
+    def json(self):
+        return self.score.json

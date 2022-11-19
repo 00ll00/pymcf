@@ -120,7 +120,7 @@ class MCFContext:
     @staticmethod
     def new_entity_tag() -> str:
         MCFContext._total_entity_tag_num += 1
-        tag = f"tag_{MCFContext._total_entity_tag_num}"
+        tag = f"{Project.namespace}.tag_{MCFContext._total_entity_tag_num}"
         MCFContext._current.entity_tags.append(tag)
         return tag
 
@@ -137,8 +137,8 @@ class MCFContext:
     # noinspection PyMethodParameters
     @staticproperty
     @lazy
-    def INIT_SCORE():
-        return MCFContext("sys.init_score", tags={"load"}, is_enter_point=True, single_file=True)
+    def INIT_VALUE():
+        return MCFContext("sys.init_value", tags={"load"}, is_enter_point=True, single_file=True)
 
 
 class MCFFile:

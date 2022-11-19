@@ -1,7 +1,8 @@
 from typing import Any, Callable, Set
 
 from pymcf import breaklevel
-from pymcf.datas.Score import IfScoreGEValueRunOp, IfScoreLTValueRunOp, ScoreSetValueOp
+from pymcf.datas.nbt import Nbt
+from pymcf.datas.score import IfScoreGEValueRunOp, IfScoreLTValueRunOp, ScoreSetValueOp
 from pymcf.datas.datas import InGameData
 from pymcf.operations import CallFunctionOp, ExecuteOp
 from pymcf.context import MCFContext, MCFFile
@@ -15,6 +16,8 @@ def convert_assign(value: Any, var: Any):
     if isinstance(var, Score):
         var.set(value)
         return var
+    elif isinstance(var, Nbt):
+        var._set_value(value)
     else:
         return value
 

@@ -1,8 +1,8 @@
 import sys
-from types import FunctionType
+from types import FunctionType, MethodType
 from typing import Any, Set, List
 
-from datas.entity.Entity import _Self
+from pymcf.datas.entity.entity import _Self
 from pymcf import logger
 from pymcf.datas.datas import InGameData, InGameObj
 from pymcf.operations import CallFunctionOp, CallMethodOp
@@ -123,6 +123,7 @@ class mcfunction:
                 if not self.ep:
                     if self.is_method:
                         CallMethodOp(args[0], ctx_name)
+                        args[0]._unwrap_()
                     else:
                         CallFunctionOp(ctx_name)
                     return_value = par.make_res_copy()
@@ -200,10 +201,10 @@ class MCFParamAndRes:
 
     def make_arg_copy(self, is_method):
         if is_method:
-            ca = tuple((_Self(self.args[0]), *(a._copy_() if isinstance(a, InGameObj) else a for a in self.args[1:])))
+            ca = tuple((_Self(self.args[0]), *(a._new_from_() if isinstance(a, InGameObj) else a for a in self.args[1:])))
         else:
-            ca = tuple(a._copy_() if isinstance(a, InGameObj) else a for a in self.args)
-        ckwa = dict((k, v._copy_() if isinstance(v, InGameObj) else v) for k, v in self.kwargs.items())
+            ca = tuple(a._new_from_() if isinstance(a, InGameObj) else a for a in self.args)
+        ckwa = dict((k, v._new_from_() if isinstance(v, InGameObj) else v) for k, v in self.kwargs.items())
         self.args = ca
         self.kwargs = ckwa
         return ca, ckwa
@@ -212,9 +213,9 @@ class MCFParamAndRes:
         if self.return_value is None:
             return None
         elif isinstance(self.return_value, tuple):
-            return tuple(r._copy_() for r in self.return_value)
+            return tuple(r._new_from_() for r in self.return_value)
         else:
-            return self.return_value._copy_()
+            return self.return_value._new_from_()
 
     def make_copy_to_args(self, args, kwargs):
         for i in range(len(self.args)):

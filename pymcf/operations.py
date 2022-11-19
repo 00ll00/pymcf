@@ -1,6 +1,5 @@
 from abc import ABC
 
-from pymcf.datas.datas import InGameEntity
 from pymcf.project import Project
 from pymcf.mcversions import MCVer
 
@@ -56,13 +55,13 @@ class CallFunctionOp(Operation):
 
 class CallMethodOp(Operation):
 
-    def __init__(self, self_var: InGameEntity, func_full_name: str, offline: bool = False):
+    def __init__(self, self_var, func_full_name: str, offline: bool = False):
         self.self_var = self_var
         self.func_full_name = func_full_name
         super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
-        return f"execute as {self.self_var.identifier} at @s rotated as @s run function {Project.namespace}:{self.func_full_name}"
+        return f"execute as {self.self_var._origin_identifier} at @s rotated as @s run function {Project.namespace}:{self.func_full_name}"
 
 
 class ExecuteOp(Operation):

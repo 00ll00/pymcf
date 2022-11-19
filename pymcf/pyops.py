@@ -134,7 +134,7 @@ class PyOps(Enum):
 
 ALL = set(PyOps)
 
-JREL = set(op for op in PyOps if op.value in dis.hasjrel) - {PyOps.FOR_ITER}
+JREL = set(op for op in PyOps if op.value in dis.hasjrel) - {PyOps.FOR_ITER, PyOps.SETUP_WITH}
 JABS = set(op for op in PyOps if op.value in dis.hasjabs)
 JMP = JREL | JABS
 

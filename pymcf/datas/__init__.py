@@ -1,1 +1,1 @@
-from pymcf.datas.Score import Score
+from pymcf.datas.score import Score

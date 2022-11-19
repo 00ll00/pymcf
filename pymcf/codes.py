@@ -2,10 +2,10 @@ import dis
 from abc import ABC, abstractmethod
 from dis import Instruction
 from types import CodeType
-from typing import List, Optional, Dict, Any, Set
+from typing import List, Optional, Dict, Any, Set, Iterable
 
 from pymcf import breaklevel
-from pymcf.datas.Score import Score, ScoreDummy
+from pymcf.datas.score import Score, ScoreDummy, Scoreboard
 from pymcf.datas.datas import InGameData, InGameIter
 from pymcf.code_helpers import convert_assign, exit_file, new_file, convert_return, load_return_value, \
     gen_run_last_file_while, gen_run_curr_file_while, gen_set_score, gen_run_last_file, exit_and_call_files_until, \
@@ -32,7 +32,7 @@ class CodeTypeRewriter:
 
         self.globals: Dict[str: Any] = {}
 
-        cbl = CodeBlockList.new(self, ListReader(Instr.wrap(instr) for instr in dis.Bytecode(ct)))
+        cbl = CodeBlockList.new(self, ListReader(Instr.wraps(dis.Bytecode(ct))))
         instrs = cbl.get_instrs()
 
         code = bytearray()
@@ -42,7 +42,9 @@ class CodeTypeRewriter:
         for instr in instrs:
             code.append(instr.opcode)
             code.append(instr.arg)
-            if instr.line_code is not None:
+            if instr.line_code is not None and instr.line_code != last_line:
+                if not -128 <= instr.offset - last_off < 128:
+                    continue  # skip out range
                 lnotab.append(instr.offset - last_off)
                 if instr.line_code > last_line:
                     lnotab.append(instr.line_code - last_line)
@@ -116,13 +118,21 @@ class Instr:
         return id(self)
 
     @staticmethod
-    def wrap(instr: Instruction):
-        return Instr(
-            PyOps(instr.opcode),
-            instr.arg if instr.arg is not None else 0,
-            instr.starts_line,
-            instr.offset
-        )
+    def wraps(instrs: Iterable[Instruction]):
+        last_line = 0
+        res = []
+        for instr in instrs:
+            if instr.starts_line is not None:
+                last_line = instr.starts_line
+            res.append(
+                Instr(
+                    PyOps(instr.opcode),
+                    instr.arg if instr.arg is not None else 0,
+                    last_line,
+                    instr.offset
+                )
+            )
+        return res
 
     def set_jmp_targ(self, target):
         if self._jmp_target is not None:
@@ -491,7 +501,7 @@ class CodeBlockList(AbstractCodeBlock):
                 if next_jmp is not None:
 
                     while_pair = reader.at(next_jmp.jmp_target.offset//2 - 1)
-                    if next_jmp.is_jmp_if \
+                    if next_jmp.is_jmp_if and while_pair.is_jmp \
                             and next_jmp.jmp_target.offset > while_pair.offset > while_pair.jmp_target.offset:
                         if while_pair.is_jmp_always:
                             # compacted while ...
@@ -704,9 +714,9 @@ class CodeChain(AbstractCodeBlock):
                         Instr(PyOps.CALL_FUNCTION, 1)
                     ))
 
-                # STORE_FAST | STORE_ATTR | STORE_NAME | STORE_GLOBAL | STORE_DEREF
+                # STORE_FAST | STORE_ATTR | STORE_SUBSCR | STORE_NAME | STORE_GLOBAL | STORE_DEREF
                 #  direct Score assignment (e.g. a = 1)
-                elif curr.op in {PyOps.STORE_FAST, PyOps.STORE_ATTR, PyOps.STORE_NAME, PyOps.STORE_GLOBAL, PyOps.STORE_DEREF}:
+                elif curr.op in {PyOps.STORE_FAST, PyOps.STORE_ATTR, PyOps.STORE_SUBSCR, PyOps.STORE_NAME, PyOps.STORE_GLOBAL, PyOps.STORE_DEREF}:
                     match curr.op:
                         case PyOps.STORE_FAST:
                             self.final_subs.extend((
@@ -737,6 +747,17 @@ class CodeChain(AbstractCodeBlock):
                                 Instr(PyOps.ROT_THREE),
                                 Instr(PyOps.CALL_FUNCTION, 2),
                                 Instr(PyOps.ROT_TWO)
+                            ))
+                        case PyOps.STORE_SUBSCR:
+                            self.final_subs.extend((
+                                Instr(PyOps.DUP_TOP_TWO),
+                                Instr(PyOps.ROT_N, 5),
+                                Instr(PyOps.ROT_N, 5),
+                                Instr(PyOps.BINARY_SUBSCR, curr.arg),
+                                Instr(PyOps.LOAD_CONST, self.pyc.add_const(convert_assign)),
+                                Instr(PyOps.ROT_THREE),
+                                Instr(PyOps.CALL_FUNCTION, 2),
+                                Instr(PyOps.ROT_THREE)
                             ))
                         # TODO convert assignment instructions
                         # case PyOps.STORE_NAME:
@@ -791,10 +812,10 @@ class CodeChain(AbstractCodeBlock):
                 if len(exts) != ext_num:
                     res = True
                     if len(exts) == 0:
-                        for jf in self.final_subs[i - ext_num].jmp_froms:
+                        for jf in self.final_subs[i - ext_num].jmp_froms.copy():
                             jf.set_jmp_targ(instr)
                     else:
-                        for jf in self.final_subs[i - ext_num].jmp_froms:
+                        for jf in self.final_subs[i - ext_num].jmp_froms.copy():
                             jf.set_jmp_targ(exts[0])
                     for _ in range(ext_num):
                         self.final_subs.pop(i - ext_num)
@@ -1701,4 +1722,4 @@ def gen_extended_arg(instr: Instr) -> List[Instr]:
 
 
 def new_brk() -> Score:
-    return Score(entity=ScoreDummy.new_var("brkflg"))
+    return Score(entity=ScoreDummy.new_var("brkflg"), objective=Scoreboard.SYS)
