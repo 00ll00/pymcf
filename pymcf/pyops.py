@@ -147,7 +147,17 @@ JMP_IF = {
 
 JMP_ALWAYS = JMP - JMP_IF
 
-NORMAL_OPS = ALL - JMP - {PyOps.FOR_ITER, PyOps.RETURN_VALUE, PyOps.RAISE_VARARGS}
+NORMAL_OPS = ALL - JMP - {PyOps.FOR_ITER, PyOps.RETURN_VALUE, PyOps.RAISE_VARARGS, PyOps.SETUP_WITH,
+                          PyOps.WITH_EXCEPT_START}
+
+UNSUPPORTED = {
+    # async
+    PyOps.SETUP_ASYNC_WITH, PyOps.BEFORE_ASYNC_WITH, PyOps.END_ASYNC_FOR,
+    # yield
+    PyOps.YIELD_FROM, PyOps.YIELD_VALUE, PyOps.GET_YIELD_FROM_ITER,
+    # try
+    PyOps.SETUP_FINALLY
+}
 
 if __name__ == '__main__':
     for op in dis.opmap:

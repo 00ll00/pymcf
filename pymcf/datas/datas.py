@@ -85,11 +85,11 @@ class InGameIter(Generic[T], Iterator[T], InGameObj, ABC):
         pass
 
     @abstractmethod
-    def iter_init(self):
+    def _iter_init(self):
         ...
 
     @abstractmethod
-    def iter_next(self, brk_flag) -> InGameData:
+    def _iter_next(self, brk_flag) -> InGameData:
         """
         return iterating var.
 

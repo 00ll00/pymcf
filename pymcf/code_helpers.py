@@ -18,6 +18,7 @@ def convert_assign(value: Any, var: Any):
         return var
     elif isinstance(var, Nbt):
         var._set_value(value)
+        return var
     else:
         return value
 

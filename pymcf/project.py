@@ -50,7 +50,7 @@ class Project:
         inst.generated = True
         for mcf in inst.mcfs.values():
             if mcf.ep:
-                mcf.generate()
+                mcf.gen_ep()
         for ctx in inst.ctxs.values():
             ctx.gen_files()
 

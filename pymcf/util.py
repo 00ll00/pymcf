@@ -24,6 +24,15 @@ class lazy:
         return self.value
 
 
+_ParamEmpty = object()
+"""
+object witch use as a default parameter to replace `None` when `None` is working as an useful signal.
+
+def fun(x=_ParamEmpty):
+    self.x = x if x is not _ParamEmpty else ...
+"""
+
+
 T = TypeVar("T")
 
 

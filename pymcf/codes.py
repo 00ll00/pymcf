@@ -11,7 +11,7 @@ from pymcf.code_helpers import convert_assign, exit_file, new_file, convert_retu
     gen_run_last_file_while, gen_run_curr_file_while, gen_set_score, gen_run_last_file, exit_and_call_files_until, \
     get_current_file, gen_run_outer_file
 from pymcf.operations import raw
-from pymcf.pyops import PyOps, JMP, JABS, NORMAL_OPS, JMP_IF, JREL, JMP_ALWAYS
+from pymcf.pyops import PyOps, JMP, JABS, NORMAL_OPS, JMP_IF, JREL, JMP_ALWAYS, UNSUPPORTED
 from pymcf.util import ListReader, EmptyReader
 
 
@@ -122,6 +122,8 @@ class Instr:
         last_line = 0
         res = []
         for instr in instrs:
+            if PyOps(instr.opcode) in UNSUPPORTED:
+                raise SyntaxError(f"unsupported operation: {instr.opname}.")
             if instr.starts_line is not None:
                 last_line = instr.starts_line
             res.append(
@@ -541,6 +543,7 @@ class CodeBlockList(AbstractCodeBlock):
                         if len(instr_next.jmp_froms) == 1 and jmp_pair.offset >= instr_next.jmp_from.offset > instr_next.offset:
                             sub = CodeWhile(pyc, instr, instr_next.jmp_from, reader, offset, jmp_pair.offset + 2)
 
+                        # TODO support a < b < c
                         # if - else - final | match - case
                         elif jmp_pair.op in JMP_ALWAYS and instr.offset <= jmp_pair.jmp_target.offset and (end == -1 or jmp_pair.jmp_target.offset <= end):
                             final = jmp_pair.jmp_target.offset
@@ -563,6 +566,17 @@ class CodeBlockList(AbstractCodeBlock):
                 case PyOps.FOR_ITER:
                     for_pair = sorted(instr.jmp_froms, key=lambda i: i.offset, reverse=True)[0]
                     sub = CodeFor(pyc, instr, for_pair, reader, offset, for_pair.offset)
+                case PyOps.SETUP_WITH:
+                    with_except = instr.jmp_target
+                    i = with_except.offset // 2 - 1
+                    pop_block = None
+                    while i > instr.offset // 2:
+                        if reader[i].op is PyOps.POP_BLOCK:
+                            pop_block = reader[i]
+                            break
+                        i -= 1
+                    assert pop_block is not None
+                    sub = CodeWith(pyc, instr, pop_block, with_except, reader, offset, with_except.offset + 14)
                 case PyOps.RETURN_VALUE:
                     sub = CodeReturn(pyc, instr, reader, offset, end)
                 case op if op in {PyOps.RAISE_VARARGS, PyOps.RERAISE}:
@@ -597,7 +611,7 @@ class CodeBlockList(AbstractCodeBlock):
         while instr := reader.try_read():
             if instr.is_jabs:
                 instr.set_jmp_targ(reader[instr.arg])
-            elif instr.is_jrel or instr.op is PyOps.FOR_ITER:
+            elif instr.is_jrel or instr.op in {PyOps.FOR_ITER, PyOps.SETUP_WITH}:
                 instr.set_jmp_targ(reader[instr.offset // 2 + instr.arg + 1])
 
         # remove extended arg
@@ -1362,7 +1376,58 @@ class CodeFor(AbstractCodeLoop):
             Instr(PyOps.CALL_FUNCTION, 0),
             Instr(PyOps.POP_TOP),
         ))
+        self.add_final_sub_and_convert(
+            CodeChain(self.pyc, after_instrs, 0, end=-1, no_convert=True, as_file=False, dbg_name="after loop"),
+            add_call=False)
+
         self._insert_exit_file()
+
+
+class CodeWith(AbstractCodeBlock):
+    """
+    with ... [as ...]
+
+    this will not make new file, for keeping code structure only.
+    mcfunction file context should be managed in `__enter__` and `__exit__`.
+    """
+
+    def __init__(self, pyc: CodeTypeRewriter, instr_with: Instr, instr_popblock: Instr, instr_except: Instr, reader: ListReader[Instr], offset: int, end: int = -1, as_file: bool = False, dbg_name=None):
+        super().__init__(pyc, reader, offset, end, 2, as_file, dbg_name)
+
+        assert not self.as_file
+        assert instr_except.op is PyOps.WITH_EXCEPT_START
+        assert instr_popblock.op is PyOps.POP_BLOCK
+
+        self.instr_with = instr_with
+        self.instr_except = instr_except
+
+        self.block_setup = CodeChain(pyc, ListReader((instr_with,)), 0, -1, no_convert=True, as_file=False, dbg_name="setup with")
+        self.add_sub(self.block_setup)
+
+        self.blocks_with = CodeBlockList(pyc, reader, offset, instr_popblock.offset, as_file=False, dbg_name="with body")
+        self.add_sub(self.blocks_with)
+        offset += self.blocks_with.size
+
+        self.block_exit = CodeChain(pyc, reader, offset, instr_popblock.offset + 12, no_convert=True, as_file=False, dbg_name="with exit")
+        self.add_sub(self.block_exit)
+        offset += self.block_exit.size
+
+        if reader[instr_except.offset // 2 - 1].is_jmp:
+            self.block_after_exit = CodeChain(pyc, reader, offset, instr_except.offset - 2, as_file=False, dbg_name="after exit")
+            self.block_after_exit.subs.append(reader.read())
+        else:
+            self.block_after_exit = CodeChain(pyc, reader, offset, instr_except.offset, no_convert=False, as_file=False, dbg_name="after exit")
+        self.add_sub(self.block_after_exit)
+        offset += self.block_after_exit.size
+
+        reader.skip()
+        self.block_except = CodeChain(pyc, reader, offset, end, no_convert=True, as_file=False, dbg_name="with except")
+        self.block_except.subs.insert(0, instr_except)
+        self.subs.append(self.block_except)
+
+    def _convert_instr(self):
+        for sub in self.subs:
+            self.add_final_sub_and_convert(sub)
 
 
 class CodeBreakIf(AbstractCodeBlock):

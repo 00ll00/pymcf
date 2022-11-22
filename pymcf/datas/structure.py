@@ -6,7 +6,7 @@ from pymcf.datas.nbt import NbtCompound, NbtShort, NbtString, NbtByte, NbtFloat,
 _T_Nbt = TypeVar("_T_Nbt", bound=NbtCompound)
 
 
-class _T_NbtList(NbtList, Generic[_T_Nbt]):
+class T_NbtList(NbtList, Generic[_T_Nbt]):
 
     def __getitem__(self, item) -> _T_Nbt:
         ...
@@ -15,7 +15,7 @@ class _T_NbtList(NbtList, Generic[_T_Nbt]):
         ...
 
 
-class _T_Entity(NbtCompound):
+class T_Entity(NbtCompound):
     Air: NbtShort
     CustomName: NbtString
     CustomNameVisible: NbtByte
@@ -25,34 +25,34 @@ class _T_Entity(NbtCompound):
     HasVisualFire: NbtByte
     id: NbtString
     Invulnerable: NbtByte
-    Motion: _T_NbtList[NbtDouble]
+    Motion: T_NbtList[NbtDouble]
     NoGravity: NbtByte
     OnGround: NbtByte
-    Passengers: _T_NbtList["_T_Entity"]
+    Passengers: T_NbtList["T_Entity"]
     PortalCooldown: NbtInt
-    Pos: _T_NbtList[NbtDouble]
-    Rotation: _T_NbtList[NbtFloat]
+    Pos: T_NbtList[NbtDouble]
+    Rotation: T_NbtList[NbtFloat]
     Silent: NbtByte
-    Tags: _T_NbtList[NbtString]
+    Tags: T_NbtList[NbtString]
     UUID: NbtIntArray
 
 
-class _T_Effect(NbtCompound):
+class T_Effect(NbtCompound):
     Ambient: NbtByte
     Amplifier: NbtByte
     Duration: NbtInt
-    HiddenEffect: "_T_Effect"
+    HiddenEffect: "T_Effect"
     Id: NbtByte
     ShowIcon: NbtByte
     ShowParticles: NbtByte
 
 
-class _T_Enchant(NbtCompound):
+class T_Enchant(NbtCompound):
     id: NbtString
     lvl: NbtShort
 
 
-class _T_AttributeModifier(NbtCompound):
+class T_AttributeModifier(NbtCompound):
     AttributeName: NbtString
     Name: NbtString
     Slot: NbtString
@@ -61,24 +61,24 @@ class _T_AttributeModifier(NbtCompound):
     UUID: NbtIntArray
 
 
-class _T_ItemDisplay(NbtCompound):
+class T_ItemDisplay(NbtCompound):
     color: NbtInt
     Name: NbtString
-    Lore: _T_NbtList[NbtString]
+    Lore: T_NbtList[NbtString]
 
 
-class _T_SkullTexture(NbtCompound):
+class T_SkullTexture(NbtCompound):
     Signature: NbtString
     Value: NbtString
 
 
-class _T_SkullOwner(NbtCompound):
+class T_SkullOwner(NbtCompound):
     Id: NbtIntArray
     Name: NbtString
-    Properties: _T_NbtList[_T_SkullTexture]
+    Properties: T_NbtList[T_SkullTexture]
 
 
-class _T_FireWorkExplosion(NbtCompound):
+class T_FireWorkExplosion(NbtCompound):
     Flicker: NbtByte
     Trail: NbtByte
     Type: NbtByte
@@ -86,12 +86,12 @@ class _T_FireWorkExplosion(NbtCompound):
     FadeColors: NbtIntArray
 
 
-class _T_Firework(NbtCompound):
+class T_Firework(NbtCompound):
     Flight: NbtByte
-    Explosions: _T_NbtList[_T_FireWorkExplosion]
+    Explosions: T_NbtList[T_FireWorkExplosion]
 
 
-class _T_MapDecoration(NbtCompound):
+class T_MapDecoration(NbtCompound):
     id: NbtString
     type: NbtByte
     x: NbtDouble
@@ -99,47 +99,47 @@ class _T_MapDecoration(NbtCompound):
     rot: NbtDouble
 
 
-class _T_SuspiciousStewEffect(NbtCompound):
+class T_SuspiciousStewEffect(NbtCompound):
     EffectId: NbtByte
     EffectDuration: NbtInt
 
 
-class _T_NbtBlockPos3(NbtCompound):
+class T_NbtBlockPos3(NbtCompound):
     X: NbtInt
     Y: NbtInt
     Z: NbtInt
 
 
-class _T_ItemTags(NbtCompound):
+class T_ItemTags(NbtCompound):
     Damage: NbtInt
     Unbreakable: NbtByte
-    CanDestroy: _T_NbtList[NbtString]
+    CanDestroy: T_NbtList[NbtString]
     CustomModelData: NbtInt
 
     # block tag
-    CanPlaceOn: _T_NbtList[NbtString]
-    BlockEntityTag: _T_Entity
+    CanPlaceOn: T_NbtList[NbtString]
+    BlockEntityTag: T_Entity
     BlockStateTag: NbtCompound
 
     # enchant
-    Enchantments: _T_NbtList[_T_Enchant]
-    StoredEnchantments: _T_NbtList[_T_Enchant]
+    Enchantments: T_NbtList[T_Enchant]
+    StoredEnchantments: T_NbtList[T_Enchant]
     RepairCost: NbtInt
 
     # attribute modifiers
-    AttributeModifiers: _T_NbtList[_T_AttributeModifier]
+    AttributeModifiers: T_NbtList[T_AttributeModifier]
 
     # potion
-    CustomPotionEffects: _T_NbtList[_T_Effect]
+    CustomPotionEffects: T_NbtList[T_Effect]
     Potion: NbtString
     CustomPotionColor: NbtInt
 
     # crossbow
     Charged: NbtByte
-    ChargedProjectiles: _T_NbtList["_T_Item"]
+    ChargedProjectiles: T_NbtList["T_Item"]
 
     # display
-    display: _T_ItemDisplay
+    display: T_ItemDisplay
     HideFlags: NbtInt
 
     # written book
@@ -147,16 +147,16 @@ class _T_ItemTags(NbtCompound):
     generation: NbtInt
     author: NbtString
     title: NbtString
-    pages: _T_NbtList[NbtString]
+    pages: T_NbtList[NbtString]
 
     # player head
-    SkullOwner: NbtString | _T_SkullOwner
+    SkullOwner: NbtString | T_SkullOwner
 
     # firework star
-    Fireworks: _T_NbtList[_T_Firework]
+    Fireworks: T_NbtList[T_Firework]
 
     # spawn egg
-    EntityTag: _T_Entity
+    EntityTag: T_Entity
 
     # fish bucket
     BucketVariantTag: NbtInt
@@ -164,11 +164,11 @@ class _T_ItemTags(NbtCompound):
     # map
     map: NbtInt
     map_scale_direction: NbtInt
-    Decorations: _T_NbtList[_T_MapDecoration]
+    Decorations: T_NbtList[T_MapDecoration]
     display: NbtInt
 
     # suspicious stew
-    Effects: _T_NbtList[_T_SuspiciousStewEffect]
+    Effects: T_NbtList[T_SuspiciousStewEffect]
 
     # debug stick
     DebugProperty: NbtCompound
@@ -176,42 +176,42 @@ class _T_ItemTags(NbtCompound):
     # compass
     LodestoneTracked: NbtByte
     LodestoneDimension: NbtString
-    LodestonePos: _T_NbtBlockPos3
+    LodestonePos: T_NbtBlockPos3
 
     # bundle
-    Items: _T_NbtList["_T_Item"]
+    Items: T_NbtList["T_Item"]
 
 
-class _T_Item(NbtCompound):
+class T_Item(NbtCompound):
     Count: NbtByte
     id: NbtString
-    tag: _T_ItemTags
+    tag: T_ItemTags
 
 
-class _T_CreatureAttributeModifier(NbtCompound):
+class T_CreatureAttributeModifier(NbtCompound):
     Amount: NbtDouble
     Name: NbtString
     Operation: NbtInt
     UUID: NbtIntArray
 
 
-class _T_CreatureAttribute(NbtCompound):
+class T_CreatureAttribute(NbtCompound):
     Base: NbtDouble
-    Modifiers: _T_NbtList[_T_CreatureAttributeModifier]
+    Modifiers: T_NbtList[T_CreatureAttributeModifier]
     Name: NbtString
 
 
-class _T_CreatureBrain(NbtCompound):
+class T_CreatureBrain(NbtCompound):
     memories: NbtCompound
 
 
-class _T_Creature(_T_Entity):
+class T_Creature(T_Entity):
     AbsorptionAmount: NbtFloat
-    ActiveEffects: _T_NbtList[_T_Effect]
-    ArmorDropChances: _T_NbtList[NbtFloat]
-    ArmorItems: _T_NbtList[_T_Item]
-    Attributes: _T_NbtList[_T_CreatureAttribute]
-    Brain: _T_CreatureBrain
+    ActiveEffects: T_NbtList[T_Effect]
+    ArmorDropChances: T_NbtList[NbtFloat]
+    ArmorItems: T_NbtList[T_Item]
+    Attributes: T_NbtList[T_CreatureAttribute]
+    Brain: T_CreatureBrain
     CanPickUpLoot: NbtByte
     DeathLootTable: NbtString
     DeathLootTableSeed: NbtLong
@@ -220,9 +220,9 @@ class _T_Creature(_T_Entity):
     Health: NbtFloat
     HurtByTimestamp: NbtInt
     HurtTime: NbtShort
-    HandDropChances: _T_NbtList[NbtFloat]
-    HandItems: _T_NbtList[_T_Item]
-    Leash: NbtIntArray | _T_NbtBlockPos3
+    HandDropChances: T_NbtList[NbtFloat]
+    HandItems: T_NbtList[T_Item]
+    Leash: NbtIntArray | T_NbtBlockPos3
     LeftHanded: NbtByte
     NoAI: NbtByte
     PersistenceRequired: NbtByte
@@ -233,70 +233,70 @@ class _T_Creature(_T_Entity):
     TicksFrozen: NbtInt
 
 
-class _T_CanBreed(NbtCompound):
+class T_CanBreed(NbtCompound):
     Age: NbtInt
     ForcedAge: NbtInt
     InLove: NbtInt
     LoveCause: NbtIntArray
 
 
-class _T_CanAnger(NbtCompound):
+class T_CanAnger(NbtCompound):
     AngerTime: NbtInt
     AngryAt: NbtIntArray
 
 
-class _T_CanTame(NbtCompound):
+class T_CanTame(NbtCompound):
     Owner: NbtIntArray
     Sitting: NbtByte
 
 
-class _T_Zombie(NbtCompound):
+class T_Zombie(NbtCompound):
     CanBreakDoors: NbtByte
     DrownedConversionTime: NbtInt
     InWaterTime: NbtInt
     IsBaby: NbtByte
 
 
-class _T_Projectile(NbtCompound):
+class T_Projectile(NbtCompound):
     HasBeenShot: NbtByte
     LeftOwner: NbtByte
     Owner: NbtIntArray
 
 
-class _T_FireBall(NbtCompound):
-    power: _T_NbtList[NbtDouble]
-    Motion: _T_NbtList[NbtDouble]
+class T_FireBall(NbtCompound):
+    power: T_NbtList[NbtDouble]
+    Motion: T_NbtList[NbtDouble]
 
 
-class _T_CanRaid(NbtCompound):
+class T_CanRaid(NbtCompound):
     CanJoinRaid: NbtByte
     HasRaidGoal: NbtByte
     PatrolLeader: NbtByte
     Patrolling: NbtByte
-    PatrolTarget: _T_NbtBlockPos3
+    PatrolTarget: T_NbtBlockPos3
     RaidId: NbtInt
     Wave: NbtInt
 
 
-class _T_Horse(NbtCompound):
-    ArmorItem: _T_Item
+class T_Horse(NbtCompound):
+    ArmorItem: T_Item
     Bred: NbtByte
     EatingHaystack: NbtByte
     Owner: NbtIntArray
-    SaddleItem: _T_Item
+    SaddleItem: T_Item
     Tame: NbtByte
     Temper: NbtInt
 
 
-class _T_ArrowInBlockState(NbtCompound):
+class T_ArrowInBlockState(NbtCompound):
     Name: NbtString
     Properties: NbtCompound
 
 
-class _T_Arrow(NbtCompound):
+class T_Arrow(NbtCompound):
     crit: NbtByte
     damage: NbtDouble
-    inBlockState: _T_ArrowInBlockState
+    inBlockState: T_ArrowInBlockState
     inGround: NbtByte
     life: NbtShort
     pickup: NbtByte
