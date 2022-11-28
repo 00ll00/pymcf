@@ -2,14 +2,14 @@ import uuid
 from abc import ABC, abstractmethod
 from typing import Optional, Any, TypeVar, Mapping, final, Generic, Type
 
-from pymcf.datas.structure import T_Entity
-from pymcf.datas.score import ScoreContainer
-from pymcf.context import MCFContext
+from .structure import T_Entity
+from pymcf.data.score import ScoreContainer
+from pymcf._frontend.context import MCFContext
 from pymcf.mcversions import MCVer
 from pymcf.project import Project
-from pymcf.datas.nbt import NbtCompound, EntityNbtContainer, NbtList
+from pymcf.data.nbt import NbtCompound, EntityNbtContainer, NbtList
 from pymcf.operations import raw, CallMethodOp, Operation
-from pymcf.datas.datas import InGameEntity, InGameIter, InGameData
+from pymcf.data.data import InGameEntity, InGameIter, InGameData
 from pymcf.util import _ParamEmpty
 
 
@@ -190,7 +190,7 @@ class _Self(InGameEntity):
         self._entity._identifier = self._origin_identifier
         return self._entity
 
-    def _new_from_(self):
+    def _structure_new_(self):
         return self
 
     def _transfer_to_(self, other):
@@ -235,7 +235,7 @@ class _Entity(InGameEntity, ScoreContainer, EntityNbtContainer[__Entity], ABC):
     def class_tag(cls) -> str:
         return f"{Project.namespace}.cls_{cls.__qualname__}"
 
-    def _new_from_(self) -> "_Entity":
+    def _structure_new_(self) -> "_Entity":
         return _Entity(Selector(tags={MCFContext.new_entity_tag()}))
 
     def _transfer_to_(self, other):
@@ -273,7 +273,7 @@ class _Newable(_Entity[__Entity], ABC):
         raw(f"""summon {self.type_name} {pos[0]} {pos[1]} {pos[2]} {nbt._serialize() if nbt is not None else ""}""")
 
     @classmethod
-    def instances(cls: Type[_T_E]) -> "_Entities[_T_E]":
+    def each_one(cls: Type[_T_E]) -> "_Entities[_T_E]":
         return _Entities(cls)
 
     @classmethod
@@ -295,7 +295,7 @@ class _NormalEntity(_Newable[__Entity], ABC):
     def kill(self):
         raw(f"""kill {self}""")
 
-    def _new_from_(self):
+    def _structure_new_(self):
         return self
 
 
@@ -334,7 +334,7 @@ class _Entities(InGameIter[_T_E], Generic[_T_E]):
     def _transfer_to_(self, other):
         pass
 
-    def _new_from_(self) -> "_Entities[_T_E]":
+    def _structure_new_(self) -> "_Entities[_T_E]":
         pass
 
 
@@ -360,11 +360,7 @@ class DelTagOp(Operation):
         return f'tag remove {self.target} {self.tag}'
 
 
-class __Marker(T_Entity):
-    data: NbtCompound
-
-
-class Marker(_NormalEntity[__Marker]):  # TODO
+class Marker(_NormalEntity):
 
     @classmethod
     def entity_type(cls) -> str:
@@ -372,3 +368,13 @@ class Marker(_NormalEntity[__Marker]):  # TODO
 
     def __init__(self, pos, nbt: Optional[NbtCompound]):
         super().__init__(pos, nbt)
+
+
+__all__ = [
+    "Identifier",
+    "UUID",
+    "Name",
+    "Selector",
+
+    "Marker"
+]

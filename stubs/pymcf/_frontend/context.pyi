@@ -1,0 +1,56 @@
+from pymcf import logger as logger
+from pymcf.project import Project as Project
+from pymcf.util import lazy as lazy, staticproperty as staticproperty
+from typing import Any, Optional, Set, List, Tuple
+
+from pymcf.data import InGameObj
+from pymcf.operations import Operation
+
+
+class MCFContext:
+    name: str
+    tags: Set[str]
+    ep: bool
+    sf: bool
+    nfiles: int
+    files: List[MCFFile]
+    file_stack: List[MCFFile]
+    return_value: None | InGameObj | Tuple[InGameObj]
+    proj: Project
+    entity_tags: List[str]
+    last: MCFContext
+    def __init__(self, name: str, tags: Optional[Set[str]] = ..., is_enter_point: bool = ..., single_file: bool = ...) -> None: ...
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None: ...
+    in_context: bool
+    def gen_files(self) -> None: ...
+    @staticmethod
+    def new_file(ctx: MCFContext | None = ...) -> None: ...
+    @staticmethod
+    def exit_file() -> None: ...
+    @staticmethod
+    def last_file() -> MCFFile: ...
+    @staticmethod
+    def current_file() -> MCFFile: ...
+    @staticmethod
+    def outer_file() -> MCFFile: ...
+    @staticmethod
+    def append_op(op) -> None: ...
+    @staticmethod
+    def assign_return_value(value: Any): ...
+    @staticmethod
+    def get_return_value(): ...
+    @staticmethod
+    def new_entity_tag() -> str: ...
+    def post_process(self) -> None: ...
+    INIT_STORE: MCFContext
+    INIT_VALUE: MCFContext
+
+class MCFFile:
+    ep: bool
+    name: str
+    proj: Project
+    operations: List[Operation]
+    def __init__(self, name: str, is_entry_point: bool = ...) -> None: ...
+    def append_op(self, op) -> None: ...
+    def gen(self) -> None: ...

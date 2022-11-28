@@ -2,17 +2,15 @@ import sys
 from types import FunctionType
 from typing import Any, Set, List
 
-from pymcf.datas.entity.entity import _Self
+from pymcf._frontend.func_rewrite import recompile
+from pymcf.entity import _Self
 from pymcf import logger
-from pymcf.datas.datas import InGameData, InGameObj
+from pymcf.data import InGameData, InGameObj, InGameEntity
 from pymcf.operations import CallFunctionOp, CallMethodOp
-from pymcf.project import Project
-from pymcf.codes import CodeTypeRewriter
-from pymcf.context import MCFContext
+from pymcf import Project
+from pymcf._frontend.context import MCFContext
 from pymcf.util import staticproperty
-import ast
 
-compile()
 
 class mcfunction:
     """
@@ -67,7 +65,7 @@ class mcfunction:
         ...
 
     @staticmethod
-    def _is_method(func):
+    def _is_arg_self(func):
         """
         detect first arg name of the function is "self" or not
         """
@@ -78,19 +76,21 @@ class mcfunction:
 
     def _wrap_func(self, func):
         # build mcfunction generator of given func
-        self.is_method = self._is_method(func)
+        self.is_arg_self = self._is_arg_self(func)
         if self.ep and (func.__code__.co_argcount > 0 or func.__code__.co_kwonlyargcount > 0):
             raise RuntimeError(f"Entry point mcfunction cannot have arguments: {func}")
-        self.name = func.__qualname__.replace('.', '/').lower()
+        name = func.__module__.replace('.', '/') + "/" if func.__module__ != "__main__" else ""
+        name += func.__qualname__.replace('.', '/')
+        self.name = name.lower()
 
         try:
-            pyc = CodeTypeRewriter(func.__code__)
+            ct, glb_ = recompile(func)
         except SyntaxError as exc:
             raise SyntaxError(f"unsupported syntax used in mcfunction: {self.name}.", exc)
         glb = func.__globals__.copy()
-        glb.update(pyc.globals)
+        glb.update(glb_)
         self.g_globals = glb
-        self.generator = FunctionType(pyc.codetype, glb)
+        self.generator = FunctionType(ct, glb)
 
         self.proj.add_mcf(self)
 
@@ -127,6 +127,8 @@ class mcfunction:
                 logger.warning("Enter point mcfunction should not have index.")
             ctx_name = self.name + '.' + str(idx) if not self.ep else self.name
 
+            is_method = self.is_arg_self and isinstance(args[0], InGameEntity)
+
             # check function parameters
             if idx == len(self.pars):
                 par = MCFParamAndRes()
@@ -134,14 +136,15 @@ class mcfunction:
                 par.set_arg(args, kwargs)
                 # generate new func
                 if not self.ep:
-                    args, kwargs = par.make_arg_copy(self.is_method)
+                    args, kwargs = par.make_arg_receiver(is_method)
+                    par.transfer_arg(args, kwargs)
                 with MCFContext(ctx_name, tags=self.tags, is_enter_point=self.ep):
                     res = self.generator.__call__(*args, **kwargs)
                 par.set_return_value(res)
                 par.set_globals(self.generator.__globals__)
                 par.update_globals(frame)
                 if not self.ep:
-                    if self.is_method:
+                    if is_method:
                         CallMethodOp(args[0], ctx_name)
                         args[0]._unwrap_()
                     else:
@@ -152,8 +155,8 @@ class mcfunction:
                 par = self.pars[idx]
                 par.update_globals(frame)
                 if not self.ep:
-                    par.make_copy_to_args(args, kwargs)
-                    if self.is_method:
+                    par.transfer_arg(args, kwargs)
+                    if is_method:
                         CallMethodOp(args[0]._origin_identifier, ctx_name)
                     else:
                         CallFunctionOp(ctx_name)
@@ -219,32 +222,30 @@ class MCFParamAndRes:
     def set_globals(self, glb):
         self.globals = glb
 
-    def make_arg_copy(self, is_method):
-        if is_method:
-            ca = tuple((_Self(self.args[0]), *(a._new_from_() if isinstance(a, InGameObj) else a for a in self.args[1:])))
+    def make_arg_receiver(self, is_entity_method):
+        if is_entity_method:
+            ca = tuple((_Self(self.args[0]), *(a._structure_new_() if isinstance(a, InGameObj) else a for a in self.args[1:])))
         else:
-            ca = tuple(a._new_from_() if isinstance(a, InGameObj) else a for a in self.args)
-        ckwa = dict((k, v._new_from_() if isinstance(v, InGameObj) else v) for k, v in self.kwargs.items())
-        self.args = ca
-        self.kwargs = ckwa
+            ca = tuple(a._structure_new_() if isinstance(a, InGameObj) else a for a in self.args)
+        ckwa = dict((k, v._structure_new_() if isinstance(v, InGameObj) else v) for k, v in self.kwargs.items())
         return ca, ckwa
 
     def make_res_copy(self):
         if self.return_value is None:
             return None
         elif isinstance(self.return_value, tuple):
-            return tuple(r._new_from_() for r in self.return_value)
+            return tuple(r._structure_new_() for r in self.return_value)
         else:
-            return self.return_value._new_from_()
+            return self.return_value._structure_new_()
 
-    def make_copy_to_args(self, args, kwargs):
+    def transfer_arg(self, args, kwargs):
         for i in range(len(self.args)):
             if isinstance(args[i], InGameObj):
-                args[i]._transfer_to_(self.args[i])
+                self.args[i]._transfer_to_(args[i])
 
         for k in kwargs.keys():
             if isinstance(args[k], InGameObj):
-                kwargs[k]._transfer_to_(self.kwargs[k])
+                self.args[k]._transfer_to_(args[k])
 
     def update_globals(self, frame):
         for key in frame.f_locals:

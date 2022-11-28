@@ -2,36 +2,11 @@ import json
 from abc import ABC, abstractmethod
 from typing import Dict, Optional, Any, List, Mapping, Iterable, Tuple, TypeVar, Generic
 
-from pymcf import MCVer
-from pymcf.datas.datas import InGameData
-from pymcf.datas.score import Fixed
+from .data import InGameData
 from pymcf.jsontext import IJsonText, JsonText, JsonTextComponent
-from pymcf.operations import Operation
+from pymcf.operations import NbtCopyOp, NbtSetScoreOp
 from pymcf.util import staticproperty, lazy
-
-
-class NbtCopyOp(Operation):
-
-    def __init__(self, target: "Nbt", source: "Nbt"):
-        self.target = target
-        self.source = source
-        super(NbtCopyOp, self).__init__()
-
-    def gen_code(self, mcver: MCVer) -> str:
-        return f"data modify {self.target} set from {self.source}"
-
-
-class NbtSetScoreOp(Operation):
-
-    def __init__(self, target: "Nbt", score, dtype: str = "int", scale: float = 1):
-        self.target = target
-        self.score = score
-        self.dtype = dtype
-        self.scale = scale
-        super().__init__()
-
-    def gen_code(self, mcver: MCVer) -> str:
-        return f"execute store result {self.target} {self.dtype} {self.scale} run scoreboard players get {self.score}"
+from .._frontend import MCFContext
 
 
 class NbtData(ABC):
@@ -380,15 +355,15 @@ class NbtLongArray(Tuple[NbtLong], NbtData):
 class Nbt(InGameData, IJsonText):
     _sys_tmp_id = 0
 
-    def __init__(self, owner: Optional["NbtContainer"] = None, path: str = ""):
+    def __init__(self, owner: Optional["NbtContainer"] = None, path: str = "", _type="int"):
         if owner is not None:
             self._owner = owner
             self._path = path if not path.startswith('.') else path[1:]
-            self._type = "int"
         else:
             Nbt._sys_tmp_id += 1
             self._owner = NbtContainer.SYS
             self._path = f"temp.var{Nbt._sys_tmp_id}"
+        self._type = _type
 
     @property
     def as_byte(self):
@@ -451,8 +426,9 @@ class Nbt(InGameData, IJsonText):
         else:
             pass  # assignments wrapped in codes
 
-    def _set_value(self, value):
-        from pymcf.datas.score import Score
+    def set_value(self, value):
+        from pymcf.data import Score
+        from pymcf.math import Fixed
         if isinstance(value, Score):
             NbtSetScoreOp(self, value, dtype=self._type)
         elif isinstance(value, Fixed):
@@ -495,7 +471,8 @@ class NbtContainer(Generic[_T_Nbt], ABC):
     @staticproperty
     @lazy
     def SYS():
-        return StorageNbtContainer("sys")
+        with MCFContext.INIT_STORE:
+            return StorageNbtContainer("sys")
 
 
 class EntityNbtContainer(NbtContainer[_T_Nbt]):

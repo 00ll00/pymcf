@@ -1,6 +1,6 @@
 import json
 from abc import ABC, abstractmethod
-from typing import Mapping
+from typing import Mapping, Sequence
 
 
 class JsonText(ABC):
@@ -16,10 +16,19 @@ class JsonText(ABC):
 class JsonTextComponent(JsonText):
 
     def __init__(self, data: Mapping):
-        self.json = data
+        self.data = data
 
     def to_str(self):
-        return json.dumps(self.json)
+        return json.dumps(self.data)
+
+
+class JsonTextList(JsonText):
+
+    def __init__(self, data: Sequence):
+        self.data = list(data)
+
+    def to_str(self):
+        return json.dumps(self.data)
 
 
 class IJsonText(ABC):

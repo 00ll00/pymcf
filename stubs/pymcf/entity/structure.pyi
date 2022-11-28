@@ -1,19 +1,12 @@
-from typing import Generic, TypeVar
+from typing import Union, TypeVar
 
-from pymcf.datas.nbt import NbtCompound, NbtShort, NbtString, NbtByte, NbtFloat, \
-    NbtDouble, NbtInt, NbtIntArray, NbtList, NbtLong
+from pymcf.data.nbt import NbtByte as NbtByte, NbtCompound as NbtCompound, NbtDouble as NbtDouble, NbtFloat as NbtFloat, NbtInt as NbtInt, NbtIntArray as NbtIntArray, NbtList as NbtList, NbtLong as NbtLong, NbtShort as NbtShort, NbtString as NbtString
 
 _T_Nbt = TypeVar("_T_Nbt", bound=NbtCompound)
 
-
-class T_NbtList(NbtList, Generic[_T_Nbt]):
-
-    def __getitem__(self, item) -> _T_Nbt:
-        ...
-
-    def __setitem__(self, key: int, value):
-        ...
-
+class T_NbtList(NbtList):
+    def __getitem__(self, item) -> _T_Nbt: ...
+    def __setitem__(self, key: int, value): ...
 
 class T_Entity(NbtCompound):
     Air: NbtShort
@@ -28,7 +21,7 @@ class T_Entity(NbtCompound):
     Motion: T_NbtList[NbtDouble]
     NoGravity: NbtByte
     OnGround: NbtByte
-    Passengers: T_NbtList["T_Entity"]
+    Passengers: T_NbtList['T_Entity']
     PortalCooldown: NbtInt
     Pos: T_NbtList[NbtDouble]
     Rotation: T_NbtList[NbtFloat]
@@ -36,21 +29,18 @@ class T_Entity(NbtCompound):
     Tags: T_NbtList[NbtString]
     UUID: NbtIntArray
 
-
 class T_Effect(NbtCompound):
     Ambient: NbtByte
     Amplifier: NbtByte
     Duration: NbtInt
-    HiddenEffect: "T_Effect"
+    HiddenEffect: T_Effect
     Id: NbtByte
     ShowIcon: NbtByte
     ShowParticles: NbtByte
 
-
 class T_Enchant(NbtCompound):
     id: NbtString
     lvl: NbtShort
-
 
 class T_AttributeModifier(NbtCompound):
     AttributeName: NbtString
@@ -60,23 +50,19 @@ class T_AttributeModifier(NbtCompound):
     Amount: NbtDouble
     UUID: NbtIntArray
 
-
 class T_ItemDisplay(NbtCompound):
     color: NbtInt
     Name: NbtString
     Lore: T_NbtList[NbtString]
 
-
 class T_SkullTexture(NbtCompound):
     Signature: NbtString
     Value: NbtString
-
 
 class T_SkullOwner(NbtCompound):
     Id: NbtIntArray
     Name: NbtString
     Properties: T_NbtList[T_SkullTexture]
-
 
 class T_FireWorkExplosion(NbtCompound):
     Flicker: NbtByte
@@ -85,11 +71,9 @@ class T_FireWorkExplosion(NbtCompound):
     Colors: NbtIntArray
     FadeColors: NbtIntArray
 
-
 class T_Firework(NbtCompound):
     Flight: NbtByte
     Explosions: T_NbtList[T_FireWorkExplosion]
-
 
 class T_MapDecoration(NbtCompound):
     id: NbtString
@@ -98,95 +82,57 @@ class T_MapDecoration(NbtCompound):
     y: NbtDouble
     rot: NbtDouble
 
-
 class T_SuspiciousStewEffect(NbtCompound):
     EffectId: NbtByte
     EffectDuration: NbtInt
-
 
 class T_NbtBlockPos3(NbtCompound):
     X: NbtInt
     Y: NbtInt
     Z: NbtInt
 
-
 class T_ItemTags(NbtCompound):
     Damage: NbtInt
     Unbreakable: NbtByte
     CanDestroy: T_NbtList[NbtString]
     CustomModelData: NbtInt
-
-    # block tag
     CanPlaceOn: T_NbtList[NbtString]
     BlockEntityTag: T_Entity
     BlockStateTag: NbtCompound
-
-    # enchant
     Enchantments: T_NbtList[T_Enchant]
     StoredEnchantments: T_NbtList[T_Enchant]
     RepairCost: NbtInt
-
-    # attribute modifiers
     AttributeModifiers: T_NbtList[T_AttributeModifier]
-
-    # potion
     CustomPotionEffects: T_NbtList[T_Effect]
     Potion: NbtString
     CustomPotionColor: NbtInt
-
-    # crossbow
     Charged: NbtByte
-    ChargedProjectiles: T_NbtList["T_Item"]
-
-    # display
+    ChargedProjectiles: T_NbtList['T_Item']
     display: T_ItemDisplay
     HideFlags: NbtInt
-
-    # written book
     resolved: NbtByte
     generation: NbtInt
     author: NbtString
     title: NbtString
     pages: T_NbtList[NbtString]
-
-    # player head
-    SkullOwner: NbtString | T_SkullOwner
-
-    # firework star
+    SkullOwner: Union[NbtString, T_SkullOwner]
     Fireworks: T_NbtList[T_Firework]
-
-    # spawn egg
     EntityTag: T_Entity
-
-    # fish bucket
     BucketVariantTag: NbtInt
-
-    # map
     map: NbtInt
     map_scale_direction: NbtInt
     Decorations: T_NbtList[T_MapDecoration]
-    display: NbtInt
-
-    # suspicious stew
     Effects: T_NbtList[T_SuspiciousStewEffect]
-
-    # debug stick
     DebugProperty: NbtCompound
-
-    # compass
     LodestoneTracked: NbtByte
     LodestoneDimension: NbtString
     LodestonePos: T_NbtBlockPos3
-
-    # bundle
-    Items: T_NbtList["T_Item"]
-
+    Items: T_NbtList['T_Item']
 
 class T_Item(NbtCompound):
     Count: NbtByte
     id: NbtString
     tag: T_ItemTags
-
 
 class T_CreatureAttributeModifier(NbtCompound):
     Amount: NbtDouble
@@ -194,16 +140,13 @@ class T_CreatureAttributeModifier(NbtCompound):
     Operation: NbtInt
     UUID: NbtIntArray
 
-
 class T_CreatureAttribute(NbtCompound):
     Base: NbtDouble
     Modifiers: T_NbtList[T_CreatureAttributeModifier]
     Name: NbtString
 
-
 class T_CreatureBrain(NbtCompound):
     memories: NbtCompound
-
 
 class T_Creature(T_Entity):
     AbsorptionAmount: NbtFloat
@@ -222,7 +165,7 @@ class T_Creature(T_Entity):
     HurtTime: NbtShort
     HandDropChances: T_NbtList[NbtFloat]
     HandItems: T_NbtList[T_Item]
-    Leash: NbtIntArray | T_NbtBlockPos3
+    Leash: Union[NbtIntArray, T_NbtBlockPos3]
     LeftHanded: NbtByte
     NoAI: NbtByte
     PersistenceRequired: NbtByte
@@ -232,23 +175,19 @@ class T_Creature(T_Entity):
     Team: NbtString
     TicksFrozen: NbtInt
 
-
 class T_CanBreed(NbtCompound):
     Age: NbtInt
     ForcedAge: NbtInt
     InLove: NbtInt
     LoveCause: NbtIntArray
 
-
 class T_CanAnger(NbtCompound):
     AngerTime: NbtInt
     AngryAt: NbtIntArray
 
-
 class T_CanTame(NbtCompound):
     Owner: NbtIntArray
     Sitting: NbtByte
-
 
 class T_Zombie(NbtCompound):
     CanBreakDoors: NbtByte
@@ -256,17 +195,14 @@ class T_Zombie(NbtCompound):
     InWaterTime: NbtInt
     IsBaby: NbtByte
 
-
 class T_Projectile(NbtCompound):
     HasBeenShot: NbtByte
     LeftOwner: NbtByte
     Owner: NbtIntArray
 
-
 class T_FireBall(NbtCompound):
     power: T_NbtList[NbtDouble]
     Motion: T_NbtList[NbtDouble]
-
 
 class T_CanRaid(NbtCompound):
     CanJoinRaid: NbtByte
@@ -277,7 +213,6 @@ class T_CanRaid(NbtCompound):
     RaidId: NbtInt
     Wave: NbtInt
 
-
 class T_Horse(NbtCompound):
     ArmorItem: T_Item
     Bred: NbtByte
@@ -287,11 +222,9 @@ class T_Horse(NbtCompound):
     Tame: NbtByte
     Temper: NbtInt
 
-
 class T_ArrowInBlockState(NbtCompound):
     Name: NbtString
     Properties: NbtCompound
-
 
 class T_Arrow(NbtCompound):
     crit: NbtByte
@@ -304,5 +237,3 @@ class T_Arrow(NbtCompound):
     shake: NbtByte
     ShotFromCrossbow: NbtByte
     SoundEvent: NbtString
-
-

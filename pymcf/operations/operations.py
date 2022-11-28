@@ -14,7 +14,7 @@ class Operation(ABC):
     def __init__(self, offline: bool = False):
         self.offline: bool = offline
         if not offline:
-            from pymcf.context import MCFContext
+            from pymcf._frontend.context import MCFContext
             MCFContext.append_op(self)
 
     def get_length(self, mcver: MCVer) -> int:
@@ -62,13 +62,3 @@ class CallMethodOp(Operation):
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"execute as {self.origin_identifier} at @s rotated as @s run function {Project.namespace}:{self.func_full_name}"
-
-
-class ExecuteOp(Operation):
-
-    def __init__(self, op: Operation, offline: bool = False):
-        self.op = op
-        super().__init__(offline)
-
-    def gen_code(self, mcver: MCVer) -> str:
-        return self.op.gen_code(mcver)

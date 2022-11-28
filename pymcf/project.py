@@ -34,7 +34,7 @@ class Project:
         logging.info(f"Output directory set to {proj.output_dir}.")
 
     def add_ctx(self, ctx):
-        from pymcf.context import MCFContext
+        from pymcf._frontend.context import MCFContext
         ctx: MCFContext
         self.ctxs[ctx.name] = ctx
 

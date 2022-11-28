@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from pymcf.mcversions import MCVer
+from .mcversions import MCVer
 
 _version = "dev-1.0"
 
@@ -18,10 +18,19 @@ logger.info(f"PYMCF {_version}, support minecraft {MCVer.JE_1_19_1} - {MCVer.JE_
 if sys.version_info.major != 3 or sys.version_info.minor != 10:
     logger.error(f"PYMCF {_version} only work with python 3.10.x, but your python version is {sys.version}. Unknown errors will occurred.")
 
-from pymcf.project import Project
-from pymcf.mcfunction import mcfunction
-from pymcf.operations import raw
-from pymcf import datas
+from .project import Project
+from .mcfunction import mcfunction
+from .operations import raw
 
+__all__ = [
+    "MCVer",
+    "Project",
+    "mcfunction",
+    "raw",
+    "logger",
+    "data",
+    "entity",
+    "math"
+]
 
-del logging
+del logging, sys

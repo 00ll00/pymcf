@@ -20,20 +20,30 @@ class InGameObj(ABC):
         """
         for mcfunction passing arguments.
 
-        use **mcfunction operations** to copy value of `self` to `other`.
+        use **mcfunction operations** to copy value from `self` to `other`.
 
         `other` is compatible `self`.
         """
         ...
 
     @abstractmethod
-    def _new_from_(self) -> "InGameObj":
+    def _structure_new_(self) -> "InGameObj":
         """
         make an arg receiver of reference. copy should be compatible to reference.
 
-        for mcfunction transfer result.
+        this method should not create mcfunction operations.
+
+        for mcfunction transfer argument and result.
         """
         ...
+
+    def _make_copy_(self) -> "InGameObj":
+        """
+        make a copy of self using mcfunction operations.
+        """
+        res = self._structure_new_()
+        self._transfer_to_(res)
+        return res
 
 
 class InGameData(InGameObj, ABC):
@@ -41,6 +51,34 @@ class InGameData(InGameObj, ABC):
     indicate a data object is an in game data container.
     """
     ...
+
+    @abstractmethod
+    def set_value(self, value):
+        """
+        equivalent to assignment statement in mcfunction context.
+        """
+        ...
+
+    def __bool_and__(self, other):
+        """
+        called on `and` operator.
+        self is treated as `True` by default.
+        """
+        return other
+
+    def __bool_or__(self, other):
+        """
+        called on `or` operator.
+        self is treated as `True` by default.
+        """
+        return True
+
+    def __bool_not__(self):
+        """
+        called on `not` operator.
+        self is treated as `True` by default.
+        """
+        return False
 
 
 class InGameEntity(InGameObj, ABC):
@@ -69,7 +107,7 @@ class InGameEntity(InGameObj, ABC):
 T = TypeVar("T", bound=InGameData)
 
 
-class InGameIter(Generic[T], Iterator[T], InGameObj, ABC):
+class InGameIter(InGameObj, Iterator[T], Generic[T], ABC):
     """
     indicate an iterator is an in game iterator.
 
@@ -82,7 +120,7 @@ class InGameIter(Generic[T], Iterator[T], InGameObj, ABC):
 
     @final
     def __next__(self) -> T:  # for type hint only
-        pass
+        raise TypeError(f"InGameIter object cannot be used in this iteration statement.")
 
     @abstractmethod
     def _iter_init(self):

@@ -1,4 +1,0 @@
-NONE = 0
-CONTINUE = 1
-BREAK = 2
-RETURN = 3

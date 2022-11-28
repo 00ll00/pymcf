@@ -1,6 +1,5 @@
 from typing import List, Any, Set, Optional, Dict
 
-from pymcf.operations import Operation
 from pymcf.project import Project
 from pymcf import logger
 from pymcf.util import staticproperty, lazy
@@ -95,7 +94,7 @@ class MCFContext:
         return curr.file_stack[-2]
 
     @staticmethod
-    def append_op(op: Operation):
+    def append_op(op):
         """
         append one operation to current file of current context
         :param op: mcfunction operation
@@ -147,12 +146,12 @@ class MCFFile:
         self.ep = is_entry_point
         self.name = name
         self.proj: Project = Project.INSTANCE
-        self.operations: List[Operation] = []
+        self.operations: List = []
 
-        self._calls: Dict[Operation, MCFFile] = {}
-        self._callers: Dict[Operation, MCFFile] = {}
+        self._calls: Dict = {}
+        self._callers: Dict = {}
 
-    def append_op(self, op: Operation):
+    def append_op(self, op):
         self.operations.append(op)
 
     def gen(self):
