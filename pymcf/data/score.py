@@ -8,7 +8,7 @@ from pymcf.jsontext import IJsonText, JsonText, JsonTextComponent
 from pymcf.operations import raw, ScoreSetValueOp, ScoreCopyOp, ScoreLTScoreOp, ScoreResetValueOp, \
     ScoreLTValueOp, ScoreLEScoreOp, ScoreLEValueOp, ScoreGTScoreOp, ScoreGTValueOp, ScoreGEScoreOp, ScoreGEValueOp, \
     ScoreEQScoreOp, ScoreEQValueOp, ScoreAddValueOp, ScoreAddScoreOp, ScoreSubValueOp, ScoreSubScoreOp, ScoreMulScoreOp, \
-    ScoreDivScoreOp, ScoreModScoreOp, DefScoreBoardOp
+    ScoreDivScoreOp, ScoreModScoreOp, DefScoreBoardOp, ScoreNEScoreOp, ScoreNEValueOp
 from pymcf.util import staticproperty, lazy
 
 
@@ -17,26 +17,29 @@ class Scoreboard:
 
     _all: Dict[str, "Scoreboard"] = {}
 
-    def __new__(cls, name: str, scb_type: str = "dummy"):
+    def __new__(cls, name: str, scb_type: str = None, display: JsonText = None):
         if name in Scoreboard._all:
             self = Scoreboard._all[name]
-            assert self.type != scb_type
+            if scb_type is not None:
+                assert self.type == scb_type
+            return self
+
         else:
             self = super().__new__(cls)
-        return self
-
-    def __init__(self, name: str, scb_type: str = "dummy"):
-        self.name = name
-        self.type = scb_type
-
-        def _init_():
-            DefScoreBoardOp(self.name, self.type)
+            Scoreboard._all[name] = self
 
         if not MCFContext.in_context:
             with MCFContext.INIT_STORE:
-                _init_()
+                DefScoreBoardOp(name, scb_type, JsonText.convert_from(display))
         else:
-            _init_()
+            DefScoreBoardOp(name, scb_type, JsonText.convert_from(display))
+
+        return self
+
+    def __init__(self, name: str, scb_type: str = None, display: JsonText | Any = None):
+        self.name = name
+        self.type = scb_type if scb_type is not None else "dummy"
+        self.display = JsonText.convert_from(display)
 
     def __str__(self):
         return self.name
@@ -79,8 +82,21 @@ class ScoreContainer(ABC):
             else:
                 self._sc._set_score_(key, value)
 
+        def __getitem__(self, item: str) -> "Score":
+            if not isinstance(item, str):
+                raise TypeError()
+            return self._sc._get_score_(item)
+
+        def __setitem__(self, key: str, value):
+            if not isinstance(key, str):
+                raise TypeError()
+            return self._sc._set_score_(key, value)
+
     @property
-    def scores(self):
+    def score(self):
+        """
+        get score container
+        """
         return ScoreContainer._Container(self)
 
     def _set_score_(self, k: str, v):
@@ -103,6 +119,10 @@ class ScoreDummy(ScoreContainer):
     def __init__(self, name: str):
         from pymcf.entity import Name
         super(ScoreDummy, self).__init__(Name(name))
+
+    @property
+    def identifier(self):
+        return self._identifier
 
     @staticmethod
     def new_var(group: str = "var"):
@@ -130,7 +150,7 @@ class Score(InGameData, IJsonText):
         else:
             self.entity = entity
             self.objective = Scoreboard.new_dummy() if objective is None else objective
-        self.identifier = str(self.entity._identifier) + ' ' + self.objective.name
+        self.identifier = str(self.entity.identifier) + ' ' + self.objective.name
 
         def _init_():
             if isinstance(value, int):
@@ -182,6 +202,7 @@ class Score(InGameData, IJsonText):
 
         set `None` for reset.
         """
+        from pymcf.data import Nbt
         if isinstance(value, int):
             ScoreSetValueOp(self, value)
         elif isinstance(value, Score):
@@ -189,6 +210,8 @@ class Score(InGameData, IJsonText):
                 ScoreCopyOp(self, value)
         elif value is None:
             ScoreResetValueOp(self)
+        elif isinstance(value, Nbt):
+            raw(f"execute store result score {self} run data get {value}")
         else:
             ScoreSetValueOp(self, int(value))
 
@@ -230,6 +253,14 @@ class Score(InGameData, IJsonText):
             ScoreEQScoreOp(res, self, other)
         else:
             ScoreEQValueOp(res, self, int(other))
+        return res
+
+    def __ne__(self, other):
+        res = Bool()
+        if isinstance(other, Score):
+            ScoreNEScoreOp(res, self, other)
+        else:
+            ScoreNEValueOp(res, self, int(other))
         return res
 
     def __add__(self, other):
@@ -284,6 +315,9 @@ class Score(InGameData, IJsonText):
             other = Score.const(int(other))
         ScoreMulScoreOp(res, other)
         return res
+
+    def __rmul__(self, other):
+        return self.__mul__(other)
 
     def __imul__(self, other):
         if not isinstance(other, Score):
@@ -411,6 +445,15 @@ class Bool(Score):
     1: True
     """
 
+    def _transfer_to_(self, other):
+        other.set_value(self)
+
+    def _structure_new_(self) -> "Bool":
+        return Bool()
+
+    def _compatible_to_(self, other) -> bool:
+        return isinstance(other, Score)
+
     def __init__(
             self,
             value: Optional[bool | Any] = None,
@@ -418,15 +461,15 @@ class Bool(Score):
             objective: Optional[Scoreboard] = None,
     ):
         if isinstance(value, bool):
-            super(Bool, self).__init__(value=int(value), entity=entity, objective=objective)
+            super().__init__(value=int(value), entity=entity, objective=objective)
         if isinstance(value, int):
-            super(Bool, self).__init__(value=int(value != 0), entity=entity, objective=objective)
+            super().__init__(value=int(value != 0), entity=entity, objective=objective)
         elif value is None:
-            super(Bool, self).__init__(value=value, entity=entity, objective=objective)
+            super().__init__(value=value, entity=entity, objective=objective)
         elif isinstance(value, Bool):
-            super(Bool, self).__init__(value=value, entity=entity, objective=objective)
+            super().__init__(value=value, entity=entity, objective=objective)
         elif isinstance(value, Score):
-            super(Bool, self).__init__(value=value, entity=entity, objective=objective)
+            super().__init__(value=value, entity=entity, objective=objective)
             raw(f"execute store success score {self} unless score {self} matches 0")  # TODO replace raw
         else:
             raise TypeError(f"cannot init Bool var using {value}.")

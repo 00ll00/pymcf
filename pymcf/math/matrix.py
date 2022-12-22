@@ -53,12 +53,25 @@ class Mat2D(InGameData):
         return self.size
 
     def __getitem__(self, index: Tuple[int, int]):
-        assert 0 <= index[0] < self.w and 0 <= index[1] < self.h
+        """
+        `M[i, j]` returns the element on ith row and jth column in mat M.
+        i, j starts from 0.
+        """
+        assert 0 <= index[0] < self.h and 0 <= index[1] < self.w
         return self.data[index[0] * self.w + index[1]]
 
     def __setitem__(self, index, value):
+        """
+        `M[i, j] = k` set k to the element on ith row and jth column in mat M.
+        i, j starts from 0.
+        """
         assert 0 <= index[0] < self.w and 0 <= index[1] < self.h
         self[index].set_value(value)
+
+    def __add__(self, other):
+        res = Mat2D(self.w, self.h, self.dtype, self.data)
+        res.__iadd__(other)
+        return res
 
     def __iadd__(self, other):
         if isinstance(other, Mat2D):
@@ -73,6 +86,11 @@ class Mat2D(InGameData):
         else:
             raise TypeError()
 
+    def __sub__(self, other):
+        res = Mat2D(self.w, self.h, self.dtype, self.data)
+        res.__isub__(other)
+        return res
+
     def __isub__(self, other):
         if isinstance(other, Mat2D):
             assert other.w == self.w and other.h == self.h
@@ -86,6 +104,11 @@ class Mat2D(InGameData):
         else:
             raise TypeError()
 
+    def __mul__(self, other):
+        res = Mat2D(self.w, self.h, self.dtype, self.data)
+        res.__imul__(other)
+        return res
+
     def __imul__(self, other):
         if isinstance(other, (Number, Numeric)):
             for s in self.data:
@@ -94,6 +117,11 @@ class Mat2D(InGameData):
         else:
             raise TypeError()
 
+    def __floordiv__(self, other):
+        res = Mat2D(self.w, self.h, self.dtype, self.data)
+        res.__ifloordiv__(other)
+        return res
+
     def __ifloordiv__(self, other):
         if isinstance(other, (Number, Numeric)):
             for s in self.data:
@@ -101,6 +129,11 @@ class Mat2D(InGameData):
             return self
         else:
             raise TypeError()
+
+    def __truediv__(self, other):
+        res = Mat2D(self.w, self.h, self.dtype, self.data)
+        res.__itruediv__(other)
+        return res
 
     def __itruediv__(self, other):
         if isinstance(other, (Number, Numeric)):
@@ -115,7 +148,13 @@ class Mat2D(InGameData):
         assert isinstance(other, Mat2D) and other.h == self.w
         logger.debug(f"generating mat multiplication for {self} and {other}")
         res = Mat2D(other.w, self.h, self.dtype)
-        for i in range(res.h):
-            for j in range(res.w):
-                res[i, j].set_value(sum(self[i, k] * other[k, j] for k in range(self.w)))
+        tmp = self.dtype()
+        for i in range(res.w):
+            for j in range(res.h):
+                res[i, j].set_value(self[i, 0])
+                res[i, j] *= other[0, j]
+                for k in range(1, self.w):
+                    tmp.set_value(self[i, k])
+                    tmp *= other[k, j]
+                    res[i, j] += tmp
         return res

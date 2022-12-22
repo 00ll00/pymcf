@@ -1,6 +1,6 @@
 from abc import ABC
 
-from pymcf.project import Project
+from pymcf._project import Project
 from pymcf.mcversions import MCVer
 
 
@@ -56,9 +56,9 @@ class CallFunctionOp(Operation):
 class CallMethodOp(Operation):
 
     def __init__(self, origin_identifier, func_full_name: str, offline: bool = False):
-        self.origin_identifier = origin_identifier
+        self.identifier = origin_identifier
         self.func_full_name = func_full_name
         super().__init__(offline)
 
     def gen_code(self, mcver: MCVer) -> str:
-        return f"execute as {self.origin_identifier} at @s rotated as @s run function {Project.namespace}:{self.func_full_name}"
+        return f"execute as {self.identifier} at @s rotated as @s run function {Project.namespace}:{self.func_full_name}"

@@ -2,8 +2,7 @@ import sys
 from types import FunctionType
 from typing import Any, Set, List
 
-from pymcf._frontend.func_rewrite import recompile
-from pymcf.entity import _Self
+from pymcf._frontend.ast_rewrite import recompile
 from pymcf import logger
 from pymcf.data import InGameData, InGameObj, InGameEntity
 from pymcf.operations import CallFunctionOp, CallMethodOp
@@ -39,13 +38,21 @@ class mcfunction:
                 # noinspection PyUnresolvedReferences
                 return self._generate(args, kwargs, sys._getframe(1))
 
-        setattr(caller, "__str__", property(lambda: self.name))
+        def caller_name():
+            if self.ep:
+                return self.name
+            else:
+                raise RuntimeError("only entry point function can access name property.")
+
+        setattr(caller, "__str__", property(caller_name))
+
+        self._caller = caller
 
         return caller
 
     def __init__(self, tags=None, is_entry_point=None, inline=None):
         # __init__ will not be invoked automatic, use for type hint
-        self.proj: Project = Project.INSTANCE
+        self.proj = Project
         self.tags: Set[str] = tags
         self.ep: bool = is_entry_point
         self.inline: bool = inline
@@ -58,11 +65,6 @@ class mcfunction:
         self.g_globals = None
 
         self.pars: List[MCFParamAndRes] = []
-
-    def __call__(self, *args, **kwargs):
-        # make mcfunction callable, for type hint only
-        # real invoke handler is caller
-        ...
 
     @staticmethod
     def _is_arg_self(func):
@@ -84,7 +86,7 @@ class mcfunction:
         self.name = name.lower()
 
         try:
-            ct, glb_ = recompile(func)
+            ct, glb_ = recompile(func, inline=self.inline)
         except SyntaxError as exc:
             raise SyntaxError(f"unsupported syntax used in mcfunction: {self.name}.", exc)
         glb = func.__globals__.copy()
@@ -125,7 +127,7 @@ class mcfunction:
             idx = self._get_index(args, kwargs)
             if self.ep and idx != 0:
                 logger.warning("Enter point mcfunction should not have index.")
-            ctx_name = self.name + '.' + str(idx) if not self.ep else self.name
+            ctx_name = self.name + '-' + str(idx) if not self.ep else self.name
 
             is_method = self.is_arg_self and isinstance(args[0], InGameEntity)
 
@@ -135,18 +137,28 @@ class mcfunction:
                 self.pars.append(par)
                 par.set_arg(args, kwargs)
                 # generate new func
-                if not self.ep:
-                    args, kwargs = par.make_arg_receiver(is_method)
-                    par.transfer_arg(args, kwargs)
-                with MCFContext(ctx_name, tags=self.tags, is_enter_point=self.ep):
+                if not self.ep:  # ep func has no arg
+                    p_args, p_kwargs = par.make_arg_receiver()
+                    par.transfer_arg(p_args, p_kwargs, is_method)
+                else:
+                    p_args = []
+                    p_kwargs = {}
+                with MCFContext(ctx_name, func_tags=self.tags, is_entry_point=self.ep) as ctx:
+                    for arg in p_args[1 if is_method else 0:]:
+                        if isinstance(p_args, InGameEntity):
+                            ctx.assign_arg_entity(arg)
+                    for arg in p_kwargs.values():
+                        if isinstance(arg, InGameEntity):
+                            ctx.assign_arg_entity(arg)
+                    if is_method:
+                        ctx.current_file().executor = args[0]
                     res = self.generator.__call__(*args, **kwargs)
                 par.set_return_value(res)
                 par.set_globals(self.generator.__globals__)
                 par.update_globals(frame)
                 if not self.ep:
                     if is_method:
-                        CallMethodOp(args[0], ctx_name)
-                        args[0]._unwrap_()
+                        CallMethodOp(args[0].identifier, ctx_name)
                     else:
                         CallFunctionOp(ctx_name)
                     return_value = par.make_res_copy()
@@ -155,7 +167,7 @@ class mcfunction:
                 par = self.pars[idx]
                 par.update_globals(frame)
                 if not self.ep:
-                    par.transfer_arg(args, kwargs)
+                    par.transfer_arg(args, kwargs, is_method)
                     if is_method:
                         CallMethodOp(args[0]._origin_identifier, ctx_name)
                     else:
@@ -222,11 +234,8 @@ class MCFParamAndRes:
     def set_globals(self, glb):
         self.globals = glb
 
-    def make_arg_receiver(self, is_entity_method):
-        if is_entity_method:
-            ca = tuple((_Self(self.args[0]), *(a._structure_new_() if isinstance(a, InGameObj) else a for a in self.args[1:])))
-        else:
-            ca = tuple(a._structure_new_() if isinstance(a, InGameObj) else a for a in self.args)
+    def make_arg_receiver(self):
+        ca = tuple(a._structure_new_() if isinstance(a, InGameObj) else a for a in self.args)
         ckwa = dict((k, v._structure_new_() if isinstance(v, InGameObj) else v) for k, v in self.kwargs.items())
         return ca, ckwa
 
@@ -238,8 +247,8 @@ class MCFParamAndRes:
         else:
             return self.return_value._structure_new_()
 
-    def transfer_arg(self, args, kwargs):
-        for i in range(len(self.args)):
+    def transfer_arg(self, args, kwargs, is_method):
+        for i in range(1 if is_method else 0, len(self.args)):
             if isinstance(args[i], InGameObj):
                 self.args[i]._transfer_to_(args[i])
 

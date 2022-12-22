@@ -1,8 +1,47 @@
 from .operations import Operation
 from .. import MCVer
+from ..jsontext import JsonText
 
 
-class ScoreSetValueOp(Operation):
+class BaseScoreOp(Operation):
+    pass
+
+
+class ISVOp(BaseScoreOp):
+    """
+    inplace score value operation.
+    """
+
+    IADD = 'IADD'
+    ISUB = 'ISUB'
+    IMUL = 'IMUL'
+    IDIV = 'IDIV'
+    IMOD = 'IMOD'
+
+    def __init__(self, score, value, op, offline=False):
+        self.score = score
+        self.value = value
+        self.op = op
+        if op in {ISVOp.IMUL, ISVOp.IDIV, ISVOp.IMOD}:
+            from pymcf.data.score import Score
+            self.value = Score.const(value)
+        super().__init__(offline)
+
+    def gen_code(self, mcver: MCVer) -> str:
+        match self.op:
+            case ISVOp.IADD:
+                return f"scoreboard players add {self.score} {self.value}"
+            case ISVOp.ISUB:
+                return f"scoreboard players remove {self.score} {self.value}"
+            case ISVOp.IMUL:
+                return f"scoreboard players operation {self.score} *= {self.value}"
+            case ISVOp.IMUL:
+                return f"scoreboard players operation {self.score} /= {self.value}"
+            case ISVOp.IMOD:
+                return f"scoreboard players operation {self.score} %= {self.value}"
+
+
+class ScoreSetValueOp(BaseScoreOp):
 
     def __init__(self, score, value: int, offline: bool = False):
         self.score = score
@@ -181,6 +220,19 @@ class ScoreEQScoreOp(Operation):
         return f"execute store success score {self.res} if score {self.left} = {self.right}"
 
 
+class ScoreNEScoreOp(Operation):
+
+    def __init__(self, res, left, right, offline: bool = False):
+        self.res = res
+        self.left = left
+        self.right = right
+
+        super().__init__(offline)
+
+    def gen_code(self, mcver: MCVer) -> str:
+        return f"execute store success score {self.res} unless score {self.left} = {self.right}"
+
+
 class ScoreGTScoreOp(Operation):
 
     def __init__(self, res, left, right, offline: bool = False):
@@ -244,6 +296,19 @@ class ScoreEQValueOp(Operation):
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"execute store success score {self.res} if score {self.score} matches {self.value}"
+
+
+class ScoreNEValueOp(Operation):
+
+    def __init__(self, res, score, value, offline: bool = False):
+        self.res = res
+        self.score = score
+        self.value: int = value
+
+        super().__init__(offline)
+
+    def gen_code(self, mcver: MCVer) -> str:
+        return f"execute store success score {self.res} unless score {self.score} matches {self.value}"
 
 
 class ScoreGTValueOp(Operation):
@@ -330,10 +395,10 @@ class IfScoreLTValueRunOp(Operation):
 
 class DefScoreBoardOp(Operation):
 
-    def __init__(self, name: str, scb_type: str = "dummy", display=None, offline: bool = False):
+    def __init__(self, name: str, scb_type: str = "dummy", display: JsonText = None, offline: bool = False):
         self.name = name
         self.type = scb_type
-        self.display = display
+        self.display = display if display is not None else ""
 
         super().__init__(offline)
 

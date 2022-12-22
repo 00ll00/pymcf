@@ -5,7 +5,7 @@ from pymcf import mcfunction as mcfunction
 from pymcf.data import InGameData as InGameData
 from typing import Any, List, Optional, Sequence, Tuple, Type, TypeVar, Union, Generic
 
-T_V = TypeVar('T_V', bound=Numeric)
+T_V = TypeVar('T_V', bound=(Numeric, InGameData))
 
 class Mat2D(InGameData, Generic[T_V]):
     w: int
@@ -13,7 +13,7 @@ class Mat2D(InGameData, Generic[T_V]):
     size: int
     dtype: Type[T_V]
     data: List[T_V]
-    def __init__(self, w: int, h: int, dtype: Type[T_V] = ..., values: Optional[List[Union[T_V, Any]]] = ...) -> None: ...
+    def __init__(self, w: int, h: int, dtype: Type[T_V] = Fixed, values: Optional[List[Union[T_V, Any]]] = ...) -> None: ...
     def copy_to(self, other: Mat2D): ...
     def copy(self): ...
     def set_value(self, values: Union['Mat2D', Sequence[Union[Number, Numeric]]]): ...

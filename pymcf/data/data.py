@@ -84,54 +84,61 @@ class InGameData(InGameObj, ABC):
 class InGameEntity(InGameObj, ABC):
     """
     indicate a class is an in game entity class.
+    this class should not be implemented by user, use Entity instead.
     """
-
-    def __init__(self, identifier):
-        self._identifier = identifier
 
     @abstractmethod
     def __enter__(self):
-        self._identifier.__enter__()
+        self.identifier.__enter__()
 
     @abstractmethod
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self._identifier.__exit__(exc_type, exc_val, exc_tb)
+        self.identifier.__exit__(exc_type, exc_val, exc_tb)
 
     def __str__(self):
-        return str(self._identifier)
+        return str(self.identifier)
 
     def _compatible_to_(self, other):
         return type(other) is InGameEntity
 
 
-T = TypeVar("T", bound=InGameData)
-
-
-class InGameIter(InGameObj, Iterator[T], Generic[T], ABC):
+class InGameIterator(InGameObj, ABC):
     """
-    indicate an iterator is an in game iterator.
+    indicate an iterator is an in game iterator. InGameIter will wrap `for` expression in mcfunction way.
+    do not call `__iter__` or `__next__` function manually.
 
-    InGameIter will wrap `for` expression in mcfunction way.
+    pymcf only create a base block file for hole for statement, iteration file management should be implemented in
+    `_iter_init_`, `_iter_next_` and `_iter_end_` manually.
     """
 
     @final
-    def __iter__(self):  # for type hint only
+    def __iter__(self):
         return self
 
     @final
-    def __next__(self) -> T:  # for type hint only
+    def __next__(self):  # for type hint only
         raise TypeError(f"InGameIter object cannot be used in this iteration statement.")
 
     @abstractmethod
-    def _iter_init(self):
+    def _iter_init_(self):
+        """
+        call before entering iteration.
+        """
         ...
 
     @abstractmethod
-    def _iter_next(self, brk_flag) -> InGameData:
+    def _iter_next_(self, brk_flag) -> InGameData:
         """
         return iterating var.
 
-        if iter reach end, set brk_flag  breaklevel.BREAK.
+        if iter reach end, set value BreakLevel.BREAK to brk_flag.
+        """
+        ...
+
+    @abstractmethod
+    def _iter_end_(self):
+        """
+        call after entering iteration.
         """
         ...
 

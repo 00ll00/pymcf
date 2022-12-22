@@ -1,31 +1,34 @@
 from pymcf import logger as logger
-from pymcf.project import Project as Project
+from pymcf._project import Project as Project
 from pymcf.util import lazy as lazy, staticproperty as staticproperty
 from typing import Any, Optional, Set, List, Tuple
 
-from pymcf.data import InGameObj
+from pymcf.data import InGameObj, InGameEntity
 from pymcf.operations import Operation
 
 
 class MCFContext:
     name: str
-    tags: Set[str]
+    func_tags: Set[str]
     ep: bool
-    sf: bool
     nfiles: int
     files: List[MCFFile]
     file_stack: List[MCFFile]
     return_value: None | InGameObj | Tuple[InGameObj]
     proj: Project
-    entity_tags: List[str]
-    last: MCFContext
-    def __init__(self, name: str, tags: Optional[Set[str]] = ..., is_enter_point: bool = ..., single_file: bool = ...) -> None: ...
-    def __enter__(self) -> None: ...
+    last_ctx: MCFContext
+    def __init__(self, name: str, func_tags: Optional[Set[str]] = ..., is_entry_point: bool = ..., executor: InGameEntity = ...) -> None: ...
+    def __enter__(self) -> MCFContext: ...
     def __exit__(self, exc_type, exc_val, exc_tb) -> None: ...
     in_context: bool
+    current: MCFContext | None
     def gen_files(self) -> None: ...
     @staticmethod
-    def new_file(ctx: MCFContext | None = ...) -> None: ...
+    def current_return_value() -> Any: ...
+    @staticmethod
+    def current_executor() -> InGameEntity | None: ...
+    @staticmethod
+    def new_file(ctx: MCFContext | None = ..., executor: InGameEntity | None = ...) -> None: ...
     @staticmethod
     def exit_file() -> None: ...
     @staticmethod
@@ -41,7 +44,7 @@ class MCFContext:
     @staticmethod
     def get_return_value(): ...
     @staticmethod
-    def new_entity_tag() -> str: ...
+    def assign_arg_entity(entity: InGameEntity) -> str: ...
     def post_process(self) -> None: ...
     INIT_STORE: MCFContext
     INIT_VALUE: MCFContext
@@ -50,7 +53,9 @@ class MCFFile:
     ep: bool
     name: str
     proj: Project
+    executor: InGameEntity
     operations: List[Operation]
-    def __init__(self, name: str, is_entry_point: bool = ...) -> None: ...
+    arg_entity: List[InGameEntity]
+    def __init__(self, name: str, is_entry_point: bool = ..., executor: InGameEntity = ...) -> None: ...
     def append_op(self, op) -> None: ...
     def gen(self) -> None: ...

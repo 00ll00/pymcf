@@ -1,5 +1,5 @@
 from types import FunctionType
-from typing import Any
+from typing import Any, Type
 
 
 class staticproperty:
@@ -13,3 +13,9 @@ class lazy:
     value: Any
     def __init__(self, func) -> None: ...
     def __call__(self, *args, **kwargs): ...
+
+def staticclass(cls: Type): ...
+
+Null: object
+
+def create_file_dir(filepath: str): ...

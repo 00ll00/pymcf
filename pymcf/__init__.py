@@ -18,9 +18,10 @@ logger.info(f"PYMCF {_version}, support minecraft {MCVer.JE_1_19_1} - {MCVer.JE_
 if sys.version_info.major != 3 or sys.version_info.minor != 10:
     logger.error(f"PYMCF {_version} only work with python 3.10.x, but your python version is {sys.version}. Unknown errors will occurred.")
 
-from .project import Project
-from .mcfunction import mcfunction
+from ._project import Project
+from ._mcfunction import mcfunction
 from .operations import raw
+from ._frontend import MCFContext
 
 __all__ = [
     "MCVer",
@@ -30,7 +31,8 @@ __all__ = [
     "logger",
     "data",
     "entity",
-    "math"
+    "math",
+    "MCFContext"
 ]
 
 del logging, sys

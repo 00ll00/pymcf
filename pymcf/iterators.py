@@ -1,9 +1,9 @@
 from pymcf.data.score import Score
-from pymcf.data.data import InGameIter, InGameData
+from pymcf.data.data import InGameIterator, InGameData
 from pymcf._frontend import BreakLevel
 
 
-class ScoreRange(InGameIter[int]):
+class ScoreRange(InGameIterator[int]):
 
     def __init__(self, start, stop, step):
         self.start = start

@@ -1,10 +1,11 @@
 import json
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Any, List, Mapping, Iterable, Tuple, TypeVar, Generic
+from numbers import Number
+from typing import Dict, Optional, Any, List, Mapping, Iterable, Tuple, TypeVar, Generic, Sequence
 
 from .data import InGameData
 from pymcf.jsontext import IJsonText, JsonText, JsonTextComponent
-from pymcf.operations import NbtCopyOp, NbtSetScoreOp
+from pymcf.operations import NbtCopyOp, NbtSetScoreOp, NbtSetValueOp
 from pymcf.util import staticproperty, lazy
 from .._frontend import MCFContext
 
@@ -56,14 +57,24 @@ class NbtData(ABC):
     def convert_from(data: Any) -> "NbtData":
         if isinstance(data, NbtData):
             return data
-        if isinstance(data, dict):
-            return NbtCompound(data)
-        if isinstance(data, list):
-            return NbtList(data)
-        if isinstance(data, str):
-            return NbtString(data)
-        if isinstance(data, int):
+        if isinstance(data, tuple):
             match data:
+                case ba if all(NbtByte._lb <= b <= NbtByte._ub for b in data):
+                    return NbtByteArray(ba)
+                case ia if all(NbtInt._lb <= i <= NbtInt._ub for i in data):
+                    return NbtIntArray(ia)
+                case la if all(NbtLong._lb <= l <= NbtLong._ub for l in data):
+                    return NbtLongArray(la)
+                case out_range:
+                    raise ValueError(f"could not convert {out_range} to nbt number.")
+        if isinstance(data, Mapping):
+            return NbtCompound(data)
+        if isinstance(data, str | JsonText):
+            return NbtString(data)
+        if isinstance(data, Sequence):
+            return NbtList(data)
+        if isinstance(data, int | bool):
+            match int(data):
                 case b if NbtByte._lb <= b <= NbtByte._ub:
                     return NbtByte(b)
                 case s if NbtShort._lb <= s <= NbtShort._ub:
@@ -79,16 +90,6 @@ class NbtData(ABC):
                 return NbtFloat(data)
             else:
                 return NbtDouble(data)
-        if isinstance(data, tuple):
-            match data:
-                case ba if all(NbtByte._lb <= b <= NbtByte._ub for b in data):
-                    return NbtByteArray(ba)
-                case ia if all(NbtInt._lb <= i <= NbtInt._ub for i in data):
-                    return NbtIntArray(ia)
-                case la if all(NbtLong._lb <= l <= NbtLong._ub for l in data):
-                    return NbtLongArray(la)
-                case out_range:
-                    raise ValueError(f"could not convert {out_range} to nbt number.")
 
         raise TypeError(f"cannot convert data to nbt item: {data}")
 
@@ -143,7 +144,7 @@ class NbtCompound(Dict[str, NbtData], NbtData):
 
 class NbtList(List[NbtData], NbtData):
 
-    def __extend_list(self, data: Iterable):
+    def __extend_list(self, data: Sequence):
         for o in data:
             o = NbtData.convert_from(o)
             o._parent = self
@@ -176,8 +177,8 @@ class NbtList(List[NbtData], NbtData):
         __object._parent = self
         super(NbtList, self).append(__object)
 
-    def extend(self, __iterable: Iterable[NbtData | Any]) -> None:
-        self.__extend_list(__iterable)
+    def extend(self, __sequence: Sequence[NbtData | Any]) -> None:
+        self.__extend_list(__sequence)
 
     def clear(self) -> None:
         for o in self:
@@ -202,9 +203,9 @@ class NbtList(List[NbtData], NbtData):
 class NbtString(NbtData):
     __encoder = json.JSONEncoder()
 
-    def __init__(self, value: Optional[str]):
+    def __init__(self, value: Optional[str | JsonText]):
         super().__init__()
-        self.value = value
+        self.value = str(value)
 
     def _serialize(self) -> str:
         return self.__encoder.encode(self.value)
@@ -429,18 +430,20 @@ class Nbt(InGameData, IJsonText):
     def set_value(self, value):
         from pymcf.data import Score
         from pymcf.math import Fixed
-        if isinstance(value, Score):
-            NbtSetScoreOp(self, value, dtype=self._type)
+        if isinstance(value, Score):  # TODO make EntityNbtContainer identifier static
+            NbtSetScoreOp(str(self), value, dtype=self._type)
         elif isinstance(value, Fixed):
-            NbtSetScoreOp(self, value, dtype=self._type, scale=1/value.scale)
+            NbtSetScoreOp(str(self), value, dtype=self._type, scale=1/value.scale)
+        elif isinstance(value, (Number, str, bool, Mapping, Sequence, NbtData)):
+            NbtSetValueOp(str(self), NbtData.convert_from(value))
         else:
             raise ValueError(f"cannot set {type(value)} to nbt")
 
+    def _structure_new_(self) -> "Nbt":
+        return Nbt()
+
     def _transfer_to_(self, other):
         NbtCopyOp(other, self)
-
-    def _new_from_(self) -> "Nbt":
-        return Nbt()
 
 
 _T_Nbt = TypeVar("_T_Nbt", bound=NbtData)
@@ -485,7 +488,7 @@ class EntityNbtContainer(NbtContainer[_T_Nbt]):
         return "entity"
 
     def _get_id_(self):
-        return str(self._identifier)
+        return str(self.identifier)
 
 
 class StorageNbtContainer(NbtContainer[_T_Nbt]):

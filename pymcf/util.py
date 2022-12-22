@@ -1,3 +1,5 @@
+import os.path
+from typing import Type
 
 
 class staticproperty:
@@ -23,10 +25,26 @@ class lazy:
         return self.value
 
 
-_ParamEmpty = object()
-"""
-object witch use as a default parameter to replace `None` when `None` is working as an useful signal.
+def staticclass(cls: Type):
+    """
+    class decorator, make a class static.
+    the class will be replaced by the singleton instance.
 
-def fun(x=_ParamEmpty):
-    self.x = x if x is not _ParamEmpty else ...
+    static class should have no init parameter, use type(cls) get origin class of static class.
+    """
+    instance = cls()
+    cls.__new__ = lambda *_, **__: instance
+    cls.__init__ = lambda *_, **__: None
+    return instance
+
+
+Null = object()
 """
+second None
+"""
+
+
+def create_file_dir(filepath: str):
+    filedir = filepath.replace('\\', '/').rsplit('/', 1)[0]
+    if not os.path.exists(filedir):
+        os.makedirs(filedir)

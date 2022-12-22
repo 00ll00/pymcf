@@ -1,16 +1,18 @@
 import uuid
 from abc import ABC, abstractmethod
+from types import FunctionType
 from typing import Optional, Any, TypeVar, Mapping, final, Generic, Type
 
-from .structure import T_Entity
-from pymcf.data.score import ScoreContainer
+from pymcf import logger
+from pymcf.data.score import ScoreContainer, Score, ScoreDummy, Scoreboard
 from pymcf._frontend.context import MCFContext
 from pymcf.mcversions import MCVer
-from pymcf.project import Project
+from pymcf.operations.entity_ops import AddTagOp
+from pymcf._project import Project
 from pymcf.data.nbt import NbtCompound, EntityNbtContainer, NbtList
 from pymcf.operations import raw, CallMethodOp, Operation
-from pymcf.data.data import InGameEntity, InGameIter, InGameData
-from pymcf.util import _ParamEmpty
+from pymcf.data.data import InGameEntity, InGameIterator, InGameData
+from pymcf.util import Null, lazy
 
 
 class Identifier(ABC):
@@ -20,8 +22,9 @@ class Identifier(ABC):
         ...
 
     def __enter__(self):
-        MCFContext.new_file()
-        return _Self(_Entity(self))
+        entity = n_Entity(identifier=self)  # TODO use Entities
+        MCFContext.new_file(executor=entity)
+        return entity
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         MCFContext.exit_file()
@@ -98,51 +101,51 @@ class Selector(Identifier):
 
     def fork(
             self,
-            x=_ParamEmpty,
-            y=_ParamEmpty,
-            z=_ParamEmpty,
-            dx=_ParamEmpty,
-            dy=_ParamEmpty,
-            dz=_ParamEmpty,
-            distance=_ParamEmpty,
-            scores=_ParamEmpty,
-            tags=_ParamEmpty,
-            teams=_ParamEmpty,
-            names=_ParamEmpty,
-            types=_ParamEmpty,
-            predicates=_ParamEmpty,
-            x_rotation=_ParamEmpty,
-            y_rotation=_ParamEmpty,
-            nbt=_ParamEmpty,
-            level=_ParamEmpty,
-            gamemodes=_ParamEmpty,
-            advancements=_ParamEmpty,
-            limit=_ParamEmpty,
-            sort=_ParamEmpty,
+            x=Null,
+            y=Null,
+            z=Null,
+            dx=Null,
+            dy=Null,
+            dz=Null,
+            distance=Null,
+            scores=Null,
+            tags=Null,
+            teams=Null,
+            names=Null,
+            types=Null,
+            predicates=Null,
+            x_rotation=Null,
+            y_rotation=Null,
+            nbt=Null,
+            level=Null,
+            gamemodes=Null,
+            advancements=Null,
+            limit=Null,
+            sort=Null,
     ):
         return Selector(
             self._is_self,
-            x=(x if x is not _ParamEmpty else self.x),
-            y=(y if y is not _ParamEmpty else self.y),
-            z=(z if z is not _ParamEmpty else self.z),
-            dx=(dx if dx is not _ParamEmpty else self.dx),
-            dy=(dy if dy is not _ParamEmpty else self.dy),
-            dz=(dz if dz is not _ParamEmpty else self.dz),
-            distance=(distance if distance is not _ParamEmpty else self.distance),
-            scores=(scores if scores is not _ParamEmpty else self.score_),
-            tags=(tags if tags is not _ParamEmpty else self.tag_),
-            teams=(teams if teams is not _ParamEmpty else self.team_),
-            names=(names if names is not _ParamEmpty else self.name_),
-            types=(types if types is not _ParamEmpty else self.type_),
-            predicates=(predicates if predicates is not _ParamEmpty else self.predicate_),
-            x_rotation=(x_rotation if x_rotation is not _ParamEmpty else self.x_rotation),
-            y_rotation=(y_rotation if y_rotation is not _ParamEmpty else self.y_rotation),
-            nbt=(nbt if nbt is not _ParamEmpty else self.nbt),
-            level=(level if level is not _ParamEmpty else self.level),
-            gamemodes=(gamemodes if gamemodes is not _ParamEmpty else self.gamemode_),
-            advancements=(advancements if advancements is not _ParamEmpty else self.advancement_),
-            limit=(limit if limit is not _ParamEmpty else self.limit),
-            sort=(sort if sort is not _ParamEmpty else self.sort),
+            x=(x if x is not Null else self.x),
+            y=(y if y is not Null else self.y),
+            z=(z if z is not Null else self.z),
+            dx=(dx if dx is not Null else self.dx),
+            dy=(dy if dy is not Null else self.dy),
+            dz=(dz if dz is not Null else self.dz),
+            distance=(distance if distance is not Null else self.distance),
+            scores=(scores if scores is not Null else self.score_),
+            tags=(tags if tags is not Null else self.tag_),
+            teams=(teams if teams is not Null else self.team_),
+            names=(names if names is not Null else self.name_),
+            types=(types if types is not Null else self.type_),
+            predicates=(predicates if predicates is not Null else self.predicate_),
+            x_rotation=(x_rotation if x_rotation is not Null else self.x_rotation),
+            y_rotation=(y_rotation if y_rotation is not Null else self.y_rotation),
+            nbt=(nbt if nbt is not Null else self.nbt),
+            level=(level if level is not Null else self.level),
+            gamemodes=(gamemodes if gamemodes is not Null else self.gamemode_),
+            advancements=(advancements if advancements is not Null else self.advancement_),
+            limit=(limit if limit is not Null else self.limit),
+            sort=(sort if sort is not Null else self.sort),
         )
 
     def __str__(self):  # TODO finish it
@@ -160,6 +163,9 @@ class Selector(Identifier):
         return ('@s' if self._is_self else '@e') + (f'[{", ".join(params)}]' if params else "")
 
 
+AtS = Selector(is_self=True)
+
+
 class __Not:
 
     def __init__(self, inner: Any):
@@ -172,121 +178,9 @@ class __Not:
         return ~hash(self.inner)
 
 
-class _Self(InGameEntity):
+class EntityBehavior(ABC):
 
-    def __enter__(self):
-        pass  # do nothing when entering self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass  # do nothing when exiting self
-
-    def __init__(self, entity: "_Entity"):
-        self._entity = entity
-        self._origin_identifier = entity._identifier
-        super().__init__(Selector(is_self=True))
-        self._entity._identifier = self._identifier
-
-    def _unwrap_(self) -> "_Entity":
-        self._entity._identifier = self._origin_identifier
-        return self._entity
-
-    def _structure_new_(self):
-        return self
-
-    def _transfer_to_(self, other):
-        # noinspection PyTypeChecker
-        AddTagOp(self, other._id_tag)
-
-    def __getattr__(self, item) -> Any:
-        if item.startswith("_"):
-            return self.__dict__[item]
-        else:
-            return getattr(self._entity, item)
-
-    def __setattr__(self, key: str, value) -> None:
-        if key.startswith("_"):
-            self.__dict__[key] = value
-        else:
-            setattr(self._entity, key, value)
-
-
-__Entity = TypeVar("__Entity", bound=T_Entity)
-
-
-class _Entity(InGameEntity, ScoreContainer, EntityNbtContainer[__Entity], ABC):
-
-    def __init__(self, identifier: Identifier):
-        """
-        init function of an Entity class should not define properties, use `score` or `nbt` instead
-        """
-        InGameEntity.__init__(self, identifier)
-        ScoreContainer.__init__(self, identifier)
-        EntityNbtContainer.__init__(self, identifier)
-
-    def __enter__(self):
-        MCFContext.new_file()
-        return _Self(self)
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        MCFContext.exit_file()
-        CallMethodOp(self._identifier, MCFContext.last_file().name)
-
-    @classmethod
-    def class_tag(cls) -> str:
-        return f"{Project.namespace}.cls_{cls.__qualname__}"
-
-    def _structure_new_(self) -> "_Entity":
-        return _Entity(Selector(tags={MCFContext.new_entity_tag()}))
-
-    def _transfer_to_(self, other):
-        AddTagOp(self, other._id_tag)  # TODO
-
-
-_T_E = TypeVar("_T_E", bound=_Entity)
-
-
-class _Newable(_Entity[__Entity], ABC):
-
-    @classmethod
-    @abstractmethod
-    def entity_type(cls) -> str:
-        ...
-
-    @final
-    def __new__(cls, *args, **kwargs):
-        self = super().__new__(cls)
-        self.type_name = cls.entity_type()
-        # noinspection PyUnresolvedReferences
-        self._init_tags = [clz.class_tag() for clz in cls.mro() if
-                           not clz.__name__.startswith('_') and _Entity in clz.mro()]
-        return self
-
-    def __init__(self, pos, nbt: Optional[NbtCompound | Mapping[str, Any]]):
-        self._id_tag = MCFContext.new_entity_tag()
-        super().__init__(Selector(tags={self._id_tag}, types={self.type_name}, limit=1))
-        nbt = NbtCompound.convert_from({nbt}) if nbt is not None else NbtCompound()
-        if "Tags" not in nbt:
-            nbt["Tags"] = NbtList()
-        self._init_tags.append(self._id_tag)
-        # noinspection PyUnresolvedReferences
-        nbt["Tags"].extend(self._init_tags)
-        raw(f"""summon {self.type_name} {pos[0]} {pos[1]} {pos[2]} {nbt._serialize() if nbt is not None else ""}""")
-
-    @classmethod
-    def each_one(cls: Type[_T_E]) -> "_Entities[_T_E]":
-        return _Entities(cls)
-
-    @classmethod
-    def selector(cls) -> Selector:
-        return Selector(types={cls.entity_type()}, tags={cls.class_tag()})
-
-    def _transfer_to_(self, other: "_Newable"):
-        AddTagOp(self, other._id_tag)  # TODO tag will be removed when function finished
-
-
-class _NormalEntity(_Newable[__Entity], ABC):
-
-    def tp(self, *pos):
+    def tp(self, *pos):  # TODO finish tp method
         if len(pos) == 3:
             raw(f"""tp {self} {pos[0]} {pos[1]} {pos[2]}""")
         elif isinstance(pos[0], str):
@@ -295,86 +189,201 @@ class _NormalEntity(_Newable[__Entity], ABC):
     def kill(self):
         raw(f"""kill {self}""")
 
-    def _structure_new_(self):
+
+class n_Entity(InGameEntity, ScoreContainer, EntityNbtContainer, EntityBehavior, ABC):
+    """
+    base class for all Entity type.
+    use 'score'/'nbt' property to access all the score/nbt vars associated to this entity.
+    all class inherit Entity should not define properties in `__init__` method.
+    """
+
+    __id_num = 0
+
+    def __new__(cls, *args, **kwargs):
+        self = super().__new__(cls)
         return self
 
+    def __init__(self, identifier: Identifier = None):
+        """
+        init function of an Entity class should not define properties, use `score` or `nbt` instead.
+        """
+        if identifier is None:
+            identifier = Selector(types={self.entity_type()}, tags={self.id_tag})
+        ScoreContainer.__init__(self, identifier)
+        EntityNbtContainer.__init__(self, identifier)
 
-class _Entities(InGameIter[_T_E], Generic[_T_E]):
-
-    def __init__(self, cls, identifier: Identifier = None):
-        self._cls = cls
-        self._identifier = identifier if identifier is not None else Selector(types={cls.entity_type()}, tags={cls.class_tag()})
-
-    def __enter__(self) -> _T_E:
-        MCFContext.new_file()
-        entity = object.__new__(self._cls)
-        _Entity.__init__(entity, self._identifier)
-        for k, v in self._cls.__dict__.items():
-            if isinstance(v, staticmethod):
-                entity.__dict__[k] = v
-        # noinspection PyTypeChecker
-        return _Self(entity)
+    def __enter__(self):
+        MCFContext.new_file(executor=self)
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         MCFContext.exit_file()
         CallMethodOp(self._identifier, MCFContext.last_file().name)
 
-    def filtered(self, **kwargs) -> "_Entities[_T_E]":
+    @property
+    def identifier(self):
+        """
+        get identifier of this entity in current function context.
+        """
+        if MCFContext.in_context and MCFContext.current.current_file().executor is self:
+            return AtS
+        else:
+            return self._identifier
+
+    @classmethod
+    def entity_type(cls) -> Optional[str]:
+        """
+        entity type fullname for selector. return None if not available.
+
+        this method could be implemented as a classmethod or not. if this method is implemented as a normal method,
+        `self` argument should set a default value to avoid argument missing exception.
+        """
+        return None
+
+    @property
+    @lazy
+    def id_tag(self) -> str:
+        """
+        unique tag for instance of Entity.
+        """
+        n_Entity.__id_num += 1
+        return f"_tag_{n_Entity.__id_num}"
+
+    @classmethod
+    def class_tag(cls) -> str:
+        return f"_cls_{cls.__qualname__}"
+
+    @classmethod
+    def each_one(cls):
+        return n_Entities(cls)
+
+    @classmethod
+    def selector(cls) -> Selector:
+        return Selector(types={cls.entity_type()}, tags={cls.class_tag()})
+
+    def _structure_new_(self):
+        cls = type(self)
+        entity = cls.__new__(cls)
+        n_Entity.__init__(entity)
+        return entity
+
+    def _transfer_to_(self, other):
+        AddTagOp(self, other.id_tag)
+
+
+class n_Newable(n_Entity, ABC):
+
+    @final
+    def __new__(cls, *args, **kwargs):
+        self = super().__new__(cls)
+        self.type_name = cls.entity_type()
+        # noinspection PyUnresolvedReferences
+        self._init_tags = [clz.class_tag() for clz in cls.mro() if
+                           not clz.__name__.startswith('n_') and n_Entity in clz.mro()]
+        return self
+
+    def __init__(self, pos, nbt: Optional[NbtCompound | Mapping[str, Any]]):
+        super().__init__(Selector(tags={self.id_tag}, types={self.type_name}, limit=1))
+        nbt = NbtCompound.convert_from({nbt}) if nbt is not None else NbtCompound()
+        if "Tags" not in nbt:
+            nbt["Tags"] = NbtList()
+        self._init_tags.append(self.id_tag)
+        # noinspection PyUnresolvedReferences
+        nbt["Tags"].extend(self._init_tags)
+        raw(f"""summon {self.type_name} {pos[0]} {pos[1]} {pos[2]} {nbt._serialize() if nbt is not None else ""}""")
+        MCFContext.assign_arg_entity(self)
+
+    @classmethod
+    @abstractmethod
+    def entity_type(cls) -> str:
+        """
+        entity type full name for summon command.
+        """
+        ...
+
+
+class n_Entities(InGameIterator, InGameEntity):  # TODO Entities should be parent class of Entity, and Entity is the special case of Entities witch limit always be 1. maybe
+
+    def __init__(self, cls, identifier: Identifier = None):
+        self._cls = cls
+        self._identifier = identifier if identifier is not None else Selector(types={cls.entity_type()},
+                                                                              tags={cls.class_tag()})
+
+    def __enter__(self):
+        entity = n_Entity.__new__(self._cls)
+        n_Entity.__init__(entity, self._identifier)
+        MCFContext.new_file(executor=entity)
+        return entity
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        MCFContext.exit_file()
+        CallMethodOp(self.identifier, MCFContext.last_file().name)
+
+    @property
+    def identifier(self):
+        if MCFContext.in_context and MCFContext.current.current_file().executor is self:
+            return AtS
+        else:
+            return self._identifier
+
+    def filtered(self, **kwargs) -> "n_Entities":
         """
         return Entities with modified selector
         """
-        return _Entities(self._cls, self._identifier.fork(**kwargs))
+        return n_Entities(self._cls, self.identifier.fork(**kwargs))
 
-    def _iter_init(self):
+    def _iter_init_(self):
         pass
 
-    def _iter_next(self, brk_flag) -> InGameData:
+    def _iter_next_(self, brk_flag) -> InGameData:
+        pass
+
+    def _iter_end_(self):
         pass
 
     def _transfer_to_(self, other):
         pass
 
-    def _structure_new_(self) -> "_Entities[_T_E]":
+    def _structure_new_(self) -> "n_Entities":
         pass
 
 
-class AddTagOp(Operation):
+class n_EntityHolder(n_Entity):
 
-    def __init__(self, target: InGameEntity, tag: str, offline: bool = False):
-        self.target = target
-        self.tag = tag
-        super().__init__(offline)
+    def __init__(self, child_cls, identifier):
+        super().__init__(identifier)
+        self.child_cls = child_cls
+        id_max = Score(entity=ScoreDummy("id_max"), objective=Scoreboard.SYS)
+        self.score.id.set_value(id_max)
+        id_max += 1
 
-    def gen_code(self, mcver: MCVer) -> str:
-        return f'tag add {self.target} {self.tag}'
+    def add_child(self, child: n_Entity):
+        child.score.owner.set_value(self.score.id)
 
-
-class DelTagOp(Operation):
-
-    def __init__(self, target: InGameEntity, tag: str, offline: bool = False):
-        self.target = target
-        self.tag = tag
-        super().__init__(offline)
-
-    def gen_code(self, mcver: MCVer) -> str:
-        return f'tag remove {self.target} {self.tag}'
+    def children_run(self, method):
+        AddTagOp(self, "__eholder__")
+        return n_Entities(self.child_cls).filtered()
 
 
-class Marker(_NormalEntity):
-
-    @classmethod
-    def entity_type(cls) -> str:
-        return "minecraft:marker"
-
-    def __init__(self, pos, nbt: Optional[NbtCompound]):
-        super().__init__(pos, nbt)
-
-
-__all__ = [
-    "Identifier",
-    "UUID",
-    "Name",
-    "Selector",
-
-    "Marker"
-]
+# def entity(cls: Type):
+#     """
+#     entity class decorator.
+#
+#     apply to an inherit class of `Entity`.
+#     """
+#     if n_Entity not in cls.mro():
+#         raise TypeError("entity decorator expect an Entity class")
+#     if '__annotations__' in cls.__dict__:
+#         for k, v in cls.__annotations__.items():
+#             if v is Score:
+#                 cls.__dict__[k] = property(
+#                     lambda self: self.score[k],
+#                     lambda self, value: self.score[k].set_value(value),
+#                     lambda self: self.score[k].set_value(None)
+#                 )
+#             elif v is Nbt:
+#                 cls.__dict__[k] = property(
+#                     lambda self: self.nbt[k],
+#                     lambda self, value: self.score[k].set_value(value),
+#                     lambda self: self.score[k].set_value(None)
+#                 )

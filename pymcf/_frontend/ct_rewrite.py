@@ -4,13 +4,14 @@ from types import CodeType
 from typing import List, Optional, Any, Set, Iterable
 
 from pymcf.operations import raw
-from pymcf._frontend.pyops import PyOps, JMP, JABS, JMP_IF, JREL, JMP_ALWAYS
+from pymcf._frontend.pyops import PyOps, JMP, JABS, JREL
 
 
 class CodeTypeRewriter:
 
-    def __init__(self, ct: CodeType):
+    def __init__(self, ct: CodeType, rewrite_return: bool = True):
         self.origin = ct
+        self.rewrite_return = rewrite_return
 
         self.co_argcount = ct.co_argcount
         self.co_posonlyargcount = ct.co_posonlyargcount
@@ -36,6 +37,8 @@ class CodeTypeRewriter:
                 if not -128 <= instr.offset - last_off < 128:
                     continue  # skip out range
                 lnotab.append(instr.offset - last_off)
+                if not -128 <= instr.line_code - last_line < 128:
+                    continue  # skip out range
                 if instr.line_code > last_line:
                     lnotab.append(instr.line_code - last_line)
                 else:
@@ -50,7 +53,7 @@ class CodeTypeRewriter:
             self.co_posonlyargcount,
             self.co_kwonlyargcount,
             len(self.co_varnames),
-            ct.co_stacksize + 1,
+            ct.co_stacksize + 3,
             ct.co_flags,
             code,
             tuple(self.co_consts),
@@ -141,14 +144,6 @@ class Instr:
     def is_jmp(self) -> bool:
         return self.op in JMP
 
-    @property
-    def is_jmp_if(self) -> bool:
-        return self.op in JMP_IF
-
-    @property
-    def is_jmp_always(self) -> bool:
-        return self.op in JMP_ALWAYS
-
     def __eq__(self, other):
         if isinstance(other, Instr):
             return self.op is other.op and self.arg == other.arg
@@ -171,28 +166,61 @@ class CodeChain:
 
     def __init__(self, pyc: CodeTypeRewriter, subs: List[Instr]):
         self.pyc = pyc
-        self.subs: List[Instr] = subs
+        self.subs: List[Instr] = []
         self.final_subs: List[Instr] = []
 
+        # ext_arg = 0
+        # i = 0
+        # while i < len(subs):
+        #     instr = subs[i]
+        #     if instr.op is PyOps.EXTENDED_ARG:
+        #         ext_arg <<= 8
+        #         ext_arg += instr.arg
+        #     elif ext_arg > 0:
+        #         ext_arg <<= 8
+        #         ext_arg += instr.arg
+        #         instr.arg = ext_arg
+        #         ext_arg = 0
+        #     i += 1
+
+        # build jump relationship
         i = 0
-        while i < len(self.subs):
-            curr = self.subs[i]
+        while i < len(subs):
+            instr = subs[i]
+            if instr.is_jabs:
+                instr.set_jmp_targ(subs[instr.arg])
+            elif instr.is_jrel:
+                instr.set_jmp_targ(subs[instr.offset // 2 + instr.arg + 1])
+            i += 1
+
+        # remove extended arg
+        i = 0
+        while i < len(subs):
+            instr = subs[i]
+            if instr.op is PyOps.EXTENDED_ARG:
+                for jf in instr.jmp_froms.copy():
+                    jf.set_jmp_targ(subs[i+1])
+            else:
+                self.subs.append(instr)
+            i += 1
+
+        for i, curr in enumerate(self.subs):
             last = None if i == 0 else self.subs[i - 1]
 
-            # (BUILD_STRING | LOAD_CONST) POP_TOP
-            # convert lonely formatted string to mcfunction part
-            if curr.op is PyOps.POP_TOP and last is not None and last.op in {PyOps.BUILD_STRING, PyOps.LOAD_CONST}:
-                self.final_subs.extend((
-                    Instr(PyOps.LOAD_CONST, self.pyc.add_const(raw)),
-                    Instr(PyOps.ROT_TWO),
-                    Instr(PyOps.CALL_FUNCTION, 1)
-                ))
+            match curr.op:
+                # (BUILD_STRING | LOAD_CONST) POP_TOP
+                # convert lonely formatted string to mcfunction part
+                case PyOps.POP_TOP if last is not None and last.op in {PyOps.BUILD_STRING, PyOps.LOAD_CONST}:
+                    self.final_subs.extend((
+                        Instr(PyOps.LOAD_CONST, self.pyc.add_const(raw)),
+                        Instr(PyOps.ROT_TWO),
+                        Instr(PyOps.CALL_FUNCTION, 1)
+                    ))
 
-            # STORE_FAST | STORE_ATTR | STORE_SUBSCR | STORE_NAME | STORE_GLOBAL | STORE_DEREF
-            #  direct Score assignment (e.g. a = 1)
-            elif curr.op in {PyOps.STORE_FAST, PyOps.STORE_ATTR, PyOps.STORE_SUBSCR, PyOps.STORE_NAME, PyOps.STORE_GLOBAL, PyOps.STORE_DEREF}:
-                match curr.op:
-                    case PyOps.STORE_FAST:
+                # STORE_FAST | STORE_ATTR | STORE_SUBSCR | STORE_NAME | STORE_GLOBAL | STORE_DEREF
+                #  direct Score assignment (e.g. a = 1)
+                case op if op in {PyOps.STORE_FAST, PyOps.STORE_DEREF}:
+                    if not self.pyc.co_varnames[curr.arg].startswith("<raw>"):
                         self.final_subs.extend((
                             Instr(PyOps.LOAD_CONST, self.pyc.add_const(self.pyc.co_varnames[curr.arg])),
                             Instr(PyOps.LOAD_CONST, self.pyc.add_const(locals)),
@@ -205,41 +233,53 @@ class CodeChain:
                             Instr(PyOps.CALL_FUNCTION, 2)
                         ))
                         jmp1.set_jmp_targ(curr)
-                    case PyOps.STORE_GLOBAL:
+                case op if op in {PyOps.STORE_GLOBAL, PyOps.STORE_NAME}:
+                    if not self.pyc.co_names[curr.arg].startswith("<raw>"):
                         self.final_subs.extend((
-                            Instr(PyOps.LOAD_GLOBAL, curr.arg),
+                            Instr(PyOps.LOAD_CONST, self.pyc.add_const(self.pyc.co_names[curr.arg])),
+                            Instr(PyOps.LOAD_CONST, self.pyc.add_const(globals)),
+                            Instr(PyOps.CALL_FUNCTION, 0),
+                            Instr(PyOps.CONTAINS_OP, 0),
+                    jmp2 := Instr(PyOps.POP_JUMP_IF_FALSE, +5),
+                            Instr(PyOps.LOAD_NAME, curr.arg),
                             Instr(PyOps.LOAD_CONST, self.pyc.add_const(convert_assign)),
                             Instr(PyOps.ROT_THREE),
                             Instr(PyOps.CALL_FUNCTION, 2)
                         ))
-                    case PyOps.STORE_ATTR:
-                        self.final_subs.extend((
-                            Instr(PyOps.DUP_TOP),
-                            Instr(PyOps.ROT_THREE),
-                            Instr(PyOps.LOAD_ATTR, curr.arg),
-                            Instr(PyOps.LOAD_CONST, self.pyc.add_const(convert_assign)),
-                            Instr(PyOps.ROT_THREE),
-                            Instr(PyOps.CALL_FUNCTION, 2),
-                            Instr(PyOps.ROT_TWO)
-                        ))
-                    case PyOps.STORE_SUBSCR:
-                        self.final_subs.extend((
-                            Instr(PyOps.DUP_TOP_TWO),
-                            Instr(PyOps.ROT_N, 5),
-                            Instr(PyOps.ROT_N, 5),
-                            Instr(PyOps.BINARY_SUBSCR, curr.arg),
-                            Instr(PyOps.LOAD_CONST, self.pyc.add_const(convert_assign)),
-                            Instr(PyOps.ROT_THREE),
-                            Instr(PyOps.CALL_FUNCTION, 2),
-                            Instr(PyOps.ROT_THREE)
-                        ))
-                    # TODO convert assignment instructions
-                    # case PyOps.STORE_NAME:
-                    #     self.instructions.insert(i, Instr(PyOps.LOAD_NAME, curr.arg))
-                    # case PyOps.STORE_DEREF:
-                    #     self.instructions.insert(i, Instr(PyOps.LOAD_DEREF, curr.arg))
+                        jmp2.set_jmp_targ(curr)
+                case PyOps.STORE_ATTR:
+                    self.final_subs.extend((
+                        Instr(PyOps.DUP_TOP),
+                        Instr(PyOps.ROT_THREE),
+                        Instr(PyOps.LOAD_ATTR, curr.arg),
+                        Instr(PyOps.LOAD_CONST, self.pyc.add_const(convert_assign)),
+                        Instr(PyOps.ROT_THREE),
+                        Instr(PyOps.CALL_FUNCTION, 2),
+                        Instr(PyOps.ROT_TWO)
+                    ))
+                case PyOps.STORE_SUBSCR:
+                    self.final_subs.extend((
+                        Instr(PyOps.DUP_TOP_TWO),
+                        Instr(PyOps.ROT_N, 5),
+                        Instr(PyOps.ROT_N, 5),
+                        Instr(PyOps.BINARY_SUBSCR, curr.arg),
+                        Instr(PyOps.LOAD_CONST, self.pyc.add_const(convert_assign)),
+                        Instr(PyOps.ROT_THREE),
+                        Instr(PyOps.CALL_FUNCTION, 2),
+                        Instr(PyOps.ROT_THREE)
+                    ))
+
+                # RETURN_VALUE
+                case PyOps.RETURN_VALUE:
+                    # LOAD_GLOBAL    <raw return>
+                    # CALL_FUNCTION  0
+                    # RETURN_VALUE
+                    if self.pyc.rewrite_return and \
+                            not (self.subs[i-2].op is PyOps.LOAD_GLOBAL and pyc.co_names[self.subs[i-2].arg] == "<raw return>"):
+                        self.final_subs.append(Instr(PyOps.POP_TOP))
+                        continue
+
             self.final_subs.append(curr)
-            i += 1
 
     def _compute_offset(self, offset):
         self.offset = offset
@@ -252,7 +292,7 @@ class CodeChain:
                     i += 1
                     ext.offset = offset
                     offset += 2
-                for jf in instr.jmp_froms:
+                for jf in instr.jmp_froms.copy():
                     jf.set_jmp_targ(exts[0])
             instr.offset = offset
             offset += 2
@@ -301,6 +341,15 @@ class CodeChain:
         while self._compute_jmp_pos():
             self._compute_offset(self.offset)
         return self.final_subs
+
+    def _dbg_print_top(self) -> List[Instr]:
+        return [
+            Instr(PyOps.DUP_TOP),
+            Instr(PyOps.LOAD_CONST, self.pyc.add_const(print)),
+            Instr(PyOps.ROT_TWO),
+            Instr(PyOps.CALL_FUNCTION, 1),
+            Instr(PyOps.POP_TOP)
+        ]
 
 
 def convert_assign(value: Any, var: Any):

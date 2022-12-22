@@ -1,6 +1,8 @@
+from typing import Any
+
 from .. import MCVer as MCVer
 from .operations import Operation as Operation
-from ..data import Nbt, Score
+from ..data import Nbt, Score, NbtData
 
 
 class NbtCopyOp(Operation):
@@ -15,4 +17,11 @@ class NbtSetScoreOp(Operation):
     dtype: str
     scale: float
     def __init__(self, target: Nbt, score: Score, dtype: str = ..., scale: float = ...) -> None: ...
+    def gen_code(self, mcver: MCVer) -> str: ...
+
+
+class NbtSetValueOp(Operation):
+    target: Nbt
+    value: NbtData
+    def __init__(self, target: Nbt, value: NbtData) -> None: ...
     def gen_code(self, mcver: MCVer) -> str: ...

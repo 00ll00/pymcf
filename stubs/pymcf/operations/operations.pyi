@@ -1,6 +1,6 @@
 from abc import ABC
 from pymcf.mcversions import MCVer as MCVer
-from pymcf.project import Project as Project
+from pymcf._project import Project as Project
 from pymcf.entity import Identifier
 
 
@@ -23,7 +23,7 @@ class CallFunctionOp(Operation):
     def gen_code(self, mcver: MCVer) -> str: ...
 
 class CallMethodOp(Operation):
-    origin_identifier: Identifier
+    identifier: Identifier
     func_full_name: str
-    def __init__(self, origin_identifier, func_full_name: str, offline: bool = ...) -> None: ...
+    def __init__(self, identifier: Identifier, func_full_name: str, offline: bool = ...) -> None: ...
     def gen_code(self, mcver: MCVer) -> str: ...

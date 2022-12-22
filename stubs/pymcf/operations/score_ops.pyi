@@ -4,6 +4,18 @@ from ..data import Score
 from ..jsontext import JsonText
 
 
+class ISVOp(Operation):
+    IADD: str
+    ISUB: str
+    IMUL: str
+    IDIV: str
+    IMOD: str
+    score: Score
+    value: int
+    op: str
+    def __init__(self, score: Score, value: int, op: str, offline: bool = ...): ...
+
+
 class ScoreSetValueOp(Operation):
     score: Score
     value: int

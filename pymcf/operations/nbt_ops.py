@@ -24,3 +24,14 @@ class NbtSetScoreOp(Operation):
 
     def gen_code(self, mcver: MCVer) -> str:
         return f"execute store result {self.target} {self.dtype} {self.scale} run scoreboard players get {self.score}"
+
+
+class NbtSetValueOp(Operation):
+
+    def __init__(self, target, value):
+        self.target = target
+        self.value = value
+        super().__init__()
+
+    def gen_code(self, mcver: MCVer) -> str:
+        return f"data modify {self.target} set value {self.value}"
