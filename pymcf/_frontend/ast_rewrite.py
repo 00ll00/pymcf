@@ -1,7 +1,7 @@
 import inspect
 from _ast import If, IfExp, FunctionDef, Call, Name, expr, Load, Assign, Store, stmt, arguments, Pass, With, \
     withitem, Constant, Or, BoolOp, Attribute, Nonlocal, Return, AnnAssign, Compare, And, NamedExpr, Assert, boolop, \
-    Not, FormattedValue, UnaryOp, While, Continue, Break, For, Expr
+    Not, FormattedValue, UnaryOp, While, Continue, Break, For, Expr, ClassDef
 from abc import ABC
 from ast import parse as parse_ast, AST, NodeTransformer, fix_missing_locations
 from types import FunctionType, CodeType
@@ -190,24 +190,16 @@ class LoopCtxManager(CtxManager):
 
 class FuncCtxManager(LoopCtxManager):
     """
-    manage function def
+    manage toplevel function def
     """
 
-    @staticmethod
-    def is_top_level() -> bool:
-        ctx = CtxManager._current
-        while not isinstance(ctx, FuncCtxManager):
-            ctx = ctx.parent
-        return ctx._is_top_level
-
-    def __init__(self, top_level: bool = False):
+    def __init__(self):
         super().__init__()
         self.brk_flag = self.new_break()
         self.ingame: bool = True
-        self._is_top_level = top_level
 
     def after_exit(self):
-        return
+        CallFunctionOp(MCFContext.last_file().name)
 
     def receive_break(self, brk_lvl: BreakLevel):
         assert brk_lvl >= BreakLevel.RETURN
@@ -225,7 +217,7 @@ class MCFTransformer(NodeTransformer):
         self._helper_funcs = []
         self._helper_vars = []
         self._is_const_loop = []
-        self._func_num = 0
+        self._toplevel_visited = False
         MCFTransformer._current = self
 
     @staticmethod
@@ -579,7 +571,7 @@ class MCFTransformer(NodeTransformer):
         else:
             return node
 
-    def visit_Continue(self, node: Continue) -> stmt:
+    def visit_Continue(self, node: Continue) -> stmt:  # continue in nested function will not be visited
         # use return to cut remaining statements. return will be removed in code type rewriting.
         return With(
             items=[
@@ -591,7 +583,7 @@ class MCFTransformer(NodeTransformer):
             ]
         ) if not self._is_const_loop[-1] else node
 
-    def visit_Break(self, node: Break) -> stmt:
+    def visit_Break(self, node: Break) -> stmt:  # break in nested function will not be visited
         # use return to cut remaining statements. return will be removed in code type rewriting.
         return With(
             items=[
@@ -603,29 +595,17 @@ class MCFTransformer(NodeTransformer):
             ]
         ) if not self._is_const_loop[-1] else node
 
-    def visit_Return(self, node: Return) -> stmt:
+    def visit_Return(self, node: Return) -> stmt:  # return in nested function will not be visited
         # return will be removed in code type rewriting.
         node = self.generic_visit(node)
 
         # if this function is not toplevel function, it should work as inline
-        new_node = If(
-            test=Call(
-                func=self.Const(FuncCtxManager.is_top_level),
-                args=[],
-                keywords=[]
-            ),
-            body=[
-                With(
-                    items=[
-                        withitem(context_expr=Call(func=self.Const(DummyCtxManager), args=[], keywords=[]))
-                    ],
-                    body=[
-                        self._build_break_stmt(BreakLevel.RETURN),
-                        node
-                    ]
-                )
+        new_node = With(
+            items=[
+                withitem(context_expr=Call(func=self.Const(DummyCtxManager), args=[], keywords=[]))
             ],
-            orelse=[
+            body=[
+                self._build_break_stmt(BreakLevel.RETURN),
                 node
             ]
         ) if not self._inline else node
@@ -797,24 +777,28 @@ class MCFTransformer(NodeTransformer):
 
         return new_node
 
-    def visit_FunctionDef(self, node: FunctionDef) -> Any:
-        node = self.generic_visit(node)
-        self._func_num += 1
-        node.decorator_list.clear()  # TODO remove @mcfunction only
-        node.body = [
-            With(
-                items=[
-                    withitem(
-                        context_expr=Call(
-                            func=self.Const(FuncCtxManager),
-                            args=[Constant(self._func_num == 1)],
-                            keywords=[]
+    def visit_FunctionDef(self, node: FunctionDef) -> Any:  # don't visit nested function def
+        if not self._toplevel_visited:
+            self._toplevel_visited = True
+            node = self.generic_visit(node)
+            node.decorator_list.clear()
+            node.body = [
+                With(
+                    items=[
+                        withitem(
+                            context_expr=Call(
+                                func=self.Const(FuncCtxManager),
+                                args=[],
+                                keywords=[]
+                            )
                         )
-                    )
-                ],
-                body=node.body
-            )
-        ]
+                    ],
+                    body=node.body
+                )
+            ]
+        return node
+
+    def visit_ClassDef(self, node: ClassDef) -> Any:  # don't visit nested class def
         return node
 
     def visit_Assign(self, node: Assign) -> Any:
