@@ -1,13 +1,10 @@
-import ast
 import sys
 from ast import *
 import inspect
-from contextvars import ContextVar
 from types import FunctionType
 from typing import Any
 
-from . import  Context, ExcSet, Scope
-from ._syntactic import ExcHandle, RtUnreachable
+from . import Context, Scope
 from . import syntactic
 from .runtime import *
 
@@ -372,7 +369,7 @@ class ASTRewriter(NodeTransformer):
                         else:
                             yield self.CF_RAISE, None, self._last_exc
 
-                excs = syntactic.For(self.iterator, sc_iter, sc_body, sc_else)
+                excs = syntactic.For(self.iterator, sc_iter, sc_body, sc_else).excs
                 if excs.always:
                     yield self.CF_RAISE, RtUnreachable()
             else:
@@ -600,7 +597,7 @@ class ASTRewriter(NodeTransformer):
                                                     value=Name(id=name_handler, ctx=Load()),
                                                     attr='exc_handler',
                                                     ctx=Load())))],
-                                    body=node.orelse if node.orelse else [ast.Pass()])]),
+                                    body=node.orelse if node.orelse else [Pass()])]),
                         match_case(
                             pattern=MatchValue(value=Constant(value=self.WhileHandler.CF_RAISE)),
                             body=[
@@ -618,14 +615,14 @@ class ASTRewriter(NodeTransformer):
             super().__init__()
             self.captures: list[tuple[type[Exception]]] = [e if isinstance(e, tuple) else (e,) for e in captures]
             all_exc_types = []
-            if len(self.captures) == 0:
-                self.is_rt_try = False
-            else:
-                self.is_rt_try = is_rt_exception(self.captures[0][0])
+            # if len(self.captures) == 0:
+            #     self.is_rt_try = False
+            # else:
+            #     self.is_rt_try = is_rt_exception(self.captures[0][0])
             for eg in self.captures:
                 for et in eg:
-                    if self.is_rt_try ^ is_rt_exception(et):
-                        raise TypeError("单个 try 语句不能同时捕获编译期异常和运行期异常")
+                    if not is_rt_exception(et):
+                        raise TypeError("不能同时捕获编译期异常")
                     all_exc_types.append(et)
             self.all_exc_types = tuple(all_exc_types)
 
@@ -638,7 +635,7 @@ class ASTRewriter(NodeTransformer):
             e.__context__ = last
 
         def control_flow(self):
-            if self.is_rt_try:
+            # if self.is_rt_try:
                 with enter_scope() as sc_try:
                     yield self.CF_TRY, None
                     if self._last_exc is not None:
@@ -687,7 +684,7 @@ class ASTRewriter(NodeTransformer):
                                     self._last_exc.__record__()
                                 elif not is_rt_exception(self._last_exc):
                                     yield self.CF_RAISE, self._last_exc
-                        excepts.append(ExcHandle(eg=real_eg, sc_handle=sc_except))
+                        excepts.append(syntactic.ExcHandle(eg=real_eg, sc_handle=sc_except))
                         handlers_exc.update(sc_except.excs.set)
 
                     with enter_scope() as sc_else:
@@ -710,48 +707,48 @@ class ASTRewriter(NodeTransformer):
                 excs = syntactic.Try(sc_try, excepts, sc_else, sc_finally).excs
                 if excs.always:
                     yield self.CF_RAISE, RtUnreachable()
-            else:
-                exc_body = exc_except = exc_else = exc_finally = None
-                # TRY
-                yield self.CF_TRY, None
-                if self._last_exc is not None:
-                    # {body} 出现异常
-                    exc_body = self._last_exc
-
-                # EXCEPT
-                if exc_body is not None:
-                    self._last_exc = None
-                    for i, eg in enumerate(self.captures):
-                        if isinstance(exc_body, eg):
-                            yield self.CF_EXCEPT + i, exc_body
-                            exc_except = self._last_exc
-                            if exc_except is not None:
-                                self.chain_exc(exc_body, exc_except)
-
-                #ELSE
-                else:
-                    self._last_exc = None
-                    yield self.CF_ELSE, None
-                    if self._last_exc is not None:
-                        # {orelse} 出现异常，先跳转 {finally}
-                        exc_else = self._last_exc
-
-                # FINALLY
-                self._last_exc = None
-                yield self.CF_FINALLY, None
-                if self._last_exc is not None:
-                    # {finally} 出现异常
-                    exc_finally = self._last_exc
-                    if isinstance(exc_finally, RtBaseExc):
-                        # finally 中的流程控制语句优先执行，同时忽略其他异常
-                        exc_finally.__record__()
-                        return
-                    if (exc_except or exc_else) is not None:
-                        self.chain_exc((exc_except or exc_else), exc_finally)
-                    yield self.CF_RAISE, exc_finally
-                elif exc_else is not None:
-                    # {finally} 无异常但 {orelse} 有异常
-                    yield self.CF_RAISE, exc_else
+            # else:
+            #     exc_body = exc_except = exc_else = exc_finally = None
+            #     # TRY
+            #     yield self.CF_TRY, None
+            #     if self._last_exc is not None:
+            #         # {body} 出现异常
+            #         exc_body = self._last_exc
+            #
+            #     # EXCEPT
+            #     if exc_body is not None:
+            #         self._last_exc = None
+            #         for i, eg in enumerate(self.captures):
+            #             if isinstance(exc_body, eg):
+            #                 yield self.CF_EXCEPT + i, exc_body
+            #                 exc_except = self._last_exc
+            #                 if exc_except is not None:
+            #                     self.chain_exc(exc_body, exc_except)
+            #
+            #     #ELSE
+            #     else:
+            #         self._last_exc = None
+            #         yield self.CF_ELSE, None
+            #         if self._last_exc is not None:
+            #             # {orelse} 出现异常，先跳转 {finally}
+            #             exc_else = self._last_exc
+            #
+            #     # FINALLY
+            #     self._last_exc = None
+            #     yield self.CF_FINALLY, None
+            #     if self._last_exc is not None:
+            #         # {finally} 出现异常
+            #         exc_finally = self._last_exc
+            #         if isinstance(exc_finally, RtBaseExc):
+            #             # finally 中的流程控制语句优先执行，同时忽略其他异常
+            #             exc_finally.__record__()
+            #             return
+            #         if (exc_except or exc_else) is not None:
+            #             self.chain_exc((exc_except or exc_else), exc_finally)
+            #         yield self.CF_RAISE, exc_finally
+            #     elif exc_else is not None:
+            #         # {finally} 无异常但 {orelse} 有异常
+            #         yield self.CF_RAISE, exc_else
 
     def visit_Try(self, node):
         """
@@ -994,42 +991,99 @@ class ASTRewriter(NodeTransformer):
                 raise
         return self.add_call(handler, *node.values)
 
+    def assign_handler(self, target, value):
+        if isinstance(target, RtBaseData):
+            target.__assign__(value)
+            return True
+        return False
 
-    # def visit_Assign(self, node):
-    #     """
-    #     target = value
-    #
-    #     =====>
-    #
-    #     tmp_value = value
-    #     try:
-    #         tmp_target = target
-    #     except Exception:
-    #         target = tmp_value
-    #     else:
-    #         if not assign_handler(tmp_target, tmp_value):
-    #             target = tmp_value
-    #
-    #     =============
-    #
-    #     target_i, ... = value
-    #
-    #     =====>
-    #
-    #
-    #
-    #     =============
-    #
-    #     target1, *target2, target3 = value
-    #
-    #     带 * 的赋值只能在所有左值均是编译期量时进行，以保证行为一致性
-    #
-    #     """
-    #     node = self.generic_visit(node)
-    #
-    #     targets = node.targets
+    def visit_Assign(self, node):
+        """
+        target = value
+
+        =====>
+
+        tmp_value = value
+        try:
+            tmp_target = target
+        except Exception:
+            target = tmp_value
+        else:
+            if not assign_handler(tmp_target, tmp_value):
+                target = tmp_value
+
+        =============
+
+        target_i, ... = value
+
+        =====>
 
 
+
+        =============
+
+        target1, *target2, target3 = value
+
+        带 * 的赋值只能在所有左值均是编译期量时进行，以保证行为一致性
+
+        """
+        node = self.generic_visit(node)
+
+        targets = node.targets
+        assert len(targets) == 1
+
+        target = targets[0]
+
+        ops = []
+
+        name_container = self.new_name()
+        name_target = self.new_name()
+        name_value = self.new_name()
+
+        if isinstance(target, Name):
+            get_target = Name(id=target.id, ctx=Load())
+        elif isinstance(target, Attribute):
+            ops.append(Assign(targets=[Name(id=name_container, ctx=Store())], value=target.value))
+            get_target = Attribute(value=Name(id=name_container, ctx=Load()), attr=target.attr, ctx=Load())
+        elif isinstance(target, Subscript):
+            ops.append(Assign(targets=[Name(id=name_container, ctx=Store())], value=target.value))
+            get_target = Subscript(value=Name(id=name_container, ctx=Load()), slice=target.slice, ctx=Load())
+        else:
+            raise NotImplementedError(f"未实现对 {type(target)} 类型的赋值")
+
+        ops.extend([
+            Assign(
+                targets=[
+                    Name(id=name_value, ctx=Store())],
+                value=node.value),
+            Try(
+                body=[
+                    Assign(
+                        targets=[
+                            Name(id=name_target, ctx=Store())],
+                        value=get_target)],
+                handlers=[
+                    ExceptHandler(
+                        type=None,
+                        body=[
+                            Assign(
+                                targets=[
+                                    target],
+                                value=Name(id=name_value, ctx=Load()))])],
+                orelse=[
+                    If(
+                        test=UnaryOp(
+                            op=Not(),
+                            operand=self.add_call(self.assign_handler, [
+                                Name(id=name_target, ctx=Load()),
+                                Name(id=name_value, ctx=Load())])),
+                        body=[
+                            Assign(
+                                targets=[
+                                    target],
+                                value=Name(id=name_value, ctx=Load()))])])
+        ])
+        return If(test=Constant(True), body=ops)
 
 
 

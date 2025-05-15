@@ -53,18 +53,18 @@ class RtUnreachable(RtCfExc):
 
 
 @final
-class RtAnyNormalExc(RtSysExc):
+class RtAnyNormalExc(RtNormalExc):
     """
-    RtAnyExc 是所有 RtNormalExc 子类的子类，仅用于抛出异常不明确时作为*任意*异常可能被抛出的提示
+    RtAnyNormalExc 是所有 RtNormalExc 子类的子类，仅用于抛出异常不明确时作为*任意*异常可能被抛出的提示
 
     不可继承，不可实例化
     """
     errno = -42
     def __init_subclass__(cls, **kwargs):
-        raise TypeError("type 'RtAnyExc' is not an acceptable base type")
+        raise TypeError("type 'RtAnyNormalExc' is not an acceptable base type")
 
     def __init__(self):
-        raise TypeError("type 'RtAnyExc' cannot be instantiated")
+        raise TypeError("type 'RtAnyNormalExc' cannot be instantiated")
 
 
 @final

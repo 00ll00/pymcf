@@ -10,34 +10,27 @@ class RtExc1(RtExc): ...
 class RtExc2(RtExc): ...
 class RtExc3(RtExc): ...
 
-config = Config(ir_simplify=3, ir_inline_raise=True)
+config = Config(ir_simplify=3, ir_inline_catch=True)
 
 # noinspection PyUnusedLocal
 def aaa():
     f"function begin"
-    try:
-        a = Score(0)
-        if a > 100:
-            raise RtExc1()
-        elif a > 10:
-            return
-        elif a > 5:
-            Call(None)
-        else:
-            f"pass"
-    except RtExc1:
-        f"11111"
-    except RtExc2:
-        f"22222"
+    for i in ScoreRange(0, 100):
+        if i > 10:
+            continue
+        if i > 20:
+            break
+        i = 100000000
+        a = Score(i)
     else:
-        f"ELSE"
+        raise RtExc2()
     f"function end"
 
 bbb = reform_func(aaa)
 
 with Context("root") as ctx:
     bbb()
-    # print(dump(ctx.root_scope, indent=4))
+    print(dump(ctx.root_scope, indent=4))
 
 cb = control_flow_expand(ctx.root_scope, Score(identifier=ScoreIdentifier(entity=Name("$bf"), scb=ScoreBoard("$sys"))), config=config)
 cb = simplify(cb, config)

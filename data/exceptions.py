@@ -1,10 +1,10 @@
-from ast_.runtime import RtBaseExc
+from ast_.runtime import RtNormalExc
 
 _all = {}
 _errno_count = 0
 
 
-class RtExc(RtBaseExc):
+class RtExc(RtNormalExc):
     _errno = 0
     def __init_subclass__(cls, *, __errno=None, **kwargs):
         global _errno_count

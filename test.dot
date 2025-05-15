@@ -2,132 +2,89 @@ digraph {
 	node [fontname="Courier New"]
 	edge [fontname="Courier New"]
 	bgcolor=white splines=ortho
-	node_2479047942864 [label=<
+	node_1993391260880 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>if_else</b></td></tr>
+                        <tr><td><b>for_else</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="0" >
-                            <tr><td align="left">1. <b>Raw</b>: code=&#x27;pass&#x27;</td></tr>
+                            <tr><td align="left">1. <b>Assign</b>: target=Score(&#x27;$bf $sys&#x27;), value=&lt;class &#x27;__main__.RtExc2&#x27;&gt;</td></tr>
                         </table></td></tr>
                         <tr><td bgcolor="#ffffcc">None</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_2479047943248 [label=<
+	node_1993391270352 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>if_body</b></td></tr>
+                        <tr><td><b>if_next</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="0" >
-                            <tr><td align="left">1. <b>Call</b>: func=None</td></tr>
+                            <tr><td align="left">1. <b>Assign</b>: target=Score(&#x27;$tmp_4 $sys&#x27;), value=100000000</td></tr>
+<tr><td align="left">2. <b>Assign</b>: target=Score(&#x27;$tmp_7 $sys&#x27;), value=Score(&#x27;$tmp_4 $sys&#x27;)</td></tr>
                         </table></td></tr>
-                        <tr><td bgcolor="#ffffcc">None</td></tr>
+                        <tr><td>None</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_2479047941584 [label=<
+	node_1993391270352:s -> node_1993391265232:n [color=blue]
+	node_1993391263632 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>if_else</b></td></tr>
-                        <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="0" >
-                            <tr><td align="left">1. <b>Compare</b>: op=&lt;ast.Gt object at 0x0000024132C598D0&gt;, target=Score(&#x27;$tmp_4 $sys&#x27;), left=Score(&#x27;$tmp_1 $sys&#x27;), right=5</td></tr>
-                        </table></td></tr>
-                        <tr><td>Score(&#x27;$tmp_4 $sys&#x27;)</td></tr>
-                    </table>
-                    > fillcolor=gray90 shape=plain style=filled]
-	node_2479047941584:sw -> node_2479047943248:n [color=green]
-	node_2479047941584:se -> node_2479047942864:n [color=red]
-	node_2479047941904 [label=<
-                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>if_body</b></td></tr>
-                        <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="0" >
-                            <tr><td align="left">1. <b>Assign</b>: target=None, value=None</td></tr>
-<tr><td align="left">2. <b>Assign</b>: target=Score(&#x27;$bf $sys&#x27;), value=&lt;class &#x27;ast_._syntactic.RtReturn&#x27;&gt;</td></tr>
-                        </table></td></tr>
-                        <tr><td bgcolor="#ffffcc">None</td></tr>
-                    </table>
-                    > fillcolor=gray90 shape=plain style=filled]
-	node_2479047934032 [label=<
-                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>if_else</b></td></tr>
-                        <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="0" >
-                            <tr><td align="left">1. <b>Compare</b>: op=&lt;ast.Gt object at 0x0000024132C59A50&gt;, target=Score(&#x27;$tmp_3 $sys&#x27;), left=Score(&#x27;$tmp_1 $sys&#x27;), right=10</td></tr>
-                        </table></td></tr>
-                        <tr><td>Score(&#x27;$tmp_3 $sys&#x27;)</td></tr>
-                    </table>
-                    > fillcolor=gray90 shape=plain style=filled]
-	node_2479047934032:sw -> node_2479047941904:n [color=green]
-	node_2479047934032:se -> node_2479047941584:n [color=red]
-	node_2479047937296 [label=<
-                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>if_body</b></td></tr>
-                        <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="0" >
-                            <tr><td align="left">1. <b>Assign</b>: target=Score(&#x27;$bf $sys&#x27;), value=&lt;class &#x27;__main__.RtExc1&#x27;&gt;</td></tr>
-                        </table></td></tr>
-                        <tr><td bgcolor="#ffffcc">None</td></tr>
-                    </table>
-                    > fillcolor=gray90 shape=plain style=filled]
-	node_2479047937744 [label=<
-                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>try_body</b></td></tr>
-                        <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="0" >
-                            <tr><td align="left">1. <b>Assign</b>: target=Score(&#x27;$tmp_1 $sys&#x27;), value=0</td></tr>
-<tr><td align="left">2. <b>Compare</b>: op=&lt;ast.Gt object at 0x0000024132C5A550&gt;, target=Score(&#x27;$tmp_2 $sys&#x27;), left=Score(&#x27;$tmp_1 $sys&#x27;), right=100</td></tr>
-                        </table></td></tr>
-                        <tr><td>Score(&#x27;$tmp_2 $sys&#x27;)</td></tr>
-                    </table>
-                    > fillcolor=gray90 shape=plain style=filled]
-	node_2479047937744:sw -> node_2479047937296:n [color=green]
-	node_2479047937744:se -> node_2479047934032:n [color=red]
-	node_2479047941776 [label=<
-                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>try_next</b></td></tr>
+                        <tr><td><b>for_next</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="0" >
                             <tr><td align="left">1. <b>Raw</b>: code=&#x27;function end&#x27;</td></tr>
                         </table></td></tr>
                         <tr><td bgcolor="#ffffcc">None</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_2479047936016 [label=<
+	node_1993391268880 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>try_finally</b></td></tr>
-                        <tr><td bgcolor="gray95"></td></tr>
-                        <tr><td>Score(&#x27;$bf $sys&#x27;)</td></tr>
+                        <tr><td><b>if_next</b></td></tr>
+                        <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="0" >
+                            <tr><td align="left">1. <b>Compare</b>: op=&lt;ast.Gt object at 0x000001D01F60CD50&gt;, target=Score(&#x27;$tmp_6 $sys&#x27;), left=Score(&#x27;$tmp_4 $sys&#x27;), right=20</td></tr>
+                        </table></td></tr>
+                        <tr><td>Score(&#x27;$tmp_6 $sys&#x27;)</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_2479047936016:se -> node_2479047941776:n [color=red]
-	node_2479047937808 [label=<
+	node_1993391268880:sw -> node_1993391263632:n [color=green]
+	node_1993391268880:se -> node_1993391270352:n [color=red]
+	node_1993391263760 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>try_except</b></td></tr>
+                        <tr><td><b>for_body</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="0" >
-                            <tr><td align="left">1. <b>Raw</b>: code=&#x27;11111&#x27;</td></tr>
+                            <tr><td align="left">1. <b>Compare</b>: op=&lt;ast.Gt object at 0x000001D01F5D97D0&gt;, target=Score(&#x27;$tmp_5 $sys&#x27;), left=Score(&#x27;$tmp_4 $sys&#x27;), right=10</td></tr>
+                        </table></td></tr>
+                        <tr><td>Score(&#x27;$tmp_5 $sys&#x27;)</td></tr>
+                    </table>
+                    > fillcolor=gray90 shape=plain style=filled]
+	node_1993391263760:sw -> node_1993391265232:n [color=green]
+	node_1993391263760:se -> node_1993391268880:n [color=red]
+	node_1993391262352 [label=<
+                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+                        <tr><td><b>if_body</b></td></tr>
+                        <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="0" >
+                            <tr><td align="left">1. <b>AugAssign</b>: op=&lt;ast.Add object at 0x000001D01F5DA810&gt;, target=Score(&#x27;$tmp_1 $sys&#x27;), value=1</td></tr>
+<tr><td align="left">2. <b>Assign</b>: target=Score(&#x27;$tmp_3 $sys&#x27;), value=Score(&#x27;$tmp_1 $sys&#x27;)</td></tr>
+<tr><td align="left">3. <b>Assign</b>: target=Score(&#x27;$tmp_4 $sys&#x27;), value=Score(&#x27;$tmp_3 $sys&#x27;)</td></tr>
                         </table></td></tr>
                         <tr><td>None</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_2479047937808:s -> node_2479047936016:n [color=blue]
-	node_2479047937552 [label=<
-            <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                <tr><td><b>try_jump</b> [inactivate=0]</td></tr>
-                <tr><td bgcolor="#ffeeff"><table border="0" cellborder="0" cellspacing="0" >
-                    <tr><td align="left">[1] <b>JmpEq</b>: value=(&lt;class &#x27;__main__.RtExc1&#x27;&gt;,)</td></tr>
-                </table></td></tr>
-                <tr><td>Score(&#x27;$bf $sys&#x27;)</td></tr>
-            </table>
-            > fillcolor="#ffddff" shape=plain style=filled]
-	node_2479047937552:s -> node_2479047937808:n [label="[1]" color=magenta decorate=true fontcolor=magenta]
-	node_2479047936080 [label=<
+	node_1993391262352:s -> node_1993391263760:n [color=blue]
+	node_1993391265232 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>try_catch</b></td></tr>
-                        <tr><td bgcolor="gray95"></td></tr>
-                        <tr><td>Score(&#x27;$bf $sys&#x27;)</td></tr>
+                        <tr><td><b>try_body</b></td></tr>
+                        <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="0" >
+                            <tr><td align="left">1. <b>Compare</b>: op=&lt;ast.Lt object at 0x000001D01F5DAE90&gt;, target=Score(&#x27;$tmp_2 $sys&#x27;), left=Score(&#x27;$tmp_1 $sys&#x27;), right=100</td></tr>
+                        </table></td></tr>
+                        <tr><td>Score(&#x27;$tmp_2 $sys&#x27;)</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_2479047936080:s -> node_2479047937744:n [color=blue]
-	node_2479047936080:sw -> node_2479047937552:n [color=green]
-	node_2479047936080:se -> node_2479047941776:n [color=red]
-	node_2479014165904 [label=<
+	node_1993391265232:sw -> node_1993391262352:n [color=green]
+	node_1993391265232:se -> node_1993391260880:n [color=red]
+	node_1993350668560 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
                         <tr><td bgcolor="#ccffff"><b>root</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="0" >
                             <tr><td align="left">1. <b>Raw</b>: code=&#x27;function begin&#x27;</td></tr>
+<tr><td align="left">2. <b>Assign</b>: target=Score(&#x27;$tmp_1 $sys&#x27;), value=0</td></tr>
                         </table></td></tr>
                         <tr><td>None</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_2479014165904:s -> node_2479047936080:n [color=blue]
+	node_1993350668560:s -> node_1993391265232:n [color=blue]
 }
