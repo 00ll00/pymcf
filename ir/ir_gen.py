@@ -123,14 +123,16 @@ class _Expander(NodeVisitor):
         cb_next_in = self.enter_block(name="if_next")
 
         if not self.inline_catch and node.sc_body.excs.might:
-            cb_body_out.cond = self.bf
-            cb_body_out.false = cb_next_in
+            if not node.sc_body.excs.always:
+                cb_body_out.cond = self.bf
+                cb_body_out.false = cb_next_in
         else:
             cb_body_out.direct = cb_next_in
 
         if not self.inline_catch and  node.sc_else.excs.might:
-            cb_else_out.cond = self.bf
-            cb_else_out.false = cb_next_in
+            if not node.sc_else.excs.always:
+                cb_else_out.cond = self.bf
+                cb_else_out.false = cb_next_in
         else:
             cb_else_out.direct = cb_next_in
 
@@ -168,14 +170,17 @@ class _Expander(NodeVisitor):
             cb_last_out.direct = cb_catch_iter
             cb_catch_iter.direct = cb_iter_in
 
-            cb_catch_iter.cond = self.bf  # TODO iter 中是否需要允许抛出 RtStopIteration 以外的异常
-            cb_catch_iter.false = cb_body
-            cb_catch_iter.true = cb_else_in  # TODO 清理异常标志
+            if node.sc_iter.excs.always:
+                cb_catch_iter.direct = cb_else_in
+            else:
+                cb_catch_iter.cond = self.bf  # TODO iter 中是否需要允许抛出 RtStopIteration 以外的异常
+                cb_catch_iter.false = cb_body
+                cb_catch_iter.true = cb_else_in  # TODO 清理异常标志
         else:
             cb_last_out.direct = cb_iter_in
             cb_iter_out.direct = cb_body
 
-        if  not self.inline_catch and node.sc_body.excs.might:
+        if not self.inline_catch and node.sc_body.excs.might:
             cb_jump = MatchJump(self.bf, [
                 # JmpEq(RtStopIteration, cb_else_in),  # TODO for 的 iterator 是否只允许抛出 RtStopIteration
                 JmpEq(RtContinue, cb_iter_in),
@@ -190,8 +195,9 @@ class _Expander(NodeVisitor):
             cb_body_out.direct = cb_iter
 
         if not self.inline_catch and node.sc_else.excs.might:
-            cb_else_out.cond = self.bf
-            cb_else_out.false = cb_next_in
+            if not node.sc_else.excs.always:
+                cb_else_out.cond = self.bf
+                cb_else_out.false = cb_next_in
         else:
             cb_else_out.direct = cb_next_in
 
@@ -245,8 +251,9 @@ class _Expander(NodeVisitor):
             cb_body_out.false = cb_else_in
 
         if not self.inline_catch and node.sc_else.excs.might:
-            cb_else_out.cond = self.bf
-            cb_else_out.false = cb_next_in
+            if not node.sc_else.excs.always:
+                cb_else_out.cond = self.bf
+                cb_else_out.false = cb_next_in
         else:
             cb_else_out.direct = cb_next_in
 
@@ -320,10 +327,9 @@ class _Expander(NodeVisitor):
         if self.inline_catch:
             assert not node.sc_finally.excs.might, "启用 ir_inline_catch 时 finally 块不能存在呈递流程控制语句（continue, break, return 或抛出异常）"
             cb_finally_out.direct = cb_next_in
-        else:
+        elif not node.sc_finally.excs.always:
             cb_finally_out.cond = self.bf
             cb_finally_out.false = cb_next_in
-
 
     def visit_Raise(self, node: Raise):
         # TODO err stack

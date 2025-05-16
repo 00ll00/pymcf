@@ -10,21 +10,15 @@ class RtExc1(RtExc): ...
 class RtExc2(RtExc): ...
 class RtExc3(RtExc): ...
 
-config = Config(ir_simplify=3, ir_inline_catch=True)
+config = Config(ir_simplify=3, ir_inline_catch=False)
 
 # noinspection PyUnusedLocal
-def aaa():
+def aaa(a: Score):
     f"say function begin"
     try:
-        for i in ScoreRange(100):
-            if i == 10:
+        for i in range(20):
+            if a == i:
                 raise RtExc1
-            elif i == 20:
-                raise RtExc2
-            elif i == 30:
-                raise RtExc3
-            else:
-                break
     except RtExc as e:
         f"handle"
     else:
@@ -34,7 +28,7 @@ def aaa():
 bbb = reform_func(aaa)
 
 with Context("root") as ctx:
-    bbb()
+    bbb(Score(0))
 ctx.finish()
 
 with open("test.html", 'w') as f:
