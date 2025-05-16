@@ -2,7 +2,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Optional
 
-from .runtime import RtBaseData
+from .runtime import RtBaseData, RtContinue, RtBreak
 from .syntactic import Scope, stmt, Assign, Raise, RtReturn, ExcSet, RtCfExc, Try, ExcHandle
 
 
@@ -81,6 +81,9 @@ class Context:
         assert not self._finished
         if self._return_value is _PlaceHolder:
             self._return_value = None
+
+        if self.root_scope.excs.set & {RtContinue, RtBreak}:
+            raise SyntaxError(f"函数 {self.name} 中出现脱离循环的运行期循环控制语句")  # TODO 提供具体的代码定位
         self._excs = self.root_scope.excs.remove_subclasses(RtCfExc)
 
         if self.inline:  # TODO 内联函数返回值处理

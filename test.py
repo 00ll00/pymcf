@@ -16,11 +16,12 @@ config = Config(ir_simplify=3, ir_inline_catch=True)
 def aaa(a: Score):
     f"say function begin"
     try:
-        # for i in range(20):
-        for _ in ScoreRange(100):
+        for i in range(10):
             if a == 1:
-                raise RtExc1
-        f"1111111111111111111"
+                return
+            if i > 5:
+                break
+            f"1111111111111111111"
     except:
         f"aaa"
     # finally:
