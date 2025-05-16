@@ -212,7 +212,7 @@ class Scope(AST):
             return self._excs
         if self.flow:
             s = reduce(lambda a, b: a | b, (st.excs.set for st in self.flow), set())
-            if self.flow[0].excs.always:
+            if self.flow[-1].excs.always:
                 s.discard(None)  # 若 flow 最后一个语句一定引发异常，则整个 scope 必然引发异常
             self._excs = ExcSet(s)
         else:
