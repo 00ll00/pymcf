@@ -280,7 +280,7 @@ class ScoreRange(RtIterator[Score]):
 
     @classmethod
     def __create_tmp__(cls) -> Self:
-        return ScoreRange(start=None, end=None, step=None)
+        return ScoreRange(None, None, None)
 
     @mcfunction.inline
     def __next__(self) -> Score:
@@ -288,7 +288,6 @@ class ScoreRange(RtIterator[Score]):
             self.i += self.step
             return self.i
         else:
-            f"debug"
             raise RtStopIteration()
 
     def __repr__(self):

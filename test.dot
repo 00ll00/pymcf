@@ -2,7 +2,7 @@ digraph {
 	node [fontname="Courier New"]
 	edge [fontname="Courier New"]
 	bgcolor=white splines=ortho
-	node_1550638433488 [label=<
+	node_2506838769552 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
                         <tr><td><b>try_next</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
@@ -11,23 +11,7 @@ digraph {
                         <tr><td bgcolor="#ffffcc">None</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_1550638333456 [label=<
-                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>try_finally</b></td></tr>
-                        <tr><td bgcolor="gray95"></td></tr>
-                        <tr><td>None</td></tr>
-                    </table>
-                    > fillcolor=gray90 shape=plain style=filled]
-	node_1550638333456:s -> node_1550638433488:n [color=blue]
-	node_1550638432464 [label=<
-                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>try_else</b></td></tr>
-                        <tr><td bgcolor="gray95"></td></tr>
-                        <tr><td>None</td></tr>
-                    </table>
-                    > fillcolor=gray90 shape=plain style=filled]
-	node_1550638432464:s -> node_1550638333456:n [color=blue]
-	node_1550638434384 [label=<
+	node_2506838950800 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
                         <tr><td><b>for_next</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
@@ -36,16 +20,8 @@ digraph {
                         <tr><td>None</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_1550638434384:s -> node_1550638432464:n [color=blue]
-	node_1550638433616 [label=<
-                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>for_else</b></td></tr>
-                        <tr><td bgcolor="gray95"></td></tr>
-                        <tr><td>None</td></tr>
-                    </table>
-                    > fillcolor=gray90 shape=plain style=filled]
-	node_1550638433616:s -> node_1550638434384:n [color=blue]
-	node_1550638436944 [label=<
+	node_2506838950800:s -> node_2506838769552:n [color=blue]
+	node_2506838953424 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
                         <tr><td><b>if_else</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
@@ -54,24 +30,8 @@ digraph {
                         <tr><td>None</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_1550638436944:s -> node_1550638433616:n [color=blue]
-	node_1550638438672 [label=<
-                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>if_next</b></td></tr>
-                        <tr><td bgcolor="gray95"></td></tr>
-                        <tr><td>None</td></tr>
-                    </table>
-                    > fillcolor=gray90 shape=plain style=filled]
-	node_1550638438672:s -> node_1550638434000:n [color=blue]
-	node_1550638438288 [label=<
-                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>if_else</b></td></tr>
-                        <tr><td bgcolor="gray95"></td></tr>
-                        <tr><td>None</td></tr>
-                    </table>
-                    > fillcolor=gray90 shape=plain style=filled]
-	node_1550638438288:s -> node_1550638438672:n [color=blue]
-	node_1550638333648 [label=<
+	node_2506838953424:s -> node_2506838950800:n [color=blue]
+	node_2506838866448 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
                         <tr><td><b>try_except</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
@@ -80,16 +40,8 @@ digraph {
                         <tr><td>None</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_1550638333648:s -> node_1550638333456:n [color=blue]
-	node_1550638434512 [label=<
-                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>if_body</b></td></tr>
-                        <tr><td bgcolor="gray95"></td></tr>
-                        <tr><td>None</td></tr>
-                    </table>
-                    > fillcolor=gray90 shape=plain style=filled]
-	node_1550638434512:s -> node_1550638333648:n [color=blue]
-	node_1550638434448 [label=<
+	node_2506838866448:s -> node_2506838769552:n [color=blue]
+	node_2506838950928 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
                         <tr><td><b>for_body</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
@@ -98,33 +50,9 @@ digraph {
                         <tr><td>Score(&#x27;$tmp_5 $sys&#x27;)</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_1550638434448:sw -> node_1550638434512:n [color=green]
-	node_1550638434448:se -> node_1550638438288:n [color=red]
-	node_1550638436432 [label=<
-                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>try_next</b></td></tr>
-                        <tr><td bgcolor="gray95"></td></tr>
-                        <tr><td>None</td></tr>
-                    </table>
-                    > fillcolor=gray90 shape=plain style=filled]
-	node_1550638436432:s -> node_1550638434448:n [color=blue]
-	node_1550638434768 [label=<
-                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>try_finally</b></td></tr>
-                        <tr><td bgcolor="gray95"></td></tr>
-                        <tr><td>None</td></tr>
-                    </table>
-                    > fillcolor=gray90 shape=plain style=filled]
-	node_1550638434768:s -> node_1550638436432:n [color=blue]
-	node_1550638434960 [label=<
-                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>try_except</b></td></tr>
-                        <tr><td bgcolor="gray95"></td></tr>
-                        <tr><td>None</td></tr>
-                    </table>
-                    > fillcolor=gray90 shape=plain style=filled]
-	node_1550638434960:s -> node_1550638434768:n [color=blue]
-	node_1550638436560 [label=<
+	node_2506838950928:sw -> node_2506838866448:n [color=green]
+	node_2506838950928:se -> node_2506838952592:n [color=red]
+	node_2506838953040 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
                         <tr><td><b>if_body</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
@@ -134,8 +62,8 @@ digraph {
                         <tr><td>None</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_1550638436560:s -> node_1550638434960:n [color=blue]
-	node_1550638436048 [label=<
+	node_2506838953040:s -> node_2506838950928:n [color=blue]
+	node_2506838952592 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
                         <tr><td><b>try_body</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
@@ -144,17 +72,9 @@ digraph {
                         <tr><td>Score(&#x27;$tmp_3 $sys&#x27;)</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_1550638436048:sw -> node_1550638436560:n [color=green]
-	node_1550638436048:se -> node_1550638436944:n [color=red]
-	node_1550638434000 [label=<
-                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                        <tr><td><b>for_iter</b></td></tr>
-                        <tr><td bgcolor="gray95"></td></tr>
-                        <tr><td>None</td></tr>
-                    </table>
-                    > fillcolor=gray90 shape=plain style=filled]
-	node_1550638434000:s -> node_1550638436048:n [color=blue]
-	node_1550638433104 [label=<
+	node_2506838952592:sw -> node_2506838953040:n [color=green]
+	node_2506838952592:se -> node_2506838953424:n [color=red]
+	node_2506838867600 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
                         <tr><td><b>try_body</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
@@ -163,8 +83,8 @@ digraph {
                         <tr><td>None</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_1550638433104:s -> node_1550638434000:n [color=blue]
-	node_1550633068816 [label=<
+	node_2506838867600:s -> node_2506838952592:n [color=blue]
+	node_2506798230928 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
                         <tr><td bgcolor="#ccffff"><b>root</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
@@ -174,5 +94,5 @@ digraph {
                         <tr><td>None</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_1550633068816:s -> node_1550638433104:n [color=blue]
+	node_2506798230928:s -> node_2506838867600:n [color=blue]
 }
