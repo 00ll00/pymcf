@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from typing import Any, NamedTuple, Protocol, Callable
 
 from config import Config
-from .codeblock import BasicBlock, MatchJump, JmpEq, code_block, JmpNeq
+from .codeblock import BasicBlock, MatchJump, JmpEq, code_block, JmpNotEq
 from ast_ import operation, Context, Scope, compiler_hint, If, For, Try, Call, RtBaseExc, \
     RtStopIteration, RtContinue, RtBreak, Assign, Raise, While, ExcHandle, stmt, ExcSet, AST
 

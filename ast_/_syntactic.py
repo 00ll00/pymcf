@@ -8,7 +8,11 @@ from typing import Any, Self, Iterable, final
 class _RtBaseExcMeta(ABCMeta):
     @property
     @abstractmethod
-    def errno(cls) -> int: ...
+    def errno(cls) -> int:
+        return cls._errno
+
+    def __repr__(cls):
+        return f"<{cls.__qualname__}(errno={cls.errno})>"
 
 
 class RtBaseExc(BaseException, metaclass=_RtBaseExcMeta):
@@ -43,7 +47,7 @@ class RtUnreachable(RtCfExc):
     """
     RtUnreachable 用于终止不可达代码的生成
     """
-    errno = -42
+    _errno = -42
     def __init_subclass__(cls, **kwargs):
         raise TypeError(f'RtUnreachable cannot be inherited')
     def __init__(self):
@@ -59,7 +63,7 @@ class RtAnyNormalExc(RtNormalExc):
 
     不可继承，不可实例化
     """
-    errno = -42
+    _errno = -42
     def __init_subclass__(cls, **kwargs):
         raise TypeError("type 'RtAnyNormalExc' is not an acceptable base type")
 
@@ -69,28 +73,28 @@ class RtAnyNormalExc(RtNormalExc):
 
 @final
 class RtStopIteration(RtSysExc):
-    errno = -1
+    _errno = -1
     def __init_subclass__(cls, **kwargs):
         raise TypeError("type 'RtStopIteration' is not an acceptable base type")
 
 
 @final
 class RtContinue(RtCfExc):
-    errno = -2
+    _errno = -2
     def __init_subclass__(cls, **kwargs):
         raise TypeError("type 'RtContinue' is not an acceptable base type")
 
 
 @final
 class RtBreak(RtCfExc):
-    errno = -3
+    _errno = -3
     def __init_subclass__(cls, **kwargs):
         raise TypeError("type 'RtBreak' is not an acceptable base type")
 
 
 @final
 class RtReturn(RtCfExc):
-    errno = -4
+    _errno = -4
     def __init_subclass__(cls, **kwargs):
         raise TypeError("type 'RtReturn' is not an acceptable base type")
     def __init__(self, value):

@@ -15,7 +15,3 @@ class RtExc(RtNormalExc):
         assert __errno not in _all, f"出现相同id的异常:{__errno}, {cls}, {_all[__errno]}"
         cls._errno = __errno
         _all[__errno] = cls
-
-    @classmethod
-    def errno(cls) -> int:
-        return cls._errno

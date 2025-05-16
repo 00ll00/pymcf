@@ -1,22 +1,16 @@
 import ast
-import json.encoder
-from html import escape as html_escape
 
 import graphviz as gv
-from graphviz import escape as gv_escape
 
-from ir.codeblock import code_block, BasicBlock, MatchJump
+from ast_ import operation
+from ir import code_block, BasicBlock, MatchJump
+from ir.codeblock import jmpop
+from visualize.reprs import repr_operation, repr_jmpop, escape
 
 
-def escape(s):
-    return gv_escape(html_escape(str(s)))
+class _GraphVizDumper(ast.NodeVisitor):
 
-def json_escape(s):
-    return json.dumps(str(s))
-
-class GraphVizDumper(ast.NodeVisitor):
-
-    def __init__(self, root: code_block):
+    def __init__(self, root: BasicBlock):
         self.visited = set()
         self.root = root
         self.graph = gv.Digraph()
@@ -44,7 +38,11 @@ class GraphVizDumper(ast.NodeVisitor):
 
     @staticmethod
     def repr_node(op):
-        return f"<b>{escape(op.__class__.__name__)}</b>: {escape(', '.join(f'{attr}={getattr(op, attr)!r}' for attr in op._fields))}"
+        if isinstance(op, operation):
+            r = repr_operation(op)
+        elif isinstance(op, jmpop):
+            r = repr_jmpop(op)
+        return f"""<td align="left"><b>{escape(op.__class__.__name__)}</b>  </td><td align="left">{escape(r)}</td>"""
 
     def visit_BasicBlock(self, node: BasicBlock):
         self.generic_visit(node)
@@ -55,8 +53,8 @@ class GraphVizDumper(ast.NodeVisitor):
             label=f"""<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
                         <tr><td{' bgcolor="#ccffff"' if begin else ''}><b>{escape(node.name)}</b></td></tr>
-                        <tr><td bgcolor="gray95">{f"""<table border="0" cellborder="0" cellspacing="0" >
-                            {'\n'.join(f'<tr><td align="left">{i + 1}. {self.repr_node(op)}</td></tr>' for i, op in enumerate(node.ops))}
+                        <tr><td bgcolor="gray95">{f"""<table border="0" cellborder="0" cellspacing="2" cellpadding="0">
+                            {'\n'.join(f'<tr><td align="left">{i + 1}.</td>{self.repr_node(op)}</tr>' for i, op in enumerate(node.ops))}
                         </table>""" if node.ops else ""}</td></tr>
                         <tr><td{' bgcolor="#ffffcc"' if end else ''}>{escape(node.cond)}</td></tr>
                     </table>
@@ -91,9 +89,9 @@ class GraphVizDumper(ast.NodeVisitor):
             name=self.node_name(node),
             label=f"""<
             <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
-                <tr><td><b>{escape(node.name)}</b> [inactivate={escape(node.inactive)}]</td></tr>
+                <tr><td><b>{escape(node.name)}</b>  [inactivate={escape(node.inactive)}]</td></tr>
                 <tr><td bgcolor="#ffeeff">{f"""<table border="0" cellborder="0" cellspacing="0" >
-                    {'\n'.join(f'<tr><td align="left">{f"[{i+1}] <b>{escape(case.__class__.__name__)}</b>: {escape(', '.join(f'{attr}={(getattr(case, attr))!r}' for attr in case._fields if attr != "target"))}"}</td></tr>' for i, case in enumerate(node.cases))}
+                    {'\n'.join(f'<tr><td align="left">[{i+1}]</td>{self.repr_node(case)}</tr>' for i, case in enumerate(node.cases))}
                 </table>""" if node.cases else ""}</td></tr>
                 <tr><td>{escape(node.flag)}</td></tr>
             </table>
@@ -114,3 +112,7 @@ class GraphVizDumper(ast.NodeVisitor):
                 fontcolor="magenta",
                 decorate="true",
             )
+
+
+def draw_ir(root: BasicBlock) -> gv.Digraph:
+    return _GraphVizDumper(root).graph

@@ -274,9 +274,12 @@ class ScoreRange(RtIterator[Score]):
     def __next__(self) -> Score:
         if self.i < self.end:
             self.i += self.step
-            return Score(self.i)
+            return self.i
         else:
             raise RtStopIteration()
+
+    def __repr__(self):
+        return f"ScoreRange({self.i!r}, {self.end!r}, {self.step!r})"
 
 # TODO nbt定义
 # class NbtIdentifier(Identifier):

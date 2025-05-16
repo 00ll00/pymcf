@@ -68,7 +68,7 @@ class JmpEq(jmpop):
         self.value = value
 
 
-class JmpNeq(jmpop):
+class JmpNotEq(jmpop):
     _fields = ("value", "target")
     def __init__(self, value: Any, target: code_block):
         super().__init__(target)
