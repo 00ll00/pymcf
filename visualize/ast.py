@@ -17,7 +17,7 @@ class _CtxDumper(NodeVisitor):
             with body():
                 with table(cls="root"):
                     with tr(), td():
-                        div(ctx.name, cls="head_root")
+                        div(ctx.name, title="\n".join(repr(e) for e in ctx.excs.set), cls="head_root")
                     with tr(), td():
                         self.visit(ctx.root_scope)
         return str(doc)
@@ -53,7 +53,7 @@ class _CtxDumper(NodeVisitor):
                         div(cls="pass")
 
     def visit_Raise(self, node: Raise):
-        div(repr(node.exc_class), cls="raise cf")
+        div(repr(node.exc_class), cls="raise")
 
     def visit_If(self, node: If):
         with table():

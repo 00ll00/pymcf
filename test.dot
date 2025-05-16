@@ -2,35 +2,98 @@ digraph {
 	node [fontname="Courier New"]
 	edge [fontname="Courier New"]
 	bgcolor=white splines=ortho
-	node_1844461982160 [label=<
+	node_1819116021008 [label=<
+                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+                        <tr><td><b>try_next</b></td></tr>
+                        <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
+                            <tr><td align="left">1.</td><td align="left"><b>Raw</b>  </td><td align="left">&#x27;say function end&#x27;</td></tr>
+                        </table></td></tr>
+                        <tr><td bgcolor="#ffffcc">None</td></tr>
+                    </table>
+                    > fillcolor=gray90 shape=plain style=filled]
+	node_1819157918352 [label=<
+                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+                        <tr><td><b>try_except</b></td></tr>
+                        <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
+                            <tr><td align="left">1.</td><td align="left"><b>Raw</b>  </td><td align="left">&#x27;handle&#x27;</td></tr>
+                        </table></td></tr>
+                        <tr><td>None</td></tr>
+                    </table>
+                    > fillcolor=gray90 shape=plain style=filled]
+	node_1819157918352:s -> node_1819116021008:n [color=blue]
+	node_1819157990928 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
                         <tr><td><b>if_else</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
-                            <tr><td align="left">1.</td><td align="left"><b>Assign</b>  </td><td align="left">None = None</td></tr>
-<tr><td align="left">2.</td><td align="left"><b>Assign</b>  </td><td align="left">Score(&#x27;$bf $sys&#x27;) = &lt;RtReturn(errno=-4)&gt;</td></tr>
+                            <tr><td align="left">1.</td><td align="left"><b>Compare</b>  </td><td align="left">Score(&#x27;$tmp_6 $sys&#x27;) = Score(&#x27;$tmp_3 $sys&#x27;) == 30</td></tr>
                         </table></td></tr>
-                        <tr><td bgcolor="#ffffcc">None</td></tr>
+                        <tr><td>Score(&#x27;$tmp_6 $sys&#x27;)</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_1844461981904 [label=<
+	node_1819157990928:sw -> node_1819157918352:n [color=green]
+	node_1819157990928:se -> node_1819116021008:n [color=red]
+	node_1819157989840 [label=<
+                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+                        <tr><td><b>if_else</b></td></tr>
+                        <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
+                            <tr><td align="left">1.</td><td align="left"><b>Compare</b>  </td><td align="left">Score(&#x27;$tmp_5 $sys&#x27;) = Score(&#x27;$tmp_3 $sys&#x27;) == 20</td></tr>
+                        </table></td></tr>
+                        <tr><td>Score(&#x27;$tmp_5 $sys&#x27;)</td></tr>
+                    </table>
+                    > fillcolor=gray90 shape=plain style=filled]
+	node_1819157989840:sw -> node_1819157918352:n [color=green]
+	node_1819157989840:se -> node_1819157990928:n [color=red]
+	node_1819157920976 [label=<
+                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+                        <tr><td><b>for_body</b></td></tr>
+                        <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
+                            <tr><td align="left">1.</td><td align="left"><b>Compare</b>  </td><td align="left">Score(&#x27;$tmp_4 $sys&#x27;) = Score(&#x27;$tmp_3 $sys&#x27;) == 10</td></tr>
+                        </table></td></tr>
+                        <tr><td>Score(&#x27;$tmp_4 $sys&#x27;)</td></tr>
+                    </table>
+                    > fillcolor=gray90 shape=plain style=filled]
+	node_1819157920976:sw -> node_1819157918352:n [color=green]
+	node_1819157920976:se -> node_1819157989840:n [color=red]
+	node_1819157988560 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
                         <tr><td><b>if_body</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
-                            <tr><td align="left">1.</td><td align="left"><b>Assign</b>  </td><td align="left">Score(&#x27;$bf $sys&#x27;) = &lt;RtExc3(errno=3)&gt;</td></tr>
+                            <tr><td align="left">1.</td><td align="left"><b>AugAssign</b>  </td><td align="left">Score(&#x27;$tmp_1 $sys&#x27;) += 1</td></tr>
+<tr><td align="left">2.</td><td align="left"><b>Assign</b>  </td><td align="left">Score(&#x27;$tmp_3 $sys&#x27;) = Score(&#x27;$tmp_1 $sys&#x27;)</td></tr>
                         </table></td></tr>
-                        <tr><td bgcolor="#ffffcc">None</td></tr>
+                        <tr><td>None</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_1844458450128 [label=<
+	node_1819157988560:s -> node_1819157920976:n [color=blue]
+	node_1819157988112 [label=<
+                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+                        <tr><td><b>try_body</b></td></tr>
+                        <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
+                            <tr><td align="left">1.</td><td align="left"><b>Compare</b>  </td><td align="left">Score(&#x27;$tmp_2 $sys&#x27;) = Score(&#x27;$tmp_1 $sys&#x27;) &lt; 100</td></tr>
+                        </table></td></tr>
+                        <tr><td>Score(&#x27;$tmp_2 $sys&#x27;)</td></tr>
+                    </table>
+                    > fillcolor=gray90 shape=plain style=filled]
+	node_1819157988112:sw -> node_1819157988560:n [color=green]
+	node_1819157988112:se -> node_1819116021008:n [color=red]
+	node_1819157919504 [label=<
+                    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+                        <tr><td><b>try_body</b></td></tr>
+                        <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
+                            <tr><td align="left">1.</td><td align="left"><b>Assign</b>  </td><td align="left">Score(&#x27;$tmp_1 $sys&#x27;) = 0</td></tr>
+                        </table></td></tr>
+                        <tr><td>None</td></tr>
+                    </table>
+                    > fillcolor=gray90 shape=plain style=filled]
+	node_1819157919504:s -> node_1819157988112:n [color=blue]
+	node_1819157704848 [label=<
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
                         <tr><td bgcolor="#ccffff"><b>root</b></td></tr>
                         <tr><td bgcolor="gray95"><table border="0" cellborder="0" cellspacing="2" cellpadding="0">
                             <tr><td align="left">1.</td><td align="left"><b>Raw</b>  </td><td align="left">&#x27;say function begin&#x27;</td></tr>
-<tr><td align="left">2.</td><td align="left"><b>Assign</b>  </td><td align="left">Score(&#x27;$tmp_1 $sys&#x27;) = 0</td></tr>
                         </table></td></tr>
-                        <tr><td>Score(&#x27;$tmp_1 $sys&#x27;)</td></tr>
+                        <tr><td>None</td></tr>
                     </table>
                     > fillcolor=gray90 shape=plain style=filled]
-	node_1844458450128:sw -> node_1844461981904:n [color=green]
-	node_1844458450128:se -> node_1844461982160:n [color=red]
+	node_1819157704848:s -> node_1819157919504:n [color=blue]
 }

@@ -15,8 +15,18 @@ config = Config(ir_simplify=3, ir_inline_catch=True)
 # noinspection PyUnusedLocal
 def aaa():
     f"say function begin"
-    if Score(0):
-        raise RtExc3()
+    try:
+        for i in ScoreRange(100):
+            if i == 10:
+                raise RtExc1
+            elif i == 20:
+                raise RtExc2
+            elif i == 30:
+                raise RtExc3
+            else:
+                break
+    except RtExc as e:
+        f"handle"
     else:
         return
     f"say function end"
@@ -25,6 +35,7 @@ bbb = reform_func(aaa)
 
 with Context("root") as ctx:
     bbb()
+ctx.finish()
 
 with open("test.html", 'w') as f:
     f.write(dump_context(ctx))

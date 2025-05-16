@@ -248,7 +248,19 @@ class RtIterator[V: RtData](RtBaseIterator[V], ABC):
 
 class ScoreRange(RtIterator[Score]):
 
-    def __init__(self, start: ScoreInitializer, end: ScoreInitializer, step: ScoreInitializer = 1):
+    @overload
+    def __init__(self, end: ScoreInitializer, /): ...
+
+    @overload
+    def __init__(self, start: ScoreInitializer, end: ScoreInitializer, step: ScoreInitializer = ..., /): ...
+
+    def __init__(self, arg1, arg2=None, step=1):
+        if arg2 is None:
+            start = 0
+            end = arg1
+        else:
+            start = arg1
+            end = arg2
         self.i = Score(start)
         self.end = int(end) if isinstance(end, Real) else Score(end)
         self.step = int(step) if isinstance(end, Real) else Score(step)
