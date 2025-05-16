@@ -16,6 +16,7 @@ class _RtBaseExcMeta(ABCMeta):
 
 
 class RtBaseExc(BaseException, metaclass=_RtBaseExcMeta):
+    _errno = NotImplemented  # TODO 异常代号范围化
     def __record__(self):
         Raise(exc=self)
 
@@ -72,7 +73,7 @@ class RtAnyNormalExc(RtNormalExc):
 
 
 @final
-class RtStopIteration(RtSysExc):
+class RtStopIteration(RtNormalExc):
     _errno = -1
     def __init_subclass__(cls, **kwargs):
         raise TypeError("type 'RtStopIteration' is not an acceptable base type")

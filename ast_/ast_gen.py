@@ -827,7 +827,7 @@ class ASTRewriter(NodeTransformer):
                 ctx=Store()),
             iter=NamedExpr(
                 target=Name(id=name_handler, ctx=Store()),
-                value=self.add_call(self.TryHandler, [List(elts=[h.type for h in node.handlers])])),
+                value=self.add_call(self.TryHandler, [List(elts=[h.type if h.type is not None else self.add_value(RtNormalExc) for h in node.handlers])])),
             body=[
                 Match(
                     subject=Name(id=name_cf_var, ctx=Load()),

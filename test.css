@@ -75,7 +75,7 @@ div{
 }
 
 .except::before{
-    content: "except";
+    content: "except ";
     font-weight: bold;
 }
 

@@ -10,19 +10,22 @@ class RtExc1(RtExc): ...
 class RtExc2(RtExc): ...
 class RtExc3(RtExc): ...
 
-config = Config(ir_simplify=3, ir_inline_catch=False)
+config = Config(ir_simplify=0, ir_inline_catch=True)
 
 # noinspection PyUnusedLocal
 def aaa(a: Score):
     f"say function begin"
     try:
-        for i in range(20):
-            if a == i:
+        # for i in range(20):
+        for _ in ScoreRange(100):
+            if a == 1:
                 raise RtExc1
-    except RtExc as e:
-        f"handle"
-    else:
-        return
+        f"1111111111111111111"
+    except:
+        f"aaa"
+    # finally:
+    #     f"pass"
+        # return
     f"say function end"
 
 bbb = reform_func(aaa)

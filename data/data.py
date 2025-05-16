@@ -288,6 +288,7 @@ class ScoreRange(RtIterator[Score]):
             self.i += self.step
             return self.i
         else:
+            f"debug"
             raise RtStopIteration()
 
     def __repr__(self):

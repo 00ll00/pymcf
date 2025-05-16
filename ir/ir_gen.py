@@ -337,7 +337,7 @@ class _Expander(NodeVisitor):
             self.current_block().add_op(self.set_flag_op(node.exc_class))
         else:
             cb_last_out = self.exit_block()
-            for eg, handler in self._exc_handler_in:
+            for eg, handler in self._exc_handler_in[::-1]:
                 if issubclass(node.exc_class, eg):
                     cb_last_out.direct = handler
                     break
