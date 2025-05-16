@@ -1,0 +1,133 @@
+body{
+    font-family: "Courier New", monospace
+}
+
+table{
+    border-collapse: collapse;
+    border-spacing: 0;
+    box-sizing: content-box;
+    width: 100%;
+    height: 100%;
+    outline: 2px solid black;
+    outline-offset: -1px;
+}
+
+/*tr{*/
+/*    border: 2px solid black;*/
+/*}*/
+
+td{
+    vertical-align: top;
+    text-align: left;
+    padding: 0;
+}
+
+div{
+    padding-left: 4px;
+    padding-right: 4px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    background: #f2f2f2;
+    height: 100%;
+}
+
+.root{
+    width: auto;
+    height: auto;
+}
+
+.head_root{
+    font-weight: bold;
+    background: #ccffff;
+    text-align: center;
+    outline: 2px solid black;
+    outline-offset: -1px;
+    padding: 4px;
+}
+
+.cf{
+    background: #e5e5e5;
+    padding: 4px;
+}
+
+.if_cond::before{
+    content: "if ";
+    font-weight: bold;
+}
+.if_cond::after{
+    content: ":";
+    font-weight: bold;
+}
+
+.else::before{
+    content: "else:";
+    font-weight: bold;
+}
+
+.raise::before{
+    content: "raise ";
+    font-weight: bold;
+}
+
+.try::before{
+    content: "try:";
+    font-weight: bold;
+}
+
+.except::before{
+    content: "except";
+    font-weight: bold;
+}
+
+.except::after{
+    content: ":";
+    font-weight: bold;
+}
+
+.finally::before{
+    content: "finally:";
+    font-weight: bold;
+}
+
+.for_iter::before{
+    content: "for ";
+    font-weight: bold;
+}
+
+.for_iter::after{
+    content: ":";
+    font-weight: bold;
+}
+
+.while_cond::before{
+    content: "while ";
+    font-weight: bold;
+}
+
+.while_cond::after{
+    content: ":";
+    font-weight: bold;
+}
+
+.pass::before{
+    content: "pass";
+    font-weight: bold;
+}
+
+.scope{
+    outline: 0;
+}
+
+.operation{
+    background: #f2f2f2;
+}
+
+.exc_never{
+    background: #e5e5e5
+}
+.exc_might{
+    background: #fff0cc;
+}
+.exc_always{
+    background: #ffcccc;
+}
