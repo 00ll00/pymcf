@@ -1,19 +1,19 @@
-from typing import Any
+import importlib.resources
 
 from dominate.tags import *
+from dominate.util import raw
 
-from ast_ import NodeVisitor, Scope, operation, compiler_hint, If, Context, control_flow, ExcSet, Raise, stmt, AST, \
-    AugAssign, For, While, Try
-from .reprs import escape, repr_operation, repr_compiler_hint
+from ast_ import NodeVisitor, Scope, operation, compiler_hint, If, Context, Raise, AST, \
+    For, While, Try
+from .reprs import repr_operation, repr_compiler_hint
 
 
 class _CtxDumper(NodeVisitor):
 
     def dump(self, ctx: Context) -> str:
         with html() as doc:
-            self.doc = doc
             with head():
-                link(rel="stylesheet", href="test.css", type="text/css")
+                style(raw(importlib.resources.read_text(__name__, 'ast.css')))
             with body():
                 with table(cls="root"):
                     with tr(), td():
@@ -42,7 +42,7 @@ class _CtxDumper(NodeVisitor):
                 for i, op in enumerate(node.flow):
                     with tr():
                         with td():
-                            div(f"{i+1}.", title="\n".join(repr(e) for e in op.excs.set), cls=("exc_always" if op.excs.always else "exc_might" if op.excs.might else "exc_never") + " tooltip")
+                            div(f"{i+1}.", title="\n".join(repr(e) for e in op.excs.set), cls=("exc_always" if op.excs.always else "exc_might" if op.excs.might else "exc_never") + " lineno")
                         with td():
                             self.visit(op)
             else:

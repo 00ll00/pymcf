@@ -12,10 +12,6 @@ table{
     outline-offset: -1px;
 }
 
-/*tr{*/
-/*    border: 2px solid black;*/
-/*}*/
-
 td{
     vertical-align: top;
     text-align: left;
@@ -23,10 +19,7 @@ td{
 }
 
 div{
-    padding-left: 4px;
-    padding-right: 4px;
-    padding-top: 2px;
-    padding-bottom: 2px;
+    padding: 2px 4px;
     background: #f2f2f2;
     height: 100%;
 }
@@ -130,4 +123,8 @@ div{
 }
 .exc_always{
     background: #ffcccc;
+}
+
+.lineno{
+    text-align: right;
 }

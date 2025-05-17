@@ -591,10 +591,11 @@ class Raise(control_flow):
 
     抛出 RtContinue, RtBreak, RtReturn 分别代替 continue, break, return，其余异常视为 raise
 
-    exc 可能是异常类或异常实例。
+    exc 是异常实例。
     """
     _fields = ("exc",)
-    def __init__(self, exc: RtBaseExc | _TBaseRtExc, *args, **kwargs):
+    def __init__(self, exc: RtBaseExc, *args, **kwargs):
+        assert isinstance(exc, RtBaseExc)
         self.exc = exc
         super().__init__(*args, **kwargs)
 
@@ -604,4 +605,4 @@ class Raise(control_flow):
 
     @property
     def exc_class(self) -> _TBaseRtExc:
-        return self.exc if isinstance(self.exc, type) else type(self.exc)
+        return type(self.exc)
