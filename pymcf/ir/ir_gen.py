@@ -29,9 +29,9 @@ class IrCfg(Config):
 
 class _Expander(NodeVisitor):
 
-    def __init__(self, scope: Scope, break_flag: Any, config: IrCfg):
+    def __init__(self, scope: Scope, break_flag: Any, config: IrCfg, root_name: str = "root"):
         self.scope = scope
-        self.root = BasicBlock("root")
+        self.root = BasicBlock(root_name)
         self.config = config
         self.cb_stack: list[BasicBlock] = [self.root]
         self.bf = break_flag
@@ -354,8 +354,8 @@ class _Expander(NodeVisitor):
                 cb_last.true = self._try_match_jump[-1]
 
 
-def control_flow_expand(scope: Scope, break_flag: Any, config: IrCfg) -> code_block:
-        expander =_Expander(scope, break_flag=break_flag, config=config)
+def control_flow_expand(scope: Scope, break_flag: Any, config: IrCfg, root_name: str = "root") -> code_block:
+        expander =_Expander(scope, break_flag=break_flag, config=config, root_name=root_name)
         expander.expand()
         return expander.root
 

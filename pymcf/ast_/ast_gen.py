@@ -1155,7 +1155,7 @@ class ASTRewriter(NodeTransformer):
         return super().generic_visit(node)
 
 
-def reform_func(func: FunctionType) -> FunctionType:
+def reform_func(func: FunctionType, wrapper_name: str = "$wrapper") -> FunctionType:
     """
     将 python 函数改造为 ast 生成器
 
@@ -1179,7 +1179,7 @@ def reform_func(func: FunctionType) -> FunctionType:
         node = node.body[0]
 
     node = increment_lineno(node, start_line - 1)
-    rewriter = ASTRewriter(wrapper_name="$wrapper")
+    rewriter = ASTRewriter(wrapper_name=wrapper_name)
     node = rewriter.rewrite(node)
     node = fix_missing_locations(node)
 
@@ -1187,10 +1187,10 @@ def reform_func(func: FunctionType) -> FunctionType:
     glb_ext = rewriter.get_glb()
     glb.update(glb_ext)
     exec(compile(node, inspect.getfile(func), 'exec'), glb)
-    wrapper = glb["$wrapper"]
+    wrapper = glb[wrapper_name]
     new_func = wrapper()
 
-    del glb["$wrapper"]
+    del glb[wrapper_name]
     for k in glb_ext:
         del glb[k]
 

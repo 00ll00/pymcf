@@ -1,4 +1,6 @@
 from abc import abstractmethod, ABC
+from contextlib import contextmanager
+from contextvars import ContextVar
 from numbers import Real
 from typing import Self, overload
 
@@ -52,6 +54,23 @@ class ScoreIdentifier(Identifier):
 
     def __repr__(self):
         return repr(f"{self.entity!r} {self.scb!r}")
+
+
+_eq_identifier: ContextVar[bool] = ContextVar("eq_identifier", default=False)
+"""
+决定是否让 RtBaseData 实例的 __eq__ 函数直接使用其 identifier 的 __eq__
+"""
+# TODO 需要一个更好的实现方式
+
+
+@contextmanager
+def set_eq_identifier(b: bool):
+    _o = _eq_identifier.get()
+    try:
+        _eq_identifier.set(b)
+        yield
+    finally:
+        _eq_identifier.set(_o)
 
 
 class RtData(RtBaseData):
@@ -122,9 +141,12 @@ class NumberLike(ABC):
         return self.__class__.__mod__(other, self)
 
     def __ne__(self, other):
-        res = Bool.__create_tmp__()
-        Compare.NotEq(res, self, other)
-        return res
+        if _eq_identifier.get():
+            return super().__ne__(other)
+        else:
+            res = Bool.__create_tmp__()
+            Compare.NotEq(res, self, other)
+            return res
 
     def __lt__(self, other):
         res = Bool.__create_tmp__()
@@ -147,9 +169,12 @@ class NumberLike(ABC):
         return res
 
     def __eq__(self, other):
-        res = Bool.__create_tmp__()
-        Compare.Eq(res, self, other)
-        return res
+        if _eq_identifier.get():
+            return super().__eq__(other)
+        else:
+            res = Bool.__create_tmp__()
+            Compare.Eq(res, self, other)
+            return res
 
     def __iadd__(self, other):
         AugAssign.Add(self, other)

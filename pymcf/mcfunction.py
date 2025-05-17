@@ -1,5 +1,6 @@
 import inspect
 from contextvars import ContextVar
+from operator import index
 from types import FunctionType, MethodType
 from typing import Self
 
@@ -34,7 +35,9 @@ class FuncArgs:
 
     def __eq__(self, other: Self) -> bool:
         # TODO
-        return self.mcf_args == other.mcf_args
+        from pymcf.data.data import set_eq_identifier
+        with set_eq_identifier(True):
+            return self.mcf_args == other.mcf_args
 
     def __hash__(self) -> int:
         # TODO
@@ -46,6 +49,14 @@ class FuncArgs:
             except TypeError:
                 ...
         return h
+
+
+def get_valid_name(func_name: str) -> str:
+    return (func_name
+            .replace("$wrapper.<locals>.", "")
+            .replace("<", "-")
+            .replace(">", "-")
+            .replace(".", "/"))
 
 
 # noinspection PyPep8Naming
@@ -96,7 +107,7 @@ class mcfunction:
 
         _generating.set(True)
         try:
-            self._ast_generator = reform_func(_func)
+            self._ast_generator = reform_func(_func, wrapper_name="$wrapper")
         finally:
             _generating.set(False)
 
@@ -105,7 +116,9 @@ class mcfunction:
         self._tags = tags if tags is not None else set()
         self._entrance = entrance
         self._inline = inline
-        self._basename = _func.__qualname__
+        self._basename = get_valid_name(_func.__qualname__)
+        if entrance:
+            self.name = self._basename
 
         mcfunction._all.append(self)
 
@@ -114,8 +127,13 @@ class mcfunction:
         if func_arg in self._arg_ctx:
             return self._arg_ctx[func_arg].return_value
 
+        if self._entrance and len(self._arg_ctx) == 0:
+            ext = ""
+        else:
+            ext = "-" + str(len(self._arg_ctx))
+
         last_ctx = Context.current_ctx()
-        with Context(name=self._basename, inline=self._inline) as ctx:
+        with Context(name=f"{self._basename}{ext}", inline=self._inline) as ctx:
             self._ast_generator(*args, **kwargs)
         ctx.finish()
 
