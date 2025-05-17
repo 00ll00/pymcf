@@ -1,7 +1,6 @@
 from abc import abstractmethod, ABC
 from typing import final, Self, Iterator
 
-from pydantic import BaseModel
 
 from ._syntactic import RtBaseExc, RtSysExc, RtNormalExc, RtCfExc, RtUnreachable, RtAnyNormalExc, RtContinue, RtBreak, RtReturn, RtStopIteration
 

@@ -1,8 +1,7 @@
 import inspect
 from contextvars import ContextVar
 from types import FunctionType, MethodType
-
-from pydantic import BaseModel
+from typing import Self
 
 from pymcf.ast_ import Context, reform_func, Call
 
@@ -29,8 +28,24 @@ type _CtArg = (
 """
 
 
-class Args(BaseModel):
-    args: tuple[_CtArg, ...]
+class FuncArgs:
+    def __init__(self, mcf_args: dict[str, _CtArg]) -> None:
+        self.mcf_args = mcf_args
+
+    def __eq__(self, other: Self) -> bool:
+        # TODO
+        return self.mcf_args == other.mcf_args
+
+    def __hash__(self) -> int:
+        # TODO
+        h = 0
+        for k, v in self.mcf_args.items():
+            h ^= hash(k)
+            try:
+                h ^= hash(v)
+            except TypeError:
+                ...
+        return h
 
 
 # noinspection PyPep8Naming
@@ -43,6 +58,8 @@ class mcfunction:
     tags: 函数标签
     inline: 是否内联
     """
+
+    _all: list[Self] = []
 
     def __new__(cls, _func=None, /, **kwargs):
 
@@ -83,17 +100,22 @@ class mcfunction:
         finally:
             _generating.set(False)
 
-        self._ctx_list: list[Context] = []
+        self._arg_ctx: dict[FuncArgs, Context] = {}
 
         self._tags = tags if tags is not None else set()
         self._entrance = entrance
         self._inline = inline
         self._basename = _func.__qualname__
 
+        mcfunction._all.append(self)
+
     def __call__(self, *args, **kwargs):
-        #TODO mcf 调用参数检查
+        func_arg = FuncArgs(self._signature.bind(*args, **kwargs).arguments)
+        if func_arg in self._arg_ctx:
+            return self._arg_ctx[func_arg].return_value
+
         last_ctx = Context.current_ctx()
-        with Context(self._basename, inline=self._inline) as ctx:
+        with Context(name=self._basename, inline=self._inline) as ctx:
             self._ast_generator(*args, **kwargs)
         ctx.finish()
 
@@ -101,9 +123,9 @@ class mcfunction:
             assert last_ctx is not None
             last_ctx.record_statement(Call(ctx, _offline=True))
 
-        self._ctx_list.append(ctx)
+        self._arg_ctx[func_arg] = ctx
 
-        return ctx._return_value
+        return ctx.return_value
 
     def __get__(self, instance, owner):
         if instance is None:
