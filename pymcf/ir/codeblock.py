@@ -2,7 +2,7 @@ import ast
 from abc import abstractmethod
 from typing import Any, Self
 
-from ast_ import operation, compiler_hint
+from pymcf.ast_ import operation, compiler_hint
 
 
 class code_block(ast.AST):

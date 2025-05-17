@@ -3,7 +3,7 @@ import importlib.resources
 from dominate.tags import *
 from dominate.util import raw
 
-from ast_ import NodeVisitor, Scope, operation, compiler_hint, If, Context, Raise, AST, \
+from pymcf.ast_ import NodeVisitor, Scope, operation, compiler_hint, If, Context, Raise, AST, \
     For, While, Try
 from .reprs import repr_operation, repr_compiler_hint
 

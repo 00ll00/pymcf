@@ -22,7 +22,9 @@ class RtBaseExc(BaseException, metaclass=_RtBaseExcMeta):
 
 
 class RtSysExc(RtBaseExc):
-    ...
+    """
+    系统保留的异常
+    """
 
 
 class _RtNormalExcMeta(_RtBaseExcMeta, ABC):
@@ -34,7 +36,11 @@ class _RtNormalExcMeta(_RtBaseExcMeta, ABC):
 
 
 class RtNormalExc(RtBaseExc, metaclass=_RtNormalExcMeta):
-    ...
+    """
+    允许用户定义的异常
+
+    通过继承此类构造新的运行期异常
+    """
 
 
 class RtCfExc(RtSysExc, ABC):

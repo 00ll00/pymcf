@@ -1,16 +1,16 @@
-from config import Config
-from ir import control_flow_expand, simplify
-from visualize import draw_ir, dump_context
-from ast_ import reform_func, Context, dump
-from data.data import ScoreRange, Score, ScoreIdentifier, Name, ScoreBoard
-from data.exceptions import RtExc
+from pymcf.config import Config
+from pymcf.ir import control_flow_expand, simplify
+from pymcf.visualize import draw_ir, dump_context
+from pymcf.ast_ import reform_func, Context
+from pymcf.data import Score, ScoreIdentifier, Name, ScoreBoard
+from pymcf.data.exceptions import RtExc
 
 
 class RtExc1(RtExc): ...
 class RtExc2(RtExc): ...
 class RtExc3(RtExc): ...
 
-config = Config(ir_simplify=3, ir_inline_catch=True)
+config = Config(ir_simplify=3, ir_inline_catch=False)
 
 # noinspection PyUnusedLocal
 def aaa(a: Score):

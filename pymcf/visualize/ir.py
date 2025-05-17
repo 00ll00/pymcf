@@ -2,10 +2,10 @@ import ast
 
 import graphviz as gv
 
-from ast_ import operation
-from ir import code_block, BasicBlock, MatchJump
-from ir.codeblock import jmpop
-from visualize.reprs import repr_operation, repr_jmpop, escape
+from pymcf.ast_ import operation
+from pymcf.ir import BasicBlock, MatchJump
+from pymcf.ir.codeblock import jmpop
+from pymcf.visualize.reprs import repr_operation, repr_jmpop, escape
 
 
 class _GraphVizDumper(ast.NodeVisitor):

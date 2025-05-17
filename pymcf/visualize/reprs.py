@@ -1,10 +1,9 @@
-from _ast import ExceptHandler
 from html import escape as html_escape
 
 from graphviz import escape as gv_escape
 
-from ast_ import *
-from ir.codeblock import jmpop, JmpEq, JmpNotEq
+from pymcf.ast_ import *
+from pymcf.ir.codeblock import jmpop, JmpEq, JmpNotEq
 
 
 def escape(s):

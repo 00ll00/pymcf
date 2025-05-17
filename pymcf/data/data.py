@@ -2,8 +2,8 @@ from abc import abstractmethod, ABC
 from numbers import Real
 from typing import Self, overload
 
-from ast_ import Context, RtBaseData, RtBaseIterator, Assign, BinOp, Compare, AugAssign, RtStopIteration
-from mcfunction import mcfunction
+from pymcf.ast_ import Context, RtBaseData, RtBaseIterator, Assign, BinOp, Compare, AugAssign, RtStopIteration
+from pymcf.mcfunction import mcfunction
 
 
 class Identifier:

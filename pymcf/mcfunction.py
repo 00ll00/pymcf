@@ -2,7 +2,9 @@ import inspect
 from contextvars import ContextVar
 from types import FunctionType, MethodType
 
-from ast_ import Context, reform_func, Call
+from pydantic import BaseModel
+
+from pymcf.ast_ import Context, reform_func, Call
 
 
 class CompileTimeError(BaseException):
@@ -16,6 +18,19 @@ _generating: ContextVar[bool] = ContextVar('_generating', default=False)
 是否已经在生成过程中
 """
 
+
+type _CtArg = (
+    bool |
+    int | float | complex | str | None |
+    list[_CtArg] | tuple[_CtArg, ...] | dict[_CtArg, _CtArg] | set[_CtArg]
+)
+"""
+允许作为参数传入 mcfunction 的编译期量
+"""
+
+
+class Args(BaseModel):
+    args: tuple[_CtArg, ...]
 
 
 # noinspection PyPep8Naming
