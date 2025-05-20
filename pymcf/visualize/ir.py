@@ -57,7 +57,7 @@ class _GraphVizDumper(ast.NodeVisitor):
                     <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
                         <tr><td{' bgcolor="#ccffff"' if begin else ''}><b>{escape(node.name)}</b></td></tr>
                         <tr><td bgcolor="gray95">{f"""<table border="0" cellborder="0" cellspacing="2" cellpadding="0">
-                            {'\n'.join(f'<tr><td align="left">{i + 1}.</td>{self.repr_node(op)}</tr>' for i, op in enumerate(node.ops))}
+                            {'\n'.join(f'<tr><td align="right">{i + 1}.</td>{self.repr_node(op)}</tr>' for i, op in enumerate(node.ops))}
                         </table>""" if node.ops else ""}</td></tr>
                         <tr><td{' bgcolor="#ffffcc"' if end else ''}>{escape(node.cond)}</td></tr>
                     </table>
