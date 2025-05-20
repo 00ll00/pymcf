@@ -325,9 +325,14 @@ class _Expander(NodeVisitor):
         if self.inline_catch:
             assert not node.sc_finally.excs.might, "启用 ir_inline_catch 时 finally 块不能存在呈递流程控制语句（continue, break, return 或抛出异常）"
             cb_finally_out.direct = cb_next_in
-        elif not node.sc_finally.excs.always:
-            cb_finally_out.cond = self.bf
-            cb_finally_out.false = cb_next_in
+        else:
+            if not node.sc_finally.excs.always:
+                if node.sc_else.excs.might or node.sc_finally.excs.might or any(h.sc_handle.excs.might for h in node.excepts):
+                    cb_finally_out.cond = self.bf
+                    cb_finally_out.false = cb_next_in
+                else:
+                    # exception_handlers, else, finally 均不会抛出异常，则可以直接跳转
+                    cb_finally_out.direct = cb_next_in
 
     def visit_Raise(self, node: Raise):
         # TODO err stack
