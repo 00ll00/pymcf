@@ -164,33 +164,30 @@ class Assign(operation):
 
 
 class UnaryOp(operation):
-    _fields = ("op", "value")
+    _fields = ("op", "target", "value")
     _reads = ("value",)
     _writes = ("target",)
-    def __init__(self, op: unaryop, value, *args, **kwargs):
+    def __init__(self, op: unaryop, target, value, *args, **kwargs):
         self.op = op
+        self.target = target
         self.value = value
         super().__init__(*args, **kwargs)
 
-    @property
-    def writes(self) -> tuple[RtBaseData, ...]:
-        return (self.target,)
+    @staticmethod
+    def UAdd(target, value, *args, **kwargs):
+        return UnaryOp(UAdd(), target, value, *args, **kwargs)
 
     @staticmethod
-    def UAdd(value, *args, **kwargs):
-        return UnaryOp(UAdd(), value, *args, **kwargs)
+    def USub(target, value, *args, **kwargs):
+        return UnaryOp(USub(), target, value, *args, **kwargs)
 
     @staticmethod
-    def USub(value, *args, **kwargs):
-        return UnaryOp(USub(), value, *args, **kwargs)
+    def Not(target, value, *args, **kwargs):
+        return UnaryOp(Not(), target, value, *args, **kwargs)
 
     @staticmethod
-    def Not(value, *args, **kwargs):
-        return UnaryOp(Not(), value, *args, **kwargs)
-
-    @staticmethod
-    def Invert(value, *args, **kwargs):
-        return UnaryOp(Invert(), value, *args, **kwargs)
+    def Invert(target, value, *args, **kwargs):
+        return UnaryOp(Invert(), target, value, *args, **kwargs)
 
 
 class BoolOp(operation):

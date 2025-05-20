@@ -243,8 +243,8 @@ class Score(RtData, NumberLike):
         elif len(args) == 2:
             if identifier is not None:
                 raise ValueError("不能同时使用两个 identifier 初始化 Score")
-            entity = Name(args[0])  # TODO 判断实体提供方式
-            scb = args[1] if isinstance(args[1], ScoreBoard) else ScoreBoard(args[1])
+            entity = EntityIdentifier(args[0])
+            scb = ScoreBoard(args[1])
             identifier = ScoreIdentifier(entity, scb)
 
         super().__init__(identifier)
@@ -263,15 +263,6 @@ class Score(RtData, NumberLike):
     def __repr__(self):
         return f"Score({self.identifier!r})"
 
-    def __bool_and__(self, other):
-        res = Bool.__create_tmp__()
-        BoolOp.And(res, self, other)
-        return res
-
-    def __bool_or__(self, other):
-        res = Bool.__create_tmp__()
-        BoolOp.Or(res, self, other)
-        return res
 
 Bool = Score
 

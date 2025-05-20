@@ -463,6 +463,7 @@ class CBInliner(CBSimplifier):
 
 
     def simplify_BasicBlock(self, cb: BasicBlock) -> BasicBlock | None:
+        ...
 
 
 

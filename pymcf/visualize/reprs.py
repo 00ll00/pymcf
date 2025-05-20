@@ -91,7 +91,7 @@ def repr_operation(op: operation) -> str:
         case Assign():
             return f"{op.target!r} = {op.value!r}"
         case UnaryOp():
-            return repr_unaryop(op.op) + repr(op.value)
+            return f"{op.target!r} = {repr_operator(op.op)}{op.value!r}"
         case BoolOp():
             return f"{op.target!r} = {op.left!r} {repr_boolop(op.op)} {op.right!r}"
         case BinOp():
