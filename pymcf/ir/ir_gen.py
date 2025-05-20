@@ -27,7 +27,7 @@ class IrCfg(Config):
     """
 
 
-class _Expander(NodeVisitor):
+class Expander(NodeVisitor):
 
     def __init__(self, scope: Scope, break_flag: Any, config: IrCfg, root_name: str = "root"):
         self.scope = scope
@@ -360,12 +360,12 @@ class _Expander(NodeVisitor):
 
 
 def control_flow_expand(scope: Scope, break_flag: Any, config: IrCfg, root_name: str = "root") -> code_block:
-        expander =_Expander(scope, break_flag=break_flag, config=config, root_name=root_name)
+        expander =Expander(scope, break_flag=break_flag, config=config, root_name=root_name)
         expander.expand()
         return expander.root
 
 
-class _Simplifier:
+class CBSimplifier:
 
     def __init__(self):
         self.visited = {}
@@ -400,8 +400,10 @@ class _Simplifier:
         return cb
 
 
-class _EmptyCBSimplifier(_Simplifier):
-
+class EmptyCBRemover(CBSimplifier):
+    """
+    消除空块和简化跳转逻辑
+    """
     def simplify_BasicBlock(self, cb: BasicBlock) -> BasicBlock | None:
         if cb.true is None and cb.false is None:
             cb.cond = None
@@ -433,7 +435,7 @@ class _EmptyCBSimplifier(_Simplifier):
 
 def simplify(root: code_block, config: IrCfg) -> code_block | None:
     for _ in range(config.ir_simplify):
-        simplifier = _EmptyCBSimplifier()
+        simplifier = EmptyCBRemover()
         root = simplifier.simplify(root)
         if root is None:
             break
