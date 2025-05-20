@@ -360,13 +360,54 @@ def control_flow_expand(scope: Scope, break_flag: Any, config: IrCfg, root_name:
         return expander.root
 
 
-def _simplify(root: code_block) -> code_block:
-    # TODO 单次 simplify 无法完全消除冗余节点
-    visited = {}
+class _Simplifier:
 
-    def simplify_BasicBlock(cb: BasicBlock) -> BasicBlock | None:
+    def __init__(self):
+        self.visited = {}
+        self.simplified = False
+
+    def simplify(self, node: code_block):
+        self.visited = self.visited
+        if id(node) in self.visited:
+            return self.visited[id(node)]
+        if isinstance(node, BasicBlock):
+            self.visited[id(node)] = self.simplify_BasicBlock(node)
+        elif isinstance(node, MatchJump):
+            self.visited[id(node)] = self.simplify_MatchJump(node)
+        else:
+            self.visited[id(node)] = node
+        for name, field in ast.iter_fields(node):
+            if isinstance(field, code_block):
+                setattr(node, name, self.simplify(field))
+            elif isinstance(field, list):
+                for item in field:
+                    self.simplify(item)
+            elif isinstance(field, ast.AST):
+                self.simplify(field)
+        if self.visited[id(node)] != node:
+            self.simplified = True
+        return self.visited[id(node)]
+
+    def simplify_BasicBlock(self, cb: BasicBlock) -> code_block | None:
+        return cb
+
+    def simplify_MatchJump(self, cb: MatchJump) -> code_block | None:
+        return cb
+
+
+class _EmptyCBSimplifier(_Simplifier):
+
+    def simplify_BasicBlock(self, cb: BasicBlock) -> BasicBlock | None:
         if cb.true is None and cb.false is None:
             cb.cond = None
+        elif cb.cond is None:
+            cb.true = cb.false = None
+        if cb.cond is None and isinstance(cb.direct, BasicBlock) and len(cb.direct.ops) == 0:
+            # 当前块直接跳转空块且无条件跳转，将空块的跳转方式提前
+            cb.cond = cb.direct.cond
+            cb.false = cb.direct.false
+            cb.true = cb.direct.true
+            cb.direct = cb.direct.direct
         if len(cb.ops) == 0 and cb.cond is None:
                 # 不应存在全空的环路
                 return cb.direct
@@ -378,40 +419,20 @@ def _simplify(root: code_block) -> code_block:
                 cb.false = cb.false.false
         return cb
 
-    def simplify_MatchJump(cb: MatchJump) -> MatchJump | None:
+    def simplify_MatchJump(self, cb: MatchJump) -> MatchJump | None:
         if len(cb.cases) == 0:
             return None
         # 无跳转目标的case暂时不能删除，可能存在flag清除的作用
         return cb
 
-    def visit(node: code_block):
-        if id(node) in visited:
-            return visited[id(node)]
-        if isinstance(node, BasicBlock):
-            visited[id(node)] = simplify_BasicBlock(node)
-        elif isinstance(node, MatchJump):
-            visited[id(node)] = simplify_MatchJump(node)
-        else:
-            visited[id(node)] = node
-        for name, field in ast.iter_fields(node):
-            if isinstance(field, code_block):
-                setattr(node, name, visit(field))
-            elif isinstance(field, list):
-                for item in field:
-                    visit(item)
-            elif isinstance(field, ast.AST):
-                visit(field)
-
-        return visited[id(node)]
-
-
-    return visit(root)
-
 
 def simplify(root: code_block, config: IrCfg) -> code_block | None:
     for _ in range(config.ir_simplify):
-        root = _simplify(root)
+        simplifier = _EmptyCBSimplifier()
+        root = simplifier.simplify(root)
         if root is None:
+            break
+        if not simplifier.simplified:
             break
     return root
 
