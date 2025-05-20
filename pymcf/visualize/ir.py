@@ -2,7 +2,7 @@ import ast
 
 import graphviz as gv
 
-from pymcf.ast_ import operation
+from pymcf.ast_ import operation, control_flow, Call
 from pymcf.ir import BasicBlock, MatchJump
 from pymcf.ir.codeblock import jmpop
 from pymcf.visualize.reprs import repr_operation, repr_jmpop, escape
@@ -24,7 +24,8 @@ class _GraphVizDumper(ast.NodeVisitor):
         self.graph.edge_attr = {
             "fontname": "Courier New",
         }
-        self.visit(root)
+        if root is not None:
+            self.visit(root)
 
     def visit(self, node):
         if node in self.visited:
@@ -42,6 +43,8 @@ class _GraphVizDumper(ast.NodeVisitor):
             r = repr_operation(op)
         elif isinstance(op, jmpop):
             r = repr_jmpop(op)
+        elif isinstance(op, Call):
+            r = f"{op.func!r}()"
         return f"""<td align="left"><b>{escape(op.__class__.__name__)}</b>  </td><td align="left">{escape(r)}</td>"""
 
     def visit_BasicBlock(self, node: BasicBlock):

@@ -989,7 +989,7 @@ class ASTRewriter(NodeTransformer):
                 handler = self.handle_or
             case _:
                 raise
-        return self.add_call(handler, *node.values)
+        return self.add_call(handler, node.values)
 
     def assign_handler(self, target, value):
         if isinstance(target, RtBaseData):

@@ -1,10 +1,11 @@
 import importlib.resources
+from typing import Any
 
 from dominate.tags import *
 from dominate.util import raw
 
 from pymcf.ast_ import NodeVisitor, Scope, operation, compiler_hint, If, Context, Raise, AST, \
-    For, While, Try
+    For, While, Try, AugAssign, Call
 from .reprs import repr_operation, repr_compiler_hint
 
 
@@ -107,6 +108,9 @@ class _CtxDumper(NodeVisitor):
                 div(cls="finally cf")
             with tr(), td():
                 self.visit(node.sc_finally)
+
+    def visit_Call(self, node: Call):
+        div(repr(node.func), cls="call")
 
 
 def dump_context(ctx: Context) -> str:

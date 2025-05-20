@@ -123,27 +123,33 @@ class mcfunction:
         mcfunction._all.append(self)
 
     def __call__(self, *args, **kwargs):
-        func_arg = FuncArgs(self._signature.bind(*args, **kwargs).arguments)
-        if func_arg in self._arg_ctx:
-            return self._arg_ctx[func_arg].return_value
-
-        if self._entrance and len(self._arg_ctx) == 0:
-            ext = ""
+        if self._inline:
+            with Context(name=f"{self._basename}@inlined", inline=self._inline) as ctx:
+                self._ast_generator(*args, **kwargs)
+            ctx.finish()
+            return ctx.return_value
         else:
-            ext = "-" + str(len(self._arg_ctx))
+            func_arg = FuncArgs(self._signature.bind(*args, **kwargs).arguments)
+            if func_arg in self._arg_ctx:
+                return self._arg_ctx[func_arg].return_value
 
-        last_ctx = Context.current_ctx()
-        with Context(name=f"{self._basename}{ext}", inline=self._inline) as ctx:
-            self._ast_generator(*args, **kwargs)
-        ctx.finish()
+            if self._entrance and len(self._arg_ctx) == 0:
+                ext = ""
+            else:
+                ext = "-" + str(len(self._arg_ctx))
 
-        if not self._entrance and not self._inline:
-            assert last_ctx is not None
-            last_ctx.record_statement(Call(ctx, _offline=True))
+            last_ctx = Context.current_ctx()
+            with Context(name=f"{self._basename}{ext}", inline=self._inline) as ctx:
+                self._ast_generator(*args, **kwargs)
+            ctx.finish()
 
-        self._arg_ctx[func_arg] = ctx
+            if not self._entrance and not self._inline:
+                assert last_ctx is not None
+                last_ctx.record_statement(Call(ctx, _offline=True))
 
-        return ctx.return_value
+            self._arg_ctx[func_arg] = ctx
+
+            return ctx.return_value
 
     def __get__(self, instance, owner):
         if instance is None:

@@ -107,6 +107,11 @@ div{
     font-weight: bold;
 }
 
+.call::before{
+    content: "call ";
+    font-weight: bold;
+}
+
 .scope{
     outline: 0;
 }

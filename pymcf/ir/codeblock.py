@@ -6,14 +6,7 @@ from pymcf.ast_ import operation, compiler_hint
 
 
 class code_block(ast.AST):
-    @abstractmethod
-    def simplified(self) -> Self | None:
-        """
-        简化代码块，返回简化后的代码块
-
-        若此代码块能够被跳过，则返回应当跳转到的代码块或 None，否则返回自身
-        """
-
+    ...
 
 class BasicBlock(code_block):
     """
@@ -38,20 +31,6 @@ class BasicBlock(code_block):
 
     def add_op(self, op):
         self.ops.append(op)
-
-    def simplified(self) -> Self | None:
-        if self.true is None and self.false is None:
-            self.cond = None
-        if len(self.ops) == 0 and self.cond is None:
-                # 不应存在全空的环路
-                return self.direct
-        if self.cond is not None:
-            # 跳过相同条件的空块
-            if isinstance(self.true, BasicBlock) and self.true.cond is self.cond and len(self.true.ops) == 0 and self.true.direct is None:
-                self.true = self.true.true
-            if isinstance(self.false, BasicBlock) and self.false.cond is self.cond and len(self.false.ops) == 0 and self.false.direct is None:
-                self.false = self.false.false
-        return self
 
 
 class jmpop(ast.AST):
@@ -90,9 +69,3 @@ class MatchJump(code_block):
         self.flag = flag
         self.cases = cases
         self.inactive = inactive  # 用于指示分支完成后的值，应避免被各分支条件响应
-
-    def simplified(self) -> Self | None:
-        if len(self.cases) == 0:
-            return None
-        # 无跳转目标的case暂时不能删除，可能存在flag清除的作用
-        return self

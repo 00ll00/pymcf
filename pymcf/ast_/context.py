@@ -41,6 +41,9 @@ class Context:
         # exit 时不能直接调用 self.finish()，存在部分 context 会多次进出
         _current_ctx.set(self._last_ctx)
 
+    def __repr__(self):
+        return f"<Context {self.name!r}>"
+
     @staticmethod
     def current_ctx() -> Optional["Context"]:
         return _current_ctx.get()
