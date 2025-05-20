@@ -1,189 +1,69 @@
-from abc import ABC, abstractmethod, ABCMeta
+from abc import ABC, abstractmethod
 from ast import AST as _AST, unaryop, UAdd, USub, Not, Invert, boolop, And, Or, operator, Add, Sub, Mult, Div, FloorDiv, Mod, \
     Pow, LShift, RShift, BitOr, BitXor, BitAnd, MatMult, cmpop, Eq, NotEq, Lt, LtE, Gt, GtE, Is, IsNot, In, NotIn
-from functools import reduce, cached_property
-from typing import Any, Self, Iterable, final
+from functools import reduce
+from types import GenericAlias
+from typing import Any, Iterable
+
+from .runtime import ExcSet, RtBaseData, RtStopIteration, RtContinue, RtBreak, RtBaseExc, _TBaseRtExc
 
 
-class _RtBaseExcMeta(ABCMeta):
-    @property
-    @abstractmethod
-    def errno(cls) -> int:
-        return cls._errno
-
-    def __repr__(cls):
-        return f"<{cls.__qualname__}(errno={cls.errno})>"
+_NOT_FOUND = object()
 
 
-class RtBaseExc(BaseException, metaclass=_RtBaseExcMeta):
-    _errno = NotImplemented  # TODO 异常代号范围化
-    def __record__(self):
-        Raise(exc=self)
+class cached_property:
+    def __init__(self, func):
+        self.func = func
+        self.attrname = None
+        self.__doc__ = func.__doc__
+        self.__module__ = func.__module__
 
+    def __set_name__(self, owner, name):
+        if self.attrname is None:
+            self.attrname = name
+        elif name != self.attrname:
+            raise TypeError(
+                "Cannot assign the same cached_property to two different names "
+                f"({self.attrname!r} and {name!r})."
+            )
 
-class RtSysExc(RtBaseExc):
-    """
-    系统保留的异常
-    """
-
-
-class _RtNormalExcMeta(_RtBaseExcMeta, ABC):
-
-    def __subclasscheck__(self, subclass):
-        if subclass is RtAnyNormalExc:
-            return True
-        return type.__subclasscheck__(self, subclass)
-
-
-class RtNormalExc(RtBaseExc, metaclass=_RtNormalExcMeta):
-    """
-    允许用户定义的异常
-
-    通过继承此类构造新的运行期异常
-    """
-
-
-class RtCfExc(RtSysExc, ABC):
-    """
-    流程控制异常
-    """
-
-
-@final
-class RtUnreachable(RtCfExc):
-    """
-    RtUnreachable 用于终止不可达代码的生成
-    """
-    _errno = -42
-    def __init_subclass__(cls, **kwargs):
-        raise TypeError(f'RtUnreachable cannot be inherited')
-    def __init__(self):
-        ...
-    def __record__(self):
-        ...  # raise RtUnreachable 不需要被记录
-
-
-@final
-class RtAnyNormalExc(RtNormalExc):
-    """
-    RtAnyNormalExc 是所有 RtNormalExc 子类的子类，仅用于抛出异常不明确时作为*任意*异常可能被抛出的提示
-
-    不可继承，不可实例化
-    """
-    _errno = -42
-    def __init_subclass__(cls, **kwargs):
-        raise TypeError("type 'RtAnyNormalExc' is not an acceptable base type")
-
-    def __init__(self):
-        raise TypeError("type 'RtAnyNormalExc' cannot be instantiated")
-
-
-@final
-class RtStopIteration(RtNormalExc):
-    _errno = -1
-    def __init_subclass__(cls, **kwargs):
-        raise TypeError("type 'RtStopIteration' is not an acceptable base type")
-
-
-@final
-class RtContinue(RtCfExc):
-    _errno = -2
-    def __init_subclass__(cls, **kwargs):
-        raise TypeError("type 'RtContinue' is not an acceptable base type")
-
-
-@final
-class RtBreak(RtCfExc):
-    _errno = -3
-    def __init_subclass__(cls, **kwargs):
-        raise TypeError("type 'RtBreak' is not an acceptable base type")
-
-
-@final
-class RtReturn(RtCfExc):
-    _errno = -4
-    def __init_subclass__(cls, **kwargs):
-        raise TypeError("type 'RtReturn' is not an acceptable base type")
-    def __init__(self, value):
-        self.value = value
-
-
-type _TBaseRtExc = type[RtBaseExc]
-
-
-class ExcSet:
-    """
-    异常集合
-
-    不可变集合，要修改内容需要创建新集合
-    """
-
-    EMPTY: Self
-    """
-    空异常集合，不含任何异常。
-    """
-
-    ANY: Self
-    """
-    满异常集合，可能出现任意 RtNormalExc 或无异常。用于描述异常未知的函数。
-    """
-
-    def __init__(self, exc: _TBaseRtExc | Iterable[_TBaseRtExc] | Self | None):
-        self._set: set[_TBaseRtExc | None] = set()
-        if isinstance(exc, type):
-            self._set.add(exc)
-        elif isinstance(exc, RtBaseExc):
-            self._set.add(type(exc))
-        elif isinstance(exc, ExcSet):
-            self._set.update(exc._set)
-        elif exc is None:
-            self._set.add(exc)
-        else:
+    def __get__(self, instance, owner=None):
+        if instance is None:
+            return self
+        if self.attrname is None:
+            raise TypeError(
+                "Cannot use cached_property instance without calling __set_name__ on it.")
+        try:
+            cache = instance._cache
+        except AttributeError:
+            msg = (
+                f"No '_cache' attribute on {type(instance).__name__!r} "
+                f"instance to cache {self.attrname!r} property."
+            )
+            raise TypeError(msg) from None
+        val = cache.get(self.attrname, _NOT_FOUND)
+        if val is _NOT_FOUND:
+            val = self.func(instance)
             try:
-                self._set.update(exc)
-            except:
-                raise ValueError(f'无效的初始化值: {exc!r}')
+                cache[self.attrname] = val
+            except TypeError:
+                msg = (
+                    f"The '_cache' attribute on {type(instance).__name__!r} instance "
+                    f"does not support item assignment for caching {self.attrname!r} property."
+                )
+                raise TypeError(msg) from None
+        return val
 
-        if len(self._set) == 0:
-            self._set.add(None)
-
-        self._always = None not in self._set
-        self._might = len(self._set - {None}) > 0
-
-    def remove(self, exc: _TBaseRtExc | set[_TBaseRtExc]) -> Self:
-        if isinstance(exc, type):
-            exc = {exc}
-        assert RtAnyNormalExc not in exc
-        return ExcSet(self._set - exc)
-
-    def remove_subclasses(self, exc: _TBaseRtExc| Iterable[_TBaseRtExc]) -> Self:
-        if isinstance(exc, type):
-            exc = (exc, )
-        else:
-            exc = tuple(exc)
-        res = ExcSet(e for e in self._set if e is None or not issubclass(e, exc))
-        has_any = RtAnyNormalExc in self._set and not issubclass(RtNormalExc, exc)  # 如果被移除的类包含 RtNormalExc 的基类，则可以移除 RtAnyNormalExc
-        if not has_any:
-            res = ExcSet(res._set - {RtAnyNormalExc})
-        return res
-
-    @property
-    def set(self) -> set[_TBaseRtExc | None]:
-        return self._set.copy()
-    @property
-    def always(self) -> bool:
-        return self._always
-    @property
-    def might(self) -> bool:
-        return self._might
-
-
-ExcSet.EMPTY = ExcSet(None)
-ExcSet.ANY = ExcSet({None, RtAnyNormalExc})
+    __class_getitem__ = classmethod(GenericAlias)
 
 
 class AST(_AST):
-    def clear_cache(self): ...
+
+    def __init__(self):
+        self._cache = {}
+
+    def clear_cache(self):
+        self._cache.clear()
 
 
 class stmt(AST):
@@ -193,11 +73,8 @@ class stmt(AST):
     def excs(self) -> ExcSet:
         ...
 
-    def clear_cache(self):
-        self._cache.clear()
-
     def __init__(self, *_, _offline: bool = None, **__):
-        self._cache = {}
+        super().__init__()
         if not _offline:
             from .context import Context
             ctx = Context.current_ctx()
@@ -211,23 +88,17 @@ class Scope(AST):
 
     def __init__(self, flow: Iterable[stmt] = None):
         self.flow: list[stmt] = list(flow) if flow is not None else []
-        self._excs: ExcSet = None
+        super().__init__()
 
-    @property
+    @cached_property
     def excs(self) -> ExcSet:
-        if self._excs is not None:
-            return self._excs
         if self.flow:
             s = reduce(lambda a, b: a | b, (st.excs.set for st in self.flow), set())
             if self.flow[-1].excs.always:
                 s.discard(None)  # 若 flow 最后一个语句一定引发异常，则整个 scope 必然引发异常
-            self._excs = ExcSet(s)
+            return ExcSet(s)
         else:
-            self._excs = ExcSet.EMPTY
-        return self._excs
-
-    def clear_cache(self):
-        self._excs = None
+            return ExcSet.EMPTY
 
 
 class compiler_hint(stmt, ABC):
@@ -241,7 +112,28 @@ class operation(stmt, ABC):
     """
     operation 不会改变控制流，也不包含控制流
     """
+    _reads = ()
+    _writes = ()
     excs = ExcSet.EMPTY
+
+    @cached_property
+    def reads(self) -> tuple[RtBaseData, ...]:
+        res = []
+        for k in self._reads:
+            v = getattr(self, k)
+            if isinstance(v, RtBaseData):
+                res.append(v)
+        return tuple(res)
+
+    @cached_property
+    @abstractmethod
+    def writes(self) -> tuple[RtBaseData, ...]:
+        res = []
+        for k in self._writes:
+            v = getattr(self, k)
+            assert isinstance(v, RtBaseData)
+            res.append(v)
+        return tuple(res)
 
 
 class control_flow(stmt, ABC):
@@ -256,9 +148,15 @@ class Raw(operation):
         self.code = code
         super().__init__(*args, **kwargs)
 
+    # TODO Raw 是否需要提供读写变量
+    reads = ()
+    writes = ()
+
 
 class Assign(operation):
     _fields = ("target", "value")
+    _reads = ("value",)
+    _writes = ("target",)
     def __init__(self, target, value, *args, **kwargs):
         self.target = target
         self.value = value
@@ -267,10 +165,16 @@ class Assign(operation):
 
 class UnaryOp(operation):
     _fields = ("op", "value")
+    _reads = ("value",)
+    _writes = ("target",)
     def __init__(self, op: unaryop, value, *args, **kwargs):
         self.op = op
         self.value = value
         super().__init__(*args, **kwargs)
+
+    @property
+    def writes(self) -> tuple[RtBaseData, ...]:
+        return (self.target,)
 
     @staticmethod
     def UAdd(value, *args, **kwargs):
@@ -291,6 +195,8 @@ class UnaryOp(operation):
 
 class BoolOp(operation):
     _fields = ("op", "target", "left", "right")
+    _reads = ("left", "right")
+    _writes = ("target",)
     def __init__(self, op: boolop, target, left, right, *args, **kwargs):
         self.op = op
         self.target = target
@@ -308,6 +214,8 @@ class BoolOp(operation):
 
 class BinOp(operation):
     _fields = ("op", "target", "left", "right")
+    _reads = ("left", "right")
+    _writes = ("target",)
     def __init__(self, op: operator, target, left, right, *args, **kwargs):
         self.op = op
         self.target = target
@@ -370,6 +278,8 @@ class BinOp(operation):
 
 class AugAssign(operation):
     _fields = ("op", "target", "value")
+    _reads = ("value",)
+    _writes = ("target",)
     def __init__(self, op: operator, target, value, *args, **kwargs):
         self.op = op
         self.target = target
@@ -431,6 +341,8 @@ class AugAssign(operation):
 
 class Compare(operation):
     _fields = ("op", "target", "left", "right")
+    _reads = ("left", "right")
+    _writes = ("target",)
     def __init__(self, op: cmpop, target, left, right, *args, **kwargs):
         self.op = op
         self.target = target

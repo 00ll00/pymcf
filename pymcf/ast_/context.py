@@ -3,8 +3,8 @@ from contextvars import ContextVar
 from copy import deepcopy
 from typing import Optional, Any
 
-from .runtime import RtBaseData, RtContinue, RtBreak
-from .syntactic import Scope, stmt, Assign, Raise, RtReturn, ExcSet, RtCfExc, Try, ExcHandle
+from .runtime import RtBaseData, RtContinue, RtBreak, RtReturn, RtCfExc
+from .syntactic import Scope, stmt, Assign, Raise, ExcSet, Try, ExcHandle
 
 
 class _PlaceHolder:
