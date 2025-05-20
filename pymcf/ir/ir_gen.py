@@ -1,5 +1,6 @@
 import ast
 from ast import NodeVisitor
+from collections import defaultdict
 from typing import Any, Callable
 
 from pymcf.config import Config
@@ -371,6 +372,9 @@ class CBSimplifier:
         self.visited = {}
         self.simplified = False
 
+    def mark_simplified(self):
+        self.simplified = True
+
     def simplify(self, node: code_block):
         self.visited = self.visited
         if id(node) in self.visited:
@@ -389,8 +393,6 @@ class CBSimplifier:
                     self.simplify(item)
             elif isinstance(field, ast.AST):
                 self.simplify(field)
-        if self.visited[id(node)] != node:
-            self.simplified = True
         return self.visited[id(node)]
 
     def simplify_BasicBlock(self, cb: BasicBlock) -> code_block | None:
@@ -407,30 +409,62 @@ class EmptyCBRemover(CBSimplifier):
     def simplify_BasicBlock(self, cb: BasicBlock) -> BasicBlock | None:
         if cb.true is None and cb.false is None:
             cb.cond = None
+            self.mark_simplified()
         elif cb.cond is None:
             cb.true = cb.false = None
+            self.mark_simplified()
+
         if cb.cond is None and isinstance(cb.direct, BasicBlock) and len(cb.direct.ops) == 0:
             # 当前块直接跳转空块且无条件跳转，将空块的跳转方式提前
             cb.cond = cb.direct.cond
             cb.false = cb.direct.false
             cb.true = cb.direct.true
             cb.direct = cb.direct.direct
+            self.mark_simplified()
         if len(cb.ops) == 0 and cb.cond is None:
-                # 不应存在全空的环路
-                return cb.direct
+            # 不应存在全空的环路
+            self.mark_simplified()
+            return cb.direct
         if cb.cond is not None:
             # 跳过相同条件的空块
             if isinstance(cb.true, BasicBlock) and cb.true.cond is cb.cond and len(cb.true.ops) == 0 and cb.true.direct is None:
                 cb.true = cb.true.true
+                self.mark_simplified()
             if isinstance(cb.false, BasicBlock) and cb.false.cond is cb.cond and len(cb.false.ops) == 0 and cb.false.direct is None:
                 cb.false = cb.false.false
+                self.mark_simplified()
         return cb
 
     def simplify_MatchJump(self, cb: MatchJump) -> MatchJump | None:
         if len(cb.cases) == 0:
+            self.mark_simplified()
             return None
         # 无跳转目标的case暂时不能删除，可能存在flag清除的作用
         return cb
+
+
+class CBInliner(CBSimplifier):
+
+    def __init__(self, root: code_block):
+        super().__init__()
+        self.node_ref = defaultdict(int)
+        def count_ref(node):
+            for name, field in ast.iter_fields(node):
+                if isinstance(field, code_block):
+                    self.node_ref[id(field)] += 1
+                    if self.node_ref[id(field)] == 1:
+                        count_ref(field)
+                elif isinstance(field, list):
+                    for item in field:
+                        self.node_ref[id(item)] += 1
+                        if self.node_ref[id(item)] == 1:
+                            count_ref(item)
+
+
+
+    def simplify_BasicBlock(self, cb: BasicBlock) -> BasicBlock | None:
+
+
 
 
 def simplify(root: code_block, config: IrCfg) -> code_block | None:

@@ -1,4 +1,4 @@
-from pymcf.ast_.runtime import RtNormalExc
+from ..ast_.runtime import RtNormalExc
 
 _all = {}
 _errno_count = 0
