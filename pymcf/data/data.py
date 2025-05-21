@@ -243,8 +243,8 @@ class Score(RtData, NumberLike):
         elif len(args) == 2:
             if identifier is not None:
                 raise ValueError("不能同时使用两个 identifier 初始化 Score")
-            entity = EntityIdentifier(args[0])
-            scb = ScoreBoard(args[1])
+            entity = Name(args[0])  # TODO
+            scb = args[1] if isinstance(args[1], ScoreBoard) else ScoreBoard(args[1])
             identifier = ScoreIdentifier(entity, scb)
 
         super().__init__(identifier)

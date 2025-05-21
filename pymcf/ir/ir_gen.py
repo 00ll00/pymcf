@@ -1,12 +1,13 @@
 import ast
-from ast import NodeVisitor
+from _ast import AST
+from ast import NodeVisitor, NodeTransformer
 from collections import defaultdict
-from typing import Any, Callable
+from typing import Any, Callable, Generator
 
 from pymcf.config import Config
 from .codeblock import BasicBlock, MatchJump, JmpEq, code_block
 from pymcf.ast_ import operation, Context, Scope, compiler_hint, If, For, Try, Call, RtBaseExc, \
-    RtStopIteration, RtContinue, RtBreak, Assign, Raise, While
+    RtStopIteration, RtContinue, RtBreak, Assign, Raise, While, RtBaseData
 
 
 class IrCfg(Config):
@@ -18,6 +19,11 @@ class IrCfg(Config):
     若启用，在条满足时会将异常产生后的逻辑重定位到其应当被捕获的块，进而省略标志判断的流程。内联不影响异常栈的构建。
     """
 
+    ir_inline_thresh: int = 32
+    """
+    允许内联的块的操作数阈值。单引用无条件跳转块只有在值为0时禁用内联。
+    """
+
     ir_set_bf: Callable[[Any], None]
 
     ir_clear_bf: Callable
@@ -26,6 +32,8 @@ class IrCfg(Config):
     """
     应用 IR 流程简化算法的迭代次数。
     """
+
+    ir_bf: RtBaseData
 
 
 class Expander(NodeVisitor):
@@ -360,59 +368,93 @@ class Expander(NodeVisitor):
                 cb_last.true = self._try_match_jump[-1]
 
 
-def control_flow_expand(scope: Scope, break_flag: Any, config: IrCfg, root_name: str = "root") -> code_block:
-        expander =Expander(scope, break_flag=break_flag, config=config, root_name=root_name)
-        expander.expand()
-        return expander.root
-
-
 class CBSimplifier:
 
-    def __init__(self):
-        self.visited = {}
+    def __init__(self, root: code_block):
         self.simplified = False
+        self._blocks: list[code_block] = [root]
+        self._ref_num = defaultdict(int)
+        self._list_all()
 
-    def mark_simplified(self):
+    def _mark_simplified(self):
         self.simplified = True
 
-    def simplify(self, node: code_block):
-        self.visited = self.visited
-        if id(node) in self.visited:
-            return self.visited[id(node)]
-        if isinstance(node, BasicBlock):
-            self.visited[id(node)] = self.simplify_BasicBlock(node)
-        elif isinstance(node, MatchJump):
-            self.visited[id(node)] = self.simplify_MatchJump(node)
-        else:
-            self.visited[id(node)] = node
-        for name, field in ast.iter_fields(node):
-            if isinstance(field, code_block):
-                setattr(node, name, self.simplify(field))
-            elif isinstance(field, list):
-                for item in field:
-                    self.simplify(item)
-            elif isinstance(field, ast.AST):
-                self.simplify(field)
-        return self.visited[id(node)]
+    def _list_all(self):
+        root = self._blocks[0]
+        self._blocks.clear()
 
-    def simplify_BasicBlock(self, cb: BasicBlock) -> code_block | None:
-        return cb
+        def visit(node):
+            if node is None or self._ref_num[node] > 1:
+                return
+            self._blocks.append(node)
+            i = getattr(self, "iter_" + node.__class__.__name__, None)(node)
+            try:
+                node = next(i)
+                while True:
+                    self._ref_num[node] += 1
+                    visit(node)
+                    node = i.send(node)
+            except StopIteration:
+                pass
 
-    def simplify_MatchJump(self, cb: MatchJump) -> code_block | None:
-        return cb
+        visit(root)
+
+    def _count_ref(self):
+        self._ref_num.clear()
+        for block in self._blocks:
+            i = getattr(self, "iter_" + block.__class__.__name__, None)(block)
+            try:
+                node = next(i)
+                while True:
+                    if node is not None:
+                        self._ref_num[node] += 1
+                    node = i.send(node)
+            except StopIteration:
+                pass
+
+    def simplify(self):
+        mapping = {}
+        for block in self._blocks:
+            if block is not None:
+                simplifier = getattr(self, "simplify_" + block.__class__.__name__)
+                mapping[block] = simplifier(block)
+        for block in self._blocks:
+            i: Generator = getattr(self, "iter_" + block.__class__.__name__, None)(block)
+            node = next(i)
+            try:
+                while True:
+                    node = i.send(mapping[node] if node is not None else None)
+            except StopIteration:
+                pass
+        return self._blocks[0]
+
+    def iter_BasicBlock(self, node: BasicBlock):
+        node.direct = yield node.direct
+        node.true = yield node.true
+        node.false = yield node.false
+
+    def iter_MatchJump(self, node: MatchJump):
+        for c in node.cases:
+            c.target = yield c.target
+
+    def simplify_BasicBlock(self, node: BasicBlock) -> code_block | None:
+        return node
+
+    def simplify_MatchJump(self, node: MatchJump) -> code_block | None:
+        return node
 
 
 class EmptyCBRemover(CBSimplifier):
     """
     消除空块和简化跳转逻辑
     """
-    def simplify_BasicBlock(self, cb: BasicBlock) -> BasicBlock | None:
+    def simplify_BasicBlock(self, cb: BasicBlock) -> code_block | None:
         if cb.true is None and cb.false is None:
             cb.cond = None
-            self.mark_simplified()
+            self._mark_simplified()
         elif cb.cond is None:
             cb.true = cb.false = None
-            self.mark_simplified()
+            self._mark_simplified()
 
         if cb.cond is None and isinstance(cb.direct, BasicBlock) and len(cb.direct.ops) == 0:
             # 当前块直接跳转空块且无条件跳转，将空块的跳转方式提前
@@ -420,24 +462,24 @@ class EmptyCBRemover(CBSimplifier):
             cb.false = cb.direct.false
             cb.true = cb.direct.true
             cb.direct = cb.direct.direct
-            self.mark_simplified()
+            self._mark_simplified()
         if len(cb.ops) == 0 and cb.cond is None:
             # 不应存在全空的环路
-            self.mark_simplified()
+            self._mark_simplified()
             return cb.direct
         if cb.cond is not None:
             # 跳过相同条件的空块
             if isinstance(cb.true, BasicBlock) and cb.true.cond is cb.cond and len(cb.true.ops) == 0 and cb.true.direct is None:
                 cb.true = cb.true.true
-                self.mark_simplified()
+                self._mark_simplified()
             if isinstance(cb.false, BasicBlock) and cb.false.cond is cb.cond and len(cb.false.ops) == 0 and cb.false.direct is None:
                 cb.false = cb.false.false
-                self.mark_simplified()
+                self._mark_simplified()
         return cb
 
-    def simplify_MatchJump(self, cb: MatchJump) -> MatchJump | None:
+    def simplify_MatchJump(self, cb: MatchJump) -> code_block | None:
         if len(cb.cases) == 0:
-            self.mark_simplified()
+            self._mark_simplified()
             return None
         # 无跳转目标的case暂时不能删除，可能存在flag清除的作用
         return cb
@@ -445,40 +487,46 @@ class EmptyCBRemover(CBSimplifier):
 
 class CBInliner(CBSimplifier):
 
-    def __init__(self, root: code_block):
-        super().__init__()
-        self.node_ref = defaultdict(int)
-        def count_ref(node):
-            for name, field in ast.iter_fields(node):
-                if isinstance(field, code_block):
-                    self.node_ref[id(field)] += 1
-                    if self.node_ref[id(field)] == 1:
-                        count_ref(field)
-                elif isinstance(field, list):
-                    for item in field:
-                        self.node_ref[id(item)] += 1
-                        if self.node_ref[id(item)] == 1:
-                            count_ref(item)
+    def __init__(self, root: code_block, inline_thresh: int):
+        super().__init__(root)
+        self.inline_thresh = inline_thresh
 
+    def simplify(self):
+        self._count_ref()
+        return super().simplify()
 
+    def simplify_BasicBlock(self, cb: BasicBlock) -> code_block | None:
+        if cb.cond is None and cb.direct is not None:
+            if (self.inline_thresh > 0 and self._ref_num[cb.direct] == 1) or len(cb.direct.ops) <= self.inline_thresh:
+                # cb.direct 不会是 cb
+                cb.cond = cb.direct.cond
+                cb.false = cb.direct.false
+                cb.true = cb.direct.true
+                cb.ops.extend(cb.direct.ops)
+                cb.direct = cb.direct.direct
+                self._mark_simplified()
+        return cb
 
-    def simplify_BasicBlock(self, cb: BasicBlock) -> BasicBlock | None:
-        ...
-
-
-
-
-def simplify(root: code_block, config: IrCfg) -> code_block | None:
-    for _ in range(config.ir_simplify):
-        simplifier = EmptyCBRemover()
-        root = simplifier.simplify(root)
-        if root is None:
-            return None
-        if not simplifier.simplified:
-            break
-    return root
 
 class Compiler:
 
-    def compile(self, ctx: Context) -> BasicBlock:
-        ...
+    def __init__(self, config: IrCfg):
+        self.config = config
+
+    def compile(self, ctx: Context) -> code_block | None:
+        cb = Expander(ctx.root_scope, self.config.ir_bf, self.config, ctx.name).expand()
+
+        for _ in range(self.config.ir_simplify):
+            simplifier = EmptyCBRemover(cb)
+            cb = simplifier.simplify()
+            if cb is None:
+                return None
+            if not simplifier.simplified:
+                break
+
+        for _ in range(self.config.ir_simplify):
+            inliner = CBInliner(cb, self.config.ir_inline_thresh)
+            cb = inliner.simplify()
+            if not inliner.simplified:
+                break
+        return cb
