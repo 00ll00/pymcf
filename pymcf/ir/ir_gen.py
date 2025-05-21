@@ -419,8 +419,8 @@ class CBSimplifier:
                 mapping[block] = simplifier(block)
         for block in self._blocks:
             i: Generator = getattr(self, "iter_" + block.__class__.__name__, None)(block)
-            node = next(i)
             try:
+                node = next(i)
                 while True:
                     node = i.send(mapping[node] if node is not None else None)
             except StopIteration:
