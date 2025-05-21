@@ -1,6 +1,5 @@
 import ast
-from _ast import AST
-from ast import NodeVisitor, NodeTransformer
+from ast import NodeVisitor
 from collections import defaultdict
 from typing import Any, Callable, Generator
 
