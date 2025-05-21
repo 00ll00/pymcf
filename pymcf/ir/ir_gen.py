@@ -473,7 +473,7 @@ def simplify(root: code_block, config: IrCfg) -> code_block | None:
         simplifier = EmptyCBRemover()
         root = simplifier.simplify(root)
         if root is None:
-            break
+            return None
         if not simplifier.simplified:
             break
     return root
