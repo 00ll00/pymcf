@@ -20,7 +20,7 @@ class IrCfg(Config):
 
     ir_inline_thresh: int = 32
     """
-    允许内联的块的操作数阈值。单引用无条件跳转块只有在值为0时禁用内联。
+    允许内联的块的操作数阈值。单引用无条件跳转块只有在值小于 0 时禁用内联。
     """
 
     ir_set_bf: Callable[[Any], None]
@@ -496,7 +496,7 @@ class CBInliner(CBSimplifier):
 
     def simplify_BasicBlock(self, cb: BasicBlock) -> code_block | None:
         if cb.cond is None and cb.direct is not None:
-            if (self.inline_thresh > 0 and self._ref_num[cb.direct] == 1) or len(cb.direct.ops) <= self.inline_thresh:
+            if (self.inline_thresh >= 0 and self._ref_num[cb.direct] == 1) or len(cb.direct.ops) <= self.inline_thresh:
                 # cb.direct 不会是 cb
                 cb.cond = cb.direct.cond
                 cb.false = cb.direct.false
