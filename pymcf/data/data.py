@@ -263,6 +263,16 @@ class Score(RtData, NumberLike):
     def __repr__(self):
         return f"Score({self.identifier!r})"
 
+    def __bool_and__(self, other):
+        res = Bool.__create_tmp__()
+        BoolOp.And(res, self, other)
+        return res
+
+    def __bool_or__(self, other):
+        res = Bool.__create_tmp__()
+        BoolOp.Or(res, self, other)
+        return res
+
 
 Bool = Score
 
