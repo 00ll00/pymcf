@@ -1,6 +1,5 @@
 import inspect
 from contextvars import ContextVar
-from operator import index
 from types import FunctionType, MethodType
 from typing import Self
 
@@ -35,9 +34,9 @@ class FuncArgs:
 
     def __eq__(self, other: Self) -> bool:
         # TODO
-        from pymcf.data.data import set_eq_identifier
-        with set_eq_identifier(True):
-            return self.mcf_args == other.mcf_args
+        # with set_eq_identifier(True):
+        #     return self.mcf_args == other.mcf_args
+        return False
 
     def __hash__(self) -> int:
         # TODO
