@@ -1,3 +1,5 @@
+from typing import Literal
+
 from .core import Command, Resolvable, EntityRef, SimpleResolve, WorldPos
 from .nbt import NBTStorable
 from .scoreboard import ScoreRef
@@ -83,7 +85,7 @@ class ExecuteChain:
         assert anchor == 'feet' or anchor == 'eyes'
         return self.add('anchored', anchor)
 
-    def cond(self, cond_type):
+    def cond(self, cond_type: Literal['if', 'unless']):
         self.can_terminate = False
         assert cond_type == 'if' or cond_type == 'unless'
         return ExecuteChain.Cond(self, cond_type)
@@ -124,7 +126,7 @@ class ExecuteChain:
             assert isinstance(dataref, NBTStorable)
             return self.add('data', dataref, path)
 
-    def store(self, store_type):
+    def store(self, store_type: Literal['result', 'success']):
         assert store_type in ['result', 'success']
         self.can_terminate = False
         return ExecuteChain.Store(self, store_type)
@@ -135,7 +137,7 @@ class ExecuteChain:
             return self.parent.add(*(('store', self.store_type) + args))
 
         def __init__(self, parent, store_type):
-            self.parent = parent
+            self.parent: ExecuteChain = parent
             self.store_type = store_type
 
         def score(self, scoreref):

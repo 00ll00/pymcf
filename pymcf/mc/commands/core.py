@@ -73,6 +73,12 @@ class NSName(namedtuple('NSName', 'namespace name')):
 class Command(Resolvable):
     pass
 
+class RawCommand(Command):
+    def __init__(self, code: str):
+        self.code = code
+    def resolve(self, scope):
+        return self.code
+
 class EntityRef(Resolvable, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod

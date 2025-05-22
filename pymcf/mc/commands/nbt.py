@@ -101,6 +101,18 @@ class Storage(NBTStorable):
     def as_text(self, scope):
         return {'storage': scope.storage(self.namespace)}
 
+class NbtRef(Resolvable):
+
+    def __init__(self, target: NBTStorable, path: NbtPath):
+        assert isinstance(target, NBTStorable)
+        assert isinstance(path, NbtPath)
+        self.target = target
+        self.path = path
+
+    def resolve(self, scope):
+        return f"{self.target.resolve(scope)} {self.path.resolve(scope)}"
+
+
 class GlobalNBT(NBTStorable):
 
     def __init__(self, namespace):

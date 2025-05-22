@@ -22,16 +22,12 @@ def repr_unaryop(op: unaryop) -> str:
             return "~"
 
 
-def repr_boolop(op: boolop) -> str:
+def repr_operator(op: operator | boolop | cmpop) -> str:
     match op:
         case And():
             return "and"
         case Or():
             return "or"
-
-
-def repr_operator(op: operator) -> str:
-    match op:
         case Add():
             return "+"
         case Sub():
@@ -58,10 +54,6 @@ def repr_operator(op: operator) -> str:
             return "&"
         case MatMult():
             return "@"
-
-
-def repr_cmpop(op: cmpop) -> str:
-    match op:
         case Eq():
             return "=="
         case NotEq():
@@ -92,14 +84,8 @@ def repr_operation(op: operation) -> str:
             return f"{op.target!r} = {op.value!r}"
         case UnaryOp():
             return f"{op.target!r} = {repr_operator(op.op)}{op.value!r}"
-        case BoolOp():
-            return f"{op.target!r} = {op.left!r} {repr_boolop(op.op)} {op.right!r}"
-        case BinOp():
-            return f"{op.target!r} = {op.left!r} {repr_operator(op.op)} {op.right!r}"
         case AugAssign():
-            return f"{op.target!r} {repr_operator(op.op)}= {op.value!r}"
-        case Compare():
-            return f"{op.target!r} = {op.left!r} {repr_cmpop(op.op)} {op.right!r}"
+            return f"{op.target!r} ({repr_operator(op.op)}) {op.value!r}"
 
 
 def repr_jmpop(op: jmpop) -> str:

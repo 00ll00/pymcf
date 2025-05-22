@@ -4,9 +4,9 @@ from contextvars import ContextVar
 from numbers import Real
 from typing import Self, overload
 
-from pymcf.ast_ import Context, RtBaseData, RtBaseIterator, Assign, BinOp, Compare, AugAssign, RtStopIteration, BoolOp
+from pymcf.ast_ import Context, RtBaseData, RtBaseIterator, Assign, AugAssign, RtStopIteration
 from pymcf.mcfunction import mcfunction
-from pymcf.mc.commands import Resolvable, ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath
+from pymcf.mc.commands import Resolvable, ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NBTStorable, NbtRef
 
 
 class RtData[M: Resolvable](RtBaseData, ABC):
@@ -22,7 +22,7 @@ class NumberLike(ABC):
 
     def __add__(self, other):
         res = self.__create_tmp__()
-        BinOp.Add(res, self, other)
+        AugAssign.Add(res, self, other)
         return res
 
     def __radd__(self, other):
@@ -30,7 +30,7 @@ class NumberLike(ABC):
 
     def __sub__(self, other):
         res = self.__create_tmp__()
-        BinOp.Sub(res, self, other)
+        AugAssign.Sub(res, self, other)
         return res
 
     def __rsub__(self, other):
@@ -38,7 +38,7 @@ class NumberLike(ABC):
 
     def __mul__(self, other):
         res = self.__create_tmp__()
-        BinOp.Mult(res, self, other)
+        AugAssign.Mult(res, self, other)
         return res
 
     def __rmul__(self, other):
@@ -46,7 +46,7 @@ class NumberLike(ABC):
 
     def __floordiv__(self, other):
         res = self.__create_tmp__()
-        BinOp.FloorDiv(res, self, other)
+        AugAssign.FloorDiv(res, self, other)
         return res
 
     def __rfloordiv__(self, other):
@@ -54,7 +54,7 @@ class NumberLike(ABC):
 
     def __truediv__(self, other):
         res = self.__create_tmp__()
-        BinOp.Div(res, self, other)
+        AugAssign.Div(res, self, other)
         return res
 
     def __rtruediv__(self, other):
@@ -62,7 +62,7 @@ class NumberLike(ABC):
 
     def __mod__(self, other):
         res = self.__create_tmp__()
-        BinOp.Mod(res, self, other)
+        AugAssign.Mod(res, self, other)
         return res
 
     def __rmod__(self, other):
@@ -70,32 +70,38 @@ class NumberLike(ABC):
 
     def __ne__(self, other):
         res = Bool.__create_tmp__()
-        Compare.NotEq(res, self, other)
+        Assign(res, self)
+        AugAssign.NotEq(res, other)
         return res
 
     def __lt__(self, other):
         res = Bool.__create_tmp__()
-        Compare.Lt(res, self, other)
+        Assign(res, self)
+        AugAssign.Lt(res, self)
         return res
 
     def __le__(self, other):
         res = Bool.__create_tmp__()
-        Compare.LtE(res, self, other)
+        Assign(res, self)
+        AugAssign.LtE(res, other)
         return res
 
     def __gt__(self, other):
         res = Bool.__create_tmp__()
-        Compare.Gt(res, self, other)
+        Assign(res, self)
+        AugAssign.Gt(res, other)
         return res
 
     def __ge__(self, other):
         res = Bool.__create_tmp__()
-        Compare.GtE(res, self, other)
+        Assign(res, self)
+        AugAssign.GtE(res, other)
         return res
 
     def __eq__(self, other):
         res = Bool.__create_tmp__()
-        Compare.Eq(res, self, other)
+        Assign(res, self)
+        AugAssign.Eq(res, other)
         return res
 
     def __iadd__(self, other):
@@ -144,7 +150,7 @@ class Score(RtData[ScoreRef], NumberLike):
             case 0 | 1:
                 self.__metadata__ = self._new_tmp_ref()
                 if len(args) == 1:
-                    Assign(self.__metadata__, args[0])
+                    Assign(self, args[0])
             case 2 | 3:
                 if isinstance(args[0], str):
                     target = NameRef(args[0])
@@ -156,7 +162,7 @@ class Score(RtData[ScoreRef], NumberLike):
                     objective = args[1]
                 self.__metadata__ = ScoreRef(target, objective)
                 if len(args) == 3:
-                    Assign(self.__metadata__, args[2])
+                    Assign(self, args[2])
             case _:
                 raise TypeError()
 
@@ -169,23 +175,29 @@ class Score(RtData[ScoreRef], NumberLike):
         return Score()
 
     def __assign__(self, value):
-        Assign(target=self.__metadata__, value=value)
+        Assign(target=self, value=value)
 
     def __repr__(self):
         return f"Score({self.__metadata__.resolve(None)})"
 
     def __bool_and__(self, other):
         res = Bool.__create_tmp__()
-        BoolOp.And(res, self, other)
+        Assign(res, self)
+        AugAssign.And(res, other)
         return res
 
     def __bool_or__(self, other):
         res = Bool.__create_tmp__()
-        BoolOp.Or(res, self, other)
+        Assign(res, self)
+        AugAssign.Or(res, other)
         return res
 
 
 Bool = Score
+
+
+class Nbt(RtData[NbtRef]):
+    ...
 
 
 class RtIterator[V: RtData](RtBaseIterator[V], ABC):

@@ -62,7 +62,7 @@ class ObjectiveRef(Resolvable):
         self.objective = name
 
     def resolve(self, scope):
-        return scope.objective(self.objective)
+        return self.objective
 
 class ScoreRef(Resolvable):
 
