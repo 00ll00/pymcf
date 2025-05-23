@@ -1,8 +1,8 @@
-from _ast import UAdd, USub, Not, Invert, And, Or, Add, Sub, Mult, Div, FloorDiv, Mod, Pow, LShift, Eq, NotEq, Lt
+from _ast import UAdd, USub, Not, Invert, And, Or, Add, Sub, Mult, Div, FloorDiv, Mod, Pow, LShift
 from numbers import Real
 from typing import SupportsInt
 
-from ..ast_ import operation, Raw, Assign, UnaryOp, Inplace, Compare, LtE, Gt, GtE
+from ..ast_ import operation, Raw, Assign, UnaryOp, Inplace, Compare, LtE, Gt, GtE, Eq, NotEq, Lt, Context
 from ..ir import BasicBlock
 from ..data import Score, Nbt
 from .commands import Command, RawCommand, ScoreRef, OpAssign, NbtPath, Execute, ExecuteChain, GetValue, DataGet, \
@@ -156,12 +156,13 @@ def translate(op: operation) -> Command | list[Command]:
     raise NotImplementedError
 
 
-def gen(cb: BasicBlock):
+def gen(cb: BasicBlock, ctx: Context):
     cmds = []
     for op in cb.ops:
         if isinstance(op, operation):
-            cmd = translate(op)
+            cmd = translate(op).resolve(ctx)
             if isinstance(cmd, list):
                 cmds.extend(cmd)
             else:
                 cmds.append(cmd)
+    return cmds

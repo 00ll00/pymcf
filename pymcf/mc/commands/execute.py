@@ -10,8 +10,8 @@ class Execute(Command):
     def __init__(self, chain):
         self.chain = SimpleResolve(*chain._components)
 
-    def resolve(self, scope):
-        return 'execute %s' % self.chain.resolve(scope)
+    def resolve(self, ctx):
+        return 'execute %s' % self.chain.resolve(ctx)
 
 def ensure_selector(sel_arg):
     assert isinstance(sel_arg, EntityRef), sel_arg

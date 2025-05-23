@@ -35,8 +35,8 @@ class Selector(EntityRef):
         params = self.resolve_params(scope)
         return 'limit' in params and params['limit'] == '1'
 
-    def resolve(self, scope):
-        return make_selector(self.type, **self.resolve_params(scope))
+    def resolve(self, ctx):
+        return make_selector(self.type, **self.resolve_params(ctx))
 
 class SelectorArgs(Resolvable):
     pass
@@ -45,7 +45,7 @@ class SimpleSelectorArgs(SelectorArgs):
     def __init__(self, args):
         self.args = args
 
-    def resolve(self, scope):
+    def resolve(self, ctx):
         return dict(self.args)
 
 class ScoreRange(Resolvable):
@@ -55,7 +55,7 @@ class ScoreRange(Resolvable):
         self.min = min
         self.max = max
 
-    def resolve(self, scope):
+    def resolve(self, ctx):
         range = ''
         if self.min is not None:
             range = '%d' % self.min
@@ -71,9 +71,9 @@ class SelRange(SelectorArgs):
         self.objective = objective
         self.range = ScoreRange(min, max)
 
-    def resolve(self, scope):
-        return {'scores': { self.objective.resolve(scope):
-                            self.range.resolve(scope) }}
+    def resolve(self, ctx):
+        return {'scores': {self.objective.resolve(ctx):
+                            self.range.resolve(ctx)}}
 
 class SelEquals(SelRange):
     def __init__(self, objective, value):
@@ -91,10 +91,10 @@ class ComboSelectorArgs(SelectorArgs):
         self.first = first
         self.second = second
 
-    def resolve(self, scope):
+    def resolve(self, ctx):
         sel = {}
-        sel.update(self.first.resolve(scope))
-        sel.update(self.second.resolve(scope))
+        sel.update(self.first.resolve(ctx))
+        sel.update(self.second.resolve(ctx))
         return sel
 
 class SelNbt(SelectorArgs):
@@ -142,5 +142,5 @@ class SelNbt(SelectorArgs):
             return node.resolve(scope)
         assert False, type(node)
 
-    def resolve(self, scope):
-        return {'nbt': self.stringify_nbt(self.nbt_spec, scope)}
+    def resolve(self, ctx):
+        return {'nbt': self.stringify_nbt(self.nbt_spec, ctx)}

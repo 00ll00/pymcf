@@ -12,9 +12,9 @@ class Tellraw(Command):
         self.text = text
         self.target = target
 
-    def resolve(self, scope):
-        return 'tellraw %s %s' % (self.target.resolve(scope),
-                                  self.text.resolve_str(scope))
+    def resolve(self, ctx):
+        return 'tellraw %s %s' % (self.target.resolve(ctx),
+                                  self.text.resolve_str(ctx))
 
 class TextComponent(Resolvable):
     pass
@@ -28,17 +28,17 @@ class TextComponentHolder(TextComponent):
     def resolve_str(self, scope):
         return json.dumps(self.resolve(scope), separators=(',', ':'))
 
-    def resolve(self, scope):
+    def resolve(self, ctx):
         text = {}
         for key, value in self.style.items():
-            text[key] = self._resolve_style(key, value, scope)
+            text[key] = self._resolve_style(key, value, ctx)
         extra = []
         for child in self.children:
             if isinstance(child, TextComponentHolder) and not child.style:
                 for child_child in child.children:
-                    extra.append(child_child.resolve(scope))
+                    extra.append(child_child.resolve(ctx))
             else:
-                extra.append(child.resolve(scope))
+                extra.append(child.resolve(ctx))
         if not self.style:
             return extra
         if extra:
@@ -59,7 +59,7 @@ class TextStringComponent(TextComponent):
     def __init__(self, stringval):
         self.val = stringval
 
-    def resolve(self, scope):
+    def resolve(self, ctx):
         return {'text': self.val}
 
 class TextNBTComponent(TextComponent):
@@ -70,9 +70,9 @@ class TextNBTComponent(TextComponent):
         self.storage = storage
         self.path = path
 
-    def resolve(self, scope):
-        obj = {'nbt': self.path.resolve(scope) }
-        obj.update(self.storage.as_text(scope))
+    def resolve(self, ctx):
+        obj = {'nbt': self.path.resolve(ctx)}
+        obj.update(self.storage.as_text(ctx))
         return obj
 
 class TextScoreComponent(TextComponent):
@@ -81,10 +81,10 @@ class TextScoreComponent(TextComponent):
         assert isinstance(ref, ScoreRef)
         self.ref = ref
 
-    def resolve(self, scope):
+    def resolve(self, ctx):
         return {'score':
-                {'name': self.ref.target.resolve(scope),
-                 'objective': self.ref.objective.resolve(scope)}}
+                {'name': self.ref.target.resolve(ctx),
+                 'objective': self.ref.objective.resolve(ctx)}}
 
 class TextClickAction(Resolvable):
 
@@ -92,11 +92,11 @@ class TextClickAction(Resolvable):
         self.action = action
         self.value = value
 
-    def resolve(self, scope):
+    def resolve(self, ctx):
         if type(self.value) == str:
             value = self.value
         else:
             assert self.action in ['run_command', 'suggest_command'] \
                    and isinstance(self.value, Command)
-            value = self.value.resolve(scope)
+            value = self.value.resolve(ctx)
         return {'action': self.action, 'value': value}
