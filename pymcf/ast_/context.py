@@ -14,10 +14,11 @@ class _PlaceHolder:
 
 class Context:
 
-    def __init__(self, name: str, inline: bool = False, return_type: type = _PlaceHolder.NoValue):
+    def __init__(self, name: str, inline: bool = False, return_type: type = _PlaceHolder.NoValue, env=None):
         self.name = name
         self.inline = inline
         self.root_scope = Scope()
+        self.env = env
         self._scope_stack = [self.root_scope]
         self._tmp_id = 0
         self._tmps = []

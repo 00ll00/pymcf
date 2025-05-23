@@ -11,6 +11,8 @@ class _RtBaseExcMeta(ABCMeta):
     def __repr__(cls):
         return f"<{cls.__qualname__}(errno={cls.errno})>"
 
+    def __int__(self) -> int:
+        return self.errno
 
 class RtBaseExc(BaseException, metaclass=_RtBaseExcMeta):
     _errno = NotImplemented  # TODO 异常代号范围化

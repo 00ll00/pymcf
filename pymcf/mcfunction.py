@@ -122,8 +122,9 @@ class mcfunction:
         mcfunction._all.append(self)
 
     def __call__(self, *args, **kwargs):
+        from .mc.environment import Env
         if self._inline:
-            with Context(name=f"{self._basename}@inlined", inline=self._inline) as ctx:
+            with Context(name=f"{self._basename}@inlined", inline=self._inline, env=Env()) as ctx:
                 self._ast_generator(*args, **kwargs)
             ctx.finish()
             return ctx.return_value
@@ -138,7 +139,7 @@ class mcfunction:
                 ext = "-" + str(len(self._arg_ctx))
 
             last_ctx = Context.current_ctx()
-            with Context(name=f"{self._basename}{ext}", inline=self._inline) as ctx:
+            with Context(name=f"{self._basename}{ext}", inline=self._inline, env=Env()) as ctx:
                 self._ast_generator(*args, **kwargs)
             ctx.finish()
 

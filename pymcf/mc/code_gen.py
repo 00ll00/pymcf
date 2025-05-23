@@ -2,14 +2,15 @@ from _ast import UAdd, USub, Not, Invert, And, Or, Add, Sub, Mult, Div, FloorDiv
 from numbers import Real
 from typing import SupportsInt
 
+from .environment import Env
 from ..ast_ import operation, Raw, Assign, UnaryOp, Inplace, Compare, LtE, Gt, GtE, Eq, NotEq, Lt, Context
 from ..ir import BasicBlock
 from ..data import Score, Nbt
 from .commands import Command, RawCommand, ScoreRef, OpAssign, NbtPath, Execute, ExecuteChain, GetValue, DataGet, \
-    SetConst, DataModifyFrom, OpSub, ScoreRange, OpMul, OpAdd, OpDiv, OpMod
+    SetConst, DataModifyFrom, OpSub, ScoreRange, OpMul, OpAdd, OpDiv, OpMod, AddConst, RemConst
 
 
-def translate(op: operation) -> Command | list[Command]:
+def translate(op: operation, env: Env) -> Command | list[Command]:
     if isinstance(op, Raw):
         return RawCommand(op.code)
 
@@ -24,7 +25,7 @@ def translate(op: operation) -> Command | list[Command]:
                 chain = ExecuteChain()
                 chain.store('result').score(target.__metadata__).run(DataGet(value.__metadata__.target, value.__metadata__.path))
                 return Execute(chain)
-            elif isinstance(value, Real):
+            elif isinstance(value, SupportsInt):
                 return SetConst(target.__metadata__, int(value))
             else:
                 raise NotImplementedError
@@ -82,6 +83,35 @@ def translate(op: operation) -> Command | list[Command]:
                     return OpDiv(target.__metadata__, value.__metadata__)
                 case Mod():
                     return OpMod(target.__metadata__, value.__metadata__)
+                case _:
+                    raise NotImplementedError
+        elif isinstance(value, SupportsInt):
+            value = int(value)
+            match op.op:
+                case And():
+                    if value:
+                        return []
+                    else:
+                        return SetConst(target.__metadata__, 0)
+                case Or():
+                    if value:
+                        return SetConst(target.__metadata__, 1)
+                    else:
+                        return []
+                case Add():
+                    return AddConst(target.__metadata__, value)
+                case Sub():
+                    return RemConst(target.__metadata__, value)
+                case Mult():
+                    return OpMul(target.__metadata__, env.get_const_score(value).__metadata__)
+                case Div():
+                    return OpDiv(target.__metadata__, env.get_const_score(value).__metadata__)
+                case FloorDiv():
+                    return OpDiv(target.__metadata__, env.get_const_score(value).__metadata__)
+                case Mod():
+                    return OpMod(target.__metadata__, env.get_const_score(value).__metadata__)
+                case _:
+                    raise NotImplementedError
 
 
     elif isinstance(op, Compare):
@@ -156,11 +186,11 @@ def translate(op: operation) -> Command | list[Command]:
     raise NotImplementedError
 
 
-def gen(cb: BasicBlock, ctx: Context):
+def gen(cb: BasicBlock, env: Env):
     cmds = []
     for op in cb.ops:
         if isinstance(op, operation):
-            cmd = translate(op).resolve(ctx)
+            cmd = translate(op, env).resolve(env)
             if isinstance(cmd, list):
                 cmds.extend(cmd)
             else:
