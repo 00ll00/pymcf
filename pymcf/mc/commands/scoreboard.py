@@ -11,9 +11,9 @@ class Scoreboard(Command):
         self.var = varref
         self.value = value
 
-    def resolve(self, ctx):
+    def resolve(self, env):
         return 'scoreboard players %s %s %d' % (
-            self.op, self.var.resolve(ctx), self.value)
+            self.op, self.var.resolve(env), self.value)
 
 class SetConst(Scoreboard):
     op = 'set'
@@ -31,8 +31,8 @@ class GetValue(Command):
         assert isinstance(scoreref, ScoreRef)
         self.ref = scoreref
 
-    def resolve(self, ctx):
-        return 'scoreboard players get %s' % self.ref.resolve(ctx)
+    def resolve(self, env):
+        return 'scoreboard players get %s' % self.ref.resolve(env)
 
 class Operation(Command):
     def __init__(self, left, right):
@@ -41,9 +41,9 @@ class Operation(Command):
         self.left = left
         self.right = right
 
-    def resolve(self, ctx):
+    def resolve(self, env):
         return 'scoreboard players operation %s %s %s' % (
-            self.left.resolve(ctx), self.op, self.right.resolve(ctx))
+            self.left.resolve(env), self.op, self.right.resolve(env))
 
 class OpAssign(Operation): op = '='
 class OpAdd(Operation): op = '+='
@@ -61,7 +61,7 @@ class ObjectiveRef(Resolvable):
         assert type(name) == str
         self.objective = name
 
-    def resolve(self, ctx):
+    def resolve(self, env):
         return self.objective
 
 class ScoreRef(Resolvable):
@@ -72,9 +72,9 @@ class ScoreRef(Resolvable):
         self.target = target
         self.objective = objective
 
-    def resolve(self, ctx):
-        return '%s %s' % (self.target.resolve(ctx),
-                          self.objective.resolve(ctx))
+    def resolve(self, env):
+        return '%s %s' % (self.target.resolve(env),
+                          self.objective.resolve(env))
 
 class Var(ScoreRef):
     def __init__(self, nameref, namespace=None):

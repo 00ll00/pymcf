@@ -17,7 +17,7 @@ class CommandBlock:
 class Resolvable(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
-    def resolve(self, ctx):
+    def resolve(self, env):
         pass
 
 class SimpleResolve(Resolvable):
@@ -25,8 +25,8 @@ class SimpleResolve(Resolvable):
     def __init__(self, *args):
         self.args = args
 
-    def resolve(self, ctx):
-        return ' '.join(map(lambda el: el.resolve(ctx) \
+    def resolve(self, env):
+        return ' '.join(map(lambda el: el.resolve(env) \
                              if isinstance(el, Resolvable) \
                              else el, self.args))
 
@@ -76,7 +76,7 @@ class Command(Resolvable):
 class RawCommand(Command):
     def __init__(self, code: str):
         self.code = code
-    def resolve(self, ctx):
+    def resolve(self, env):
         return self.code
 
 class EntityRef(Resolvable, metaclass=abc.ABCMeta):
@@ -100,7 +100,7 @@ class NameRef(EntityRef):
     def is_single_entity(self, scope):
         return True
 
-    def resolve(self, ctx):
+    def resolve(self, env):
         return self.name
 
 class WorldPos(Resolvable):
@@ -132,7 +132,7 @@ class WorldPos(Resolvable):
         from .nbt import BlockReference
         return BlockReference(self)
 
-    def resolve(self, ctx):
+    def resolve(self, env):
         return '%s %s %s' % (self.x, self.y, self.z)
 
 class RelativeCoord:
@@ -167,16 +167,16 @@ class GlobalEntity(EntityRef):
     def is_single_entity(self, scope):
         return True
 
-    def resolve(self, ctx):
-        return ctx.global_entity(self.namespace)
+    def resolve(self, env):
+        return env.global_entity(self.namespace)
 
 class _PosUtil(EntityRef):
 
     def is_single_entity(self, scope):
         return True
 
-    def resolve(self, ctx):
-        return ctx.pos_util_entity()
+    def resolve(self, env):
+        return env.pos_util_entity()
 
 PosUtil = _PosUtil()
 
@@ -186,10 +186,10 @@ class _UtilBlockPos(WorldPos):
         self.block_pos = True
         self.is_zero_tick = is_zero_tick
 
-    def resolve(self, ctx):
+    def resolve(self, env):
         if self.is_zero_tick:
-            return ctx.get_zero_tick_block()
-        return ctx.get_util_block()
+            return env.get_zero_tick_block()
+        return env.get_util_block()
 
 UtilBlockPos = _UtilBlockPos(False)
 ZeroTickBlockPos = _UtilBlockPos(True)
@@ -199,21 +199,21 @@ class TeamName(Resolvable):
     def __init__(self, name):
         self.name = name
 
-    def resolve(self, ctx):
-        return ctx.team_name(self.name)
+    def resolve(self, env):
+        return env.team_name(self.name)
 
 class Bossbar(Resolvable):
 
     def __init__(self, name):
         self.name = name
 
-    def resolve(self, ctx):
-        return ctx.bossbar(self.name)
+    def resolve(self, env):
+        return env.bossbar(self.name)
 
 class AdvancementRef(Resolvable):
 
     def __init__(self, name):
         self.name = name
 
-    def resolve(self, ctx):
-        return ctx.advancement_name(self.name)
+    def resolve(self, env):
+        return env.advancement_name(self.name)
