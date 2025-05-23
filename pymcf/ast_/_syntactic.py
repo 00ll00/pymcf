@@ -1,9 +1,10 @@
+import ast
 from abc import ABC, abstractmethod
 from ast import AST as _AST, unaryop, UAdd, USub, Not, Invert, boolop, And, Or, operator, Add, Sub, Mult, Div, FloorDiv, Mod, \
-    Pow, LShift, RShift, BitOr, BitXor, BitAnd, MatMult, cmpop, Eq, NotEq, Lt, LtE, Gt, GtE, Is, IsNot, In, NotIn
+    Pow, LShift, RShift, BitOr, BitXor, BitAnd, MatMult
 from functools import reduce
 from types import GenericAlias
-from typing import Any, Iterable
+from typing import Any, Iterable, Self
 
 from .runtime import ExcSet, RtBaseData, RtStopIteration, RtContinue, RtBreak, RtBaseExc, _TBaseRtExc
 
@@ -126,7 +127,6 @@ class operation(stmt, ABC):
         return tuple(res)
 
     @cached_property
-    @abstractmethod
     def writes(self) -> tuple[RtBaseData, ...]:
         res = []
         for k in self._writes:
@@ -190,14 +190,14 @@ class UnaryOp(operation):
         return UnaryOp(Invert(), target, value, *args, **kwargs)
 
 
-class AugAssign(operation):
+class Inplace(operation):
     """
     target = target <op> value
     """
     _fields = ("op", "target", "value")
     _reads = ("target", "value")
     _writes = ("target",)
-    def __init__(self, op: operator | boolop | cmpop, target, value, *args, **kwargs):
+    def __init__(self, op: operator | boolop, target, value, *args, **kwargs):
         self.op = op
         self.target = target
         self.value = value
@@ -205,103 +205,145 @@ class AugAssign(operation):
 
     @staticmethod
     def And(target, value, *args, **kwargs):
-        return AugAssign(And(), target, value, *args, **kwargs)
+        return Inplace(And(), target, value, *args, **kwargs)
 
     @staticmethod
     def Or(target, value, *args, **kwargs):
-        return AugAssign(Or(), target, value, *args, **kwargs)
+        return Inplace(Or(), target, value, *args, **kwargs)
 
     @staticmethod
     def Add(target, value, *args, **kwargs):
-        return AugAssign(Add(), target, value, *args, **kwargs)
+        return Inplace(Add(), target, value, *args, **kwargs)
 
     @staticmethod
     def Sub(target, value, *args, **kwargs):
-        return AugAssign(Sub(), target, value, *args, **kwargs)
+        return Inplace(Sub(), target, value, *args, **kwargs)
 
     @staticmethod
     def Mult(target, value, *args, **kwargs):
-        return AugAssign(Mult(), target, value, *args, **kwargs)
+        return Inplace(Mult(), target, value, *args, **kwargs)
 
     @staticmethod
     def Div(target, value, *args, **kwargs):
-        return AugAssign(Div(), target, value, *args, **kwargs)
+        return Inplace(Div(), target, value, *args, **kwargs)
 
     @staticmethod
     def FloorDiv(target, value, *args, **kwargs):
-        return AugAssign(FloorDiv(), target, value, *args, **kwargs)
+        return Inplace(FloorDiv(), target, value, *args, **kwargs)
 
     @staticmethod
     def Mod(target, value, *args, **kwargs):
-        return AugAssign(Mod(), target, value, *args, **kwargs)
+        return Inplace(Mod(), target, value, *args, **kwargs)
 
     @staticmethod
     def Pow(target, value, *args, **kwargs):
-        return AugAssign(Pow(), target, value, *args, **kwargs)
+        return Inplace(Pow(), target, value, *args, **kwargs)
 
     @staticmethod
     def LShift(target, value, *args, **kwargs):
-        return AugAssign(LShift(), target, value, *args, **kwargs)
+        return Inplace(LShift(), target, value, *args, **kwargs)
 
     @staticmethod
     def RShift(target, value, *args, **kwargs):
-        return AugAssign(RShift(), target, value, *args, **kwargs)
+        return Inplace(RShift(), target, value, *args, **kwargs)
 
     @staticmethod
     def BitOr(target, value, *args, **kwargs):
-        return AugAssign(BitOr(), target, value, *args, **kwargs)
+        return Inplace(BitOr(), target, value, *args, **kwargs)
 
     @staticmethod
     def BitXor(target, value, *args, **kwargs):
-        return AugAssign(BitXor(), target, value, *args, **kwargs)
+        return Inplace(BitXor(), target, value, *args, **kwargs)
 
     @staticmethod
     def BitAnd(target, value, *args, **kwargs):
-        return AugAssign(BitAnd(), target, value, *args, **kwargs)
+        return Inplace(BitAnd(), target, value, *args, **kwargs)
 
     @staticmethod
     def MatMult(target, value, *args, **kwargs):
-        return AugAssign(MatMult(), target, value, *args, **kwargs)
+        return Inplace(MatMult(), target, value, *args, **kwargs)
+
+
+class cmpop(ast.cmpop):
+
+    @abstractmethod
+    def opposite(self) -> Self: ...
+
+
+class Eq(cmpop):
+    def opposite(self) -> Self:
+        return self
+
+class NotEq(cmpop):
+    def opposite(self) -> Self:
+        return self
+
+class Lt(cmpop):
+    def opposite(self) -> Self:
+        return Gt()
+
+class LtE(cmpop):
+    def opposite(self) -> Self:
+        return GtE()
+
+class Gt(cmpop):
+    def opposite(self) -> Self:
+        return Lt()
+
+class GtE(cmpop):
+    def opposite(self) -> Self:
+        return LtE()
+
+class Compare(operation):
+    _fields = ("op", "target", "left", "right")
+    _reads = ("left", "right")
+    _writes = ("target",)
+    def __init__(self, op: cmpop, target, left, right, *args, **kwargs):
+        self.op = op
+        self.target = target
+        self.left = left
+        self.right = right
+        super().__init__(*args, **kwargs)
 
     @staticmethod
-    def Eq(target, value, *args, **kwargs):
-        return AugAssign(Eq(), target, value, *args, **kwargs)
+    def Eq(target, left, right, *args, **kwargs):
+        return Compare(Eq(), target, left, right, *args, **kwargs)
 
     @staticmethod
-    def NotEq(target, value, *args, **kwargs):
-        return AugAssign(NotEq(), target, value, *args, **kwargs)
+    def NotEq(target, left, right, *args, **kwargs):
+        return Compare(NotEq(), target, left, right, *args, **kwargs)
 
     @staticmethod
-    def Lt(target, value, *args, **kwargs):
-        return AugAssign(Lt(), target, value, *args, **kwargs)
+    def Lt(target, left, right, *args, **kwargs):
+        return Compare(Lt(), target, left, right, *args, **kwargs)
 
     @staticmethod
-    def LtE(target, value, *args, **kwargs):
-        return AugAssign(LtE(), target, value, *args, **kwargs)
+    def LtE(target, left, right, *args, **kwargs):
+        return Compare(LtE(), target, left, right, *args, **kwargs)
 
     @staticmethod
-    def Gt(target, value, *args, **kwargs):
-        return AugAssign(Gt(), target, value, *args, **kwargs)
+    def Gt(target, left, right, *args, **kwargs):
+        return Compare(Gt(), target, left, right, *args, **kwargs)
 
     @staticmethod
-    def GtE(target, value, *args, **kwargs):
-        return AugAssign(GtE(), target, value, *args, **kwargs)
+    def GtE(target, left, right, *args, **kwargs):
+        return Compare(GtE(), target, left, right, *args, **kwargs)
 
-    @staticmethod
-    def Is(target, value, *args, **kwargs):
-        return AugAssign(Is(), target, value, *args, **kwargs)
-
-    @staticmethod
-    def IsNot(target, value, *args, **kwargs):
-        return AugAssign(IsNot(), target, value, *args, **kwargs)
-
-    @staticmethod
-    def In(target, value, *args, **kwargs):
-        return AugAssign(In(), target, value, *args, **kwargs)
-
-    @staticmethod
-    def NotIn(target, value, *args, **kwargs):
-        return AugAssign(NotIn(), target, value, *args, **kwargs)
+    # @staticmethod
+    # def Is(target, left, right, *args, **kwargs):
+    #     return Compare(Is(), target, left, right, *args, **kwargs)
+    #
+    # @staticmethod
+    # def IsNot(target, left, right, *args, **kwargs):
+    #     return Compare(IsNot(), target, left, right, *args, **kwargs)
+    #
+    # @staticmethod
+    # def In(target, left, right, *args, **kwargs):
+    #     return Compare(In(), target, left, right, *args, **kwargs)
+    #
+    # @staticmethod
+    # def NotIn(target, left, right, *args, **kwargs):
+    #     return Compare(NotIn(), target, left, right, *args, **kwargs)
 
 
 class If(control_flow):

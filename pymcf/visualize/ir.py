@@ -2,7 +2,7 @@ import ast
 
 import graphviz as gv
 
-from pymcf.ast_ import operation, control_flow, Call
+from pymcf.ast_ import operation, control_flow, Call, Inplace, UnaryOp, Compare
 from pymcf.ir import BasicBlock, MatchJump
 from pymcf.ir.codeblock import jmpop
 from pymcf.visualize.reprs import repr_operation, repr_jmpop, escape
@@ -45,7 +45,10 @@ class _GraphVizDumper(ast.NodeVisitor):
             r = repr_jmpop(op)
         elif isinstance(op, Call):
             r = f"{op.func!r}()"
-        return f"""<td align="left"><b>{escape(op.__class__.__name__)}</b>  </td><td align="left">{escape(r)}</td>"""
+        class_name = op.__class__.__name__
+        if isinstance(op, Inplace | UnaryOp | Compare):
+            class_name += f'.{op.op.__class__.__name__}'
+        return f"""<td align="left"><b>{escape(class_name)}</b>  </td><td align="left">{escape(r)}</td>"""
 
     def visit_BasicBlock(self, node: BasicBlock):
         self.generic_visit(node)

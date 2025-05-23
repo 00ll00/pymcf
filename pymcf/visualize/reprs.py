@@ -20,6 +20,8 @@ def repr_unaryop(op: unaryop) -> str:
             return "not "
         case Invert():
             return "~"
+        case _:
+            raise NotImplementedError
 
 
 def repr_operator(op: operator | boolop | cmpop) -> str:
@@ -74,6 +76,8 @@ def repr_operator(op: operator | boolop | cmpop) -> str:
             return "in"
         case NotIn():
             return "not in"
+        case _:
+            raise NotImplementedError
 
 
 def repr_operation(op: operation) -> str:
@@ -84,8 +88,12 @@ def repr_operation(op: operation) -> str:
             return f"{op.target!r} = {op.value!r}"
         case UnaryOp():
             return f"{op.target!r} = {repr_operator(op.op)}{op.value!r}"
-        case AugAssign():
-            return f"{op.target!r} ({repr_operator(op.op)}) {op.value!r}"
+        case Inplace():
+            return f"{op.target!r} = {op.target!r} {repr_operator(op.op)} {op.value!r}"
+        case Compare():
+            return f"{op.target!r} = {op.left!r} {repr_operator(op.op)} {op.right!r}"
+        case _:
+            raise NotImplementedError
 
 
 def repr_jmpop(op: jmpop) -> str:
@@ -94,6 +102,8 @@ def repr_jmpop(op: jmpop) -> str:
             return f"$ == {op.value!r}"
         case JmpNotEq():
             return f"$ != {op.value!r}"
+        case _:
+            raise NotImplementedError
 
 
 def repr_compiler_hint(h: compiler_hint) -> str:

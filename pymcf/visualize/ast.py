@@ -5,7 +5,7 @@ from dominate.tags import *
 from dominate.util import raw
 
 from pymcf.ast_ import NodeVisitor, Scope, operation, compiler_hint, If, Context, Raise, AST, \
-    For, While, Try, AugAssign, Call
+    For, While, Try, Inplace, Call
 from .reprs import repr_operation, repr_compiler_hint
 
 

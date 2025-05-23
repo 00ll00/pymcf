@@ -97,13 +97,13 @@ class ExecuteChain:
             return self.parent.add(*((self.cond_type,) + args))
 
         def __init__(self, parent, cond_type):
-            self.parent = parent
+            self.parent: ExecuteChain = parent
             self.cond_type = cond_type
 
         def entity(self, entityref):
             return self.add('entity', ensure_selector(entityref))
 
-        def score(self, targetref, operator, sourceref):
+        def score(self, targetref, operator: Literal['<', '<=', '=', '>=', '>'], sourceref):
             assert isinstance(targetref, ScoreRef)
             assert isinstance(sourceref, ScoreRef)
             assert operator in ['<', '<=', '=', '>=', '>']

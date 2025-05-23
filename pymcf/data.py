@@ -2,9 +2,9 @@ from abc import abstractmethod, ABC
 from contextlib import contextmanager
 from contextvars import ContextVar
 from numbers import Real
-from typing import Self, overload
+from typing import Self, overload, SupportsInt
 
-from pymcf.ast_ import Context, RtBaseData, RtBaseIterator, Assign, AugAssign, RtStopIteration
+from pymcf.ast_ import Context, RtBaseData, RtBaseIterator, Assign, Inplace, RtStopIteration, Compare
 from pymcf.mcfunction import mcfunction
 from pymcf.mc.commands import Resolvable, ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NBTStorable, NbtRef
 
@@ -22,7 +22,8 @@ class NumberLike(ABC):
 
     def __add__(self, other):
         res = self.__create_tmp__()
-        AugAssign.Add(res, self, other)
+        Assign(res, self)
+        Inplace.Add(res, other)
         return res
 
     def __radd__(self, other):
@@ -30,7 +31,8 @@ class NumberLike(ABC):
 
     def __sub__(self, other):
         res = self.__create_tmp__()
-        AugAssign.Sub(res, self, other)
+        Assign(res, self)
+        Inplace.Sub(res, other)
         return res
 
     def __rsub__(self, other):
@@ -38,7 +40,8 @@ class NumberLike(ABC):
 
     def __mul__(self, other):
         res = self.__create_tmp__()
-        AugAssign.Mult(res, self, other)
+        Assign(res, self)
+        Inplace.Mult(res, other)
         return res
 
     def __rmul__(self, other):
@@ -46,7 +49,8 @@ class NumberLike(ABC):
 
     def __floordiv__(self, other):
         res = self.__create_tmp__()
-        AugAssign.FloorDiv(res, self, other)
+        Assign(res, self)
+        Inplace.FloorDiv(res, other)
         return res
 
     def __rfloordiv__(self, other):
@@ -54,7 +58,8 @@ class NumberLike(ABC):
 
     def __truediv__(self, other):
         res = self.__create_tmp__()
-        AugAssign.Div(res, self, other)
+        Assign(res, self)
+        Inplace.Div(res, other)
         return res
 
     def __rtruediv__(self, other):
@@ -62,7 +67,8 @@ class NumberLike(ABC):
 
     def __mod__(self, other):
         res = self.__create_tmp__()
-        AugAssign.Mod(res, self, other)
+        Assign(res, self)
+        Inplace.Mod(res, other)
         return res
 
     def __rmod__(self, other):
@@ -70,69 +76,63 @@ class NumberLike(ABC):
 
     def __ne__(self, other):
         res = Bool.__create_tmp__()
-        Assign(res, self)
-        AugAssign.NotEq(res, other)
+        Compare.NotEq(res, self, other)
         return res
 
     def __lt__(self, other):
         res = Bool.__create_tmp__()
-        Assign(res, self)
-        AugAssign.Lt(res, self)
+        Compare.Lt(res, self, other)
         return res
 
     def __le__(self, other):
         res = Bool.__create_tmp__()
-        Assign(res, self)
-        AugAssign.LtE(res, other)
+        Compare.LtE(res, self, other)
         return res
 
     def __gt__(self, other):
         res = Bool.__create_tmp__()
-        Assign(res, self)
-        AugAssign.Gt(res, other)
+        Compare.Gt(res, self, other)
         return res
 
     def __ge__(self, other):
         res = Bool.__create_tmp__()
-        Assign(res, self)
-        AugAssign.GtE(res, other)
+        Compare.GtE(res, self, other)
         return res
 
     def __eq__(self, other):
         res = Bool.__create_tmp__()
-        Assign(res, self)
-        AugAssign.Eq(res, other)
+        Compare.Eq(res, self, other)
         return res
 
     def __iadd__(self, other):
-        AugAssign.Add(self, other)
+        Inplace.Add(self, other)
         return self
 
     def __isub__(self, other):
-        AugAssign.Sub(self, other)
+        Inplace.Sub(self, other)
         return self
 
     def __imul__(self, other):
-        AugAssign.Mult(self, other)
+        Inplace.Mult(self, other)
         return self
 
     def __ifloordiv__(self, other):
-        AugAssign.FloorDiv(self, other)
+        Inplace.FloorDiv(self, other)
         return self
 
     def __itruediv__(self, other):
-        AugAssign.Div(self, other)
+        Inplace.Div(self, other)
         return self
 
     def __imod__(self, other):
-        AugAssign.Mod(self, other)
+        Inplace.Mod(self, other)
         return self
 
 
 ScoreBoard = ObjectiveRef
 Name = NameRef
 
-type ScoreInitializer = NumberLike | Real | ScoreRef | None
+type ScoreInitializer = NumberLike | SupportsInt | ScoreRef | None
 
 
 class Score(RtData[ScoreRef], NumberLike):
@@ -183,13 +183,13 @@ class Score(RtData[ScoreRef], NumberLike):
     def __bool_and__(self, other):
         res = Bool.__create_tmp__()
         Assign(res, self)
-        AugAssign.And(res, other)
+        Inplace.And(res, other)
         return res
 
     def __bool_or__(self, other):
         res = Bool.__create_tmp__()
         Assign(res, self)
-        AugAssign.Or(res, other)
+        Inplace.Or(res, other)
         return res
 
 
@@ -223,7 +223,7 @@ class ScoreRange(RtIterator[Score]):
             stop = arg2
         self.start = Score(start)
         self.stop = int(stop) if isinstance(stop, Real) else Score(stop)
-        self.step = int(step) if isinstance(stop, Real) else Score(step)
+        self.step = int(step) if isinstance(step, Real) else Score(step)
 
     def __assign__(self, value):
         if not isinstance(value, (ScoreRange, range)):
