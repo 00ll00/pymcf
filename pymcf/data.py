@@ -138,7 +138,7 @@ type ScoreInitializer = NumberLike | SupportsInt | ScoreRef | None
 class Score(RtData[ScoreRef], NumberLike):
 
     @overload
-    def __init__(self, number: ScoreInitializer=None):
+    def __init__(self, number: ScoreInitializer = None):
         ...
 
     @overload
@@ -192,6 +192,26 @@ class Score(RtData[ScoreRef], NumberLike):
         Inplace.Or(res, other)
         return res
 
+    @mcfunction.inline
+    def __pow__(self, power, modulo=None):
+        if isinstance(power, RtBaseData):
+            res = Score(1)
+            for _ in ScoreRange(power):
+                res *= self
+        else:
+            power = int(power)
+            if power < 0:
+                raise ValueError()
+            elif power == 0:
+                return Score(1)
+            res = Score(self)
+            for _ in range(power - 1):
+                res *= self
+        return res
+
+    @mcfunction.inline
+    def __rpow__(self, other):
+        return Score(other).__pow__(self)
 
 Bool = Score
 
