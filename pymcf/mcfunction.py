@@ -81,7 +81,7 @@ class mcfunction:
             try:
                 inspect.getsource(func)
             except OSError:
-                raise ValueError(f"无法获取函数 {func.__qualname__} 的源代码。")
+                raise ValueError(f"无法获取函数 {func.__module__}.{func.__qualname__} 的源代码。")
             self = object.__new__(cls)
             if _func is None:
                 # 说明返回的是 wrapper，需要手动 init
@@ -97,6 +97,7 @@ class mcfunction:
                  tags: set[str] = None,
                  entrance: bool = False,
                  inline: bool = False,
+                 **kwargs,
                  ):
         self.__name__ = _func.__name__
         self.__doc__ = _func.__doc__
@@ -105,7 +106,6 @@ class mcfunction:
 
         self._origin_func = _func
         self._signature = inspect.signature(_func)
-        print(_func.__qualname__)
         _generating.set(True)
         try:
             self._ast_generator = reform_func(_func, wrapper_name="$wrapper")
@@ -117,7 +117,12 @@ class mcfunction:
         self._tags = tags if tags is not None else set()
         self._entrance = entrance
         self._inline = inline
-        self._basename = get_valid_name(_func.__qualname__)
+
+        basename = _func.__qualname__
+        if _func.__module__ != "__main__":
+            basename = _func.__module__ + '.' + basename
+
+        self._basename = get_valid_name(basename)
         if entrance:
             self.name = self._basename
 
@@ -160,17 +165,21 @@ class mcfunction:
         return MethodType(self, instance)
 
     @staticmethod
-    def inline(_func=None, /):
-        return mcfunction(_func, inline=True, tags=None, entrance=False)
+    def inline(_func=None, /, **kwargs):
+        return mcfunction(_func, inline=True, tags=None, entrance=False, **kwargs)
 
     @staticmethod
-    def manual(_func=None, /, *, tags: set[str] = None):
-        return mcfunction(_func, inline=False, tags=tags, entrance=True)
+    def manual(_func=None, /, *, tags: set[str] = None, **kwargs):
+        return mcfunction(_func, inline=False, tags=tags, entrance=True, **kwargs)
 
     @staticmethod
-    def load(_func=None, /):
-        return mcfunction(_func, inline=False, tags={"load"}, entrance=True)
+    def load(_func=None, /, *, tags: set[str] = None, **kwargs):
+        if tags is None:
+            tags = {}
+        return mcfunction(_func, inline=False, tags={*tags, "load"}, entrance=True, **kwargs)
 
     @staticmethod
-    def tick(_func=None, /):
-        return mcfunction(_func, inline=False, tags={"tick"}, entrance=True)
+    def tick(_func=None, /, *, tags: set[str] = None, **kwargs):
+        if tags is None:
+            tags = {}
+        return mcfunction(_func, inline=False, tags={*tags, "tick"}, entrance=True, **kwargs)
