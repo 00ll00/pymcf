@@ -1,4 +1,3 @@
-import ast
 from typing import Protocol, cast
 
 from ._syntactic import *

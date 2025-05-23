@@ -1,9 +1,7 @@
-from _ast import UAdd, USub, Not, Invert, And, Or, Add, Sub, Mult, Div, FloorDiv, Mod, Pow, LShift
-from numbers import Real
 from typing import SupportsInt
 
 from .environment import Env
-from ..ast_ import operation, Raw, Assign, UnaryOp, Inplace, Compare, LtE, Gt, GtE, Eq, NotEq, Lt, Context
+from ..ast_ import operation, Raw, Assign, UnaryOp, Inplace, Compare, LtE, Gt, GtE, Eq, NotEq, Lt, UAdd, USub, Not, Invert, And, Or, Add, Sub, Mult, Div, FloorDiv, Mod, Context
 from ..ir import BasicBlock
 from ..data import Score, Nbt
 from .commands import Command, RawCommand, ScoreRef, OpAssign, NbtPath, Execute, ExecuteChain, GetValue, DataGet, \
