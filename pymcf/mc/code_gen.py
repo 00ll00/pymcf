@@ -12,8 +12,8 @@ from ..ir.codeblock import JmpEq
 
 class MCF:
 
-    def __init__(self, path: str, cmds: list[Command], env: Env):
-        self.path = path + ".mcfunction"
+    def __init__(self, name: str, cmds: list[Command], env: Env):
+        self.name = name
         self.cmds = cmds
         self.env = env
 
