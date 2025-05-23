@@ -28,12 +28,11 @@ class Cmd(Command):
 
 class Function(Command):
 
-    def __init__(self, func_name):
-        assert isinstance(func_name, NSName)
-        self.name = func_name
+    def __init__(self, token):
+        self.token = token
 
     def resolve(self, env):
-        return 'function %s' % env.function_name(self.name)
+        return 'function %s' % env.function_name(self.token)
 
 class FunctionTag(Command):
 

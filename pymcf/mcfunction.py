@@ -35,8 +35,8 @@ class FuncArgs:
     def __eq__(self, other: Self) -> bool:
         # TODO
         # with set_eq_identifier(True):
-        #     return self.mcf_args == other.mcf_args
-        return False
+        return self.mcf_args == other.mcf_args
+        # return False
 
     def __hash__(self) -> int:
         # TODO
@@ -83,7 +83,9 @@ class mcfunction:
             except OSError:
                 raise ValueError(f"无法获取函数 {func.__qualname__} 的源代码。")
             self = object.__new__(cls)
-            self.__init__(func, **kwargs)
+            if _func is None:
+                # 说明返回的是 wrapper，需要手动 init
+                self.__init__(func, **kwargs)
             return self
 
         if _func is None:
@@ -103,7 +105,7 @@ class mcfunction:
 
         self._origin_func = _func
         self._signature = inspect.signature(_func)
-
+        print(_func.__qualname__)
         _generating.set(True)
         try:
             self._ast_generator = reform_func(_func, wrapper_name="$wrapper")
@@ -139,7 +141,8 @@ class mcfunction:
                 ext = "-" + str(len(self._arg_ctx))
 
             last_ctx = Context.current_ctx()
-            with Context(name=f"{self._basename}{ext}", inline=self._inline, env=Env()) as ctx:
+            ctx_name = f"{self._basename}{ext}"
+            with Context(name=ctx_name, inline=self._inline, env=Env(rooot_name=ctx_name)) as ctx:
                 self._ast_generator(*args, **kwargs)
             ctx.finish()
 
@@ -158,36 +161,16 @@ class mcfunction:
 
     @staticmethod
     def inline(_func=None, /):
-        def wrap(func):
-            return mcfunction(func, inline=True, tags=None, entrance=False)
-        if _func is None:
-            return wrap
-        else:
-            return wrap(_func)
+        return mcfunction(_func, inline=True, tags=None, entrance=False)
 
     @staticmethod
     def manual(_func=None, /, *, tags: set[str] = None):
-        def wrap(func):
-            return mcfunction(func, inline=False, tags=tags, entrance=True)
-        if _func is None:
-            return wrap
-        else:
-            return wrap(_func)
+        return mcfunction(_func, inline=False, tags=tags, entrance=True)
 
     @staticmethod
     def load(_func=None, /):
-        def wrap(func):
-            return mcfunction(func, inline=False, tags={"load"}, entrance=True)
-        if _func is None:
-            return wrap
-        else:
-            return wrap(_func)
+        return mcfunction(_func, inline=False, tags={"load"}, entrance=True)
 
     @staticmethod
     def tick(_func=None, /):
-        def wrap(func):
-            return mcfunction(func, inline=False, tags={"tick"}, entrance=True)
-        if _func is None:
-            return wrap
-        else:
-            return wrap(_func)
+        return mcfunction(_func, inline=False, tags={"tick"}, entrance=True)

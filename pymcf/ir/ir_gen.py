@@ -7,6 +7,7 @@ from pymcf.config import Config
 from .codeblock import BasicBlock, MatchJump, JmpEq, code_block
 from pymcf.ast_ import operation, Context, Scope, compiler_hint, If, For, Try, Call, RtBaseExc, \
     RtStopIteration, RtContinue, RtBreak, Assign, Raise, While, RtBaseData
+from ..ast_.runtime import RtReturn
 
 
 class IrCfg(Config):
@@ -512,14 +513,14 @@ class Compiler:
     def __init__(self, config: IrCfg):
         self.config = config
 
-    def compile(self, ctx: Context) -> code_block | None:
+    def compile(self, ctx: Context) -> list[code_block]:
         cb = Expander(ctx.root_scope, self.config.ir_bf, self.config, ctx.name).expand()
 
         for _ in range(self.config.ir_simplify):
             simplifier = EmptyCBRemover(cb)
             cb = simplifier.simplify()
             if cb is None:
-                return None
+                return []
             if not simplifier.simplified:
                 break
 
@@ -528,4 +529,6 @@ class Compiler:
             cb = inliner.simplify()
             if not inliner.simplified:
                 break
-        return cb
+
+        collector = CBSimplifier(cb)
+        return collector._blocks
