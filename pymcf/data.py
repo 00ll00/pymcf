@@ -196,7 +196,7 @@ class Score(RtData[ScoreRef], NumberLike):
     def __pow__(self, power, modulo=None):
         if isinstance(power, RtBaseData):
             res = Score(1)
-            for _ in ScoreRange(power):
+            for _ in Range(power):
                 res *= self
         else:
             power = int(power)
@@ -224,7 +224,7 @@ class RtIterator[V: RtData](RtBaseIterator[V], ABC):
     ...
 
 
-class ScoreRange(RtIterator[Score]):
+class Range(RtIterator[Score]):
 
     @overload
     def __init__(self, end: ScoreInitializer, /):
@@ -246,7 +246,7 @@ class ScoreRange(RtIterator[Score]):
         self.step = int(step) if isinstance(step, Real) else Score(step)
 
     def __assign__(self, value):
-        if not isinstance(value, (ScoreRange, range)):
+        if not isinstance(value, (Range, range)):
             raise TypeError(f"不能将 {value.__class__.__name__} 赋值到 ScoreRange")
         self.start.__assign__(value.start)
         if isinstance(value.stop, Real):
@@ -260,7 +260,7 @@ class ScoreRange(RtIterator[Score]):
 
     @classmethod
     def __create_var__(cls) -> Self:
-        return ScoreRange(None, None, None)
+        return Range(None, None, None)
 
     @mcfunction.inline
     def __next__(self) -> Score:

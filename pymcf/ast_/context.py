@@ -109,15 +109,19 @@ class Context:
             raise SyntaxError(f"函数 {self.name} 中出现脱离循环的运行期循环控制语句")  # TODO 提供具体的代码定位
         self._excs = self.root_scope.excs.remove_subclasses(RtCfExc)
 
+        # 消除 RtReturn
+        return_catch = Try(
+            sc_try=self.root_scope,
+            excepts=[ExcHandle((RtReturn,), Scope([]))],
+            sc_else=Scope(),
+            sc_finally=Scope(),
+            excs=self._excs,
+            _offline=True)
+        self.root_scope = Scope([return_catch])
+
         if self.inline:  # TODO 内联函数返回值处理
             curr = _current_ctx.get()
-            curr.record_statement(Try(
-                sc_try=self.root_scope,
-                excepts=[ExcHandle((RtReturn,), Scope([]))],
-                sc_else=Scope(),
-                sc_finally=Scope(),
-                excs=self._excs,
-                _offline=True))
+            curr.record_statement(return_catch)
 
         self._finished = True
 
