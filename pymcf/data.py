@@ -17,11 +17,11 @@ class NumberLike(ABC):
 
     @classmethod
     @abstractmethod
-    def __create_tmp__(cls):
+    def __create_var__(cls):
         ...
 
     def __add__(self, other):
-        res = self.__create_tmp__()
+        res = self.__create_var__()
         Assign(res, self)
         Inplace.Add(res, other)
         return res
@@ -30,7 +30,7 @@ class NumberLike(ABC):
         return self.__class__.__add__(other, self)
 
     def __sub__(self, other):
-        res = self.__create_tmp__()
+        res = self.__create_var__()
         Assign(res, self)
         Inplace.Sub(res, other)
         return res
@@ -39,7 +39,7 @@ class NumberLike(ABC):
         return self.__class__.__sub__(other, self)
 
     def __mul__(self, other):
-        res = self.__create_tmp__()
+        res = self.__create_var__()
         Assign(res, self)
         Inplace.Mult(res, other)
         return res
@@ -48,7 +48,7 @@ class NumberLike(ABC):
         return self.__class__.__mul__(other, self)
 
     def __floordiv__(self, other):
-        res = self.__create_tmp__()
+        res = self.__create_var__()
         Assign(res, self)
         Inplace.FloorDiv(res, other)
         return res
@@ -57,7 +57,7 @@ class NumberLike(ABC):
         return self.__class__.__floordiv__(other, self)
 
     def __truediv__(self, other):
-        res = self.__create_tmp__()
+        res = self.__create_var__()
         Assign(res, self)
         Inplace.Div(res, other)
         return res
@@ -66,7 +66,7 @@ class NumberLike(ABC):
         return self.__class__.__truediv__(other, self)
 
     def __mod__(self, other):
-        res = self.__create_tmp__()
+        res = self.__create_var__()
         Assign(res, self)
         Inplace.Mod(res, other)
         return res
@@ -75,32 +75,32 @@ class NumberLike(ABC):
         return self.__class__.__mod__(other, self)
 
     def __ne__(self, other):
-        res = Bool.__create_tmp__()
+        res = Bool.__create_var__()
         Compare.NotEq(res, self, other)
         return res
 
     def __lt__(self, other):
-        res = Bool.__create_tmp__()
+        res = Bool.__create_var__()
         Compare.Lt(res, self, other)
         return res
 
     def __le__(self, other):
-        res = Bool.__create_tmp__()
+        res = Bool.__create_var__()
         Compare.LtE(res, self, other)
         return res
 
     def __gt__(self, other):
-        res = Bool.__create_tmp__()
+        res = Bool.__create_var__()
         Compare.Gt(res, self, other)
         return res
 
     def __ge__(self, other):
-        res = Bool.__create_tmp__()
+        res = Bool.__create_var__()
         Compare.GtE(res, self, other)
         return res
 
     def __eq__(self, other):
-        res = Bool.__create_tmp__()
+        res = Bool.__create_var__()
         Compare.Eq(res, self, other)
         return res
 
@@ -148,7 +148,7 @@ class Score(RtData[ScoreRef], NumberLike):
     def __init__(self, *args):
         match len(args):
             case 0 | 1:
-                self.__metadata__ = self._new_tmp_ref()
+                self.__metadata__ = self._new_local_ref()
                 if len(args) == 1:
                     Assign(self, args[0])
             case 2 | 3:
@@ -167,11 +167,11 @@ class Score(RtData[ScoreRef], NumberLike):
                 raise TypeError()
 
     @staticmethod
-    def _new_tmp_ref() -> ScoreRef:
-        return ScoreRef(target=NameRef(name=f"$tmp_{Context.current_ctx().new_tmp_id()}"), objective=ObjectiveRef(name="$sys"))
+    def _new_local_ref() -> ScoreRef:
+        return Context.current_ctx().env.new_local_score()
 
     @classmethod
-    def __create_tmp__(cls) -> Self:
+    def __create_var__(cls) -> Self:
         return Score()
 
     def __assign__(self, value):
@@ -181,13 +181,13 @@ class Score(RtData[ScoreRef], NumberLike):
         return f"Score({self.__metadata__.resolve(None)})"
 
     def __bool_and__(self, other):
-        res = Bool.__create_tmp__()
+        res = Bool.__create_var__()
         Assign(res, self)
         Inplace.And(res, other)
         return res
 
     def __bool_or__(self, other):
-        res = Bool.__create_tmp__()
+        res = Bool.__create_var__()
         Assign(res, self)
         Inplace.Or(res, other)
         return res
@@ -239,7 +239,7 @@ class ScoreRange(RtIterator[Score]):
             self.step = Score(value.step)
 
     @classmethod
-    def __create_tmp__(cls) -> Self:
+    def __create_var__(cls) -> Self:
         return ScoreRange(None, None, None)
 
     @mcfunction.inline
@@ -260,5 +260,5 @@ class Entity(RtData[EntityRef]):
         pass
 
     @classmethod
-    def __create_tmp__(cls):
+    def __create_var__(cls):
         ...

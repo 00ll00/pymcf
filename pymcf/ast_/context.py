@@ -14,14 +14,11 @@ class _PlaceHolder:
 
 class Context:
 
-    def __init__(self, name: str, inline: bool = False, return_type: type = _PlaceHolder.NoValue, env=None):
+    def __init__(self, name: str, env=None, inline: bool = False, return_type: type = _PlaceHolder.NoValue):
         self.name = name
         self.inline = inline
         self.root_scope = Scope()
-        self.env = env
         self._scope_stack = [self.root_scope]
-        self._tmp_id = 0
-        self._tmps = []
         self._return_type = return_type  # 指定的返回值类型，为 _PlaceHolder.NoValue 表示自行推断
         self._raw_return_values = []  # 所有原始 return 语句返回的值
         self._return_value: Any = _PlaceHolder.NoValue  # 使用 _PlaceHolder.NoValue 占位，在结束时检查
@@ -29,8 +26,11 @@ class Context:
         self._finished = False
 
         if self.inline:
+            assert env is None
             curr = _current_ctx.get()
-            self._tmp_id = curr._tmp_id
+            self.env = curr.env
+        else:
+            self.env = env
 
     def __enter__(self):
         assert not self._finished
@@ -79,7 +79,7 @@ class Context:
             # 未记录返回值
             if self._return_type is _PlaceHolder.NoValue:  # 未提供返回值类型
                 if isinstance(value, RtBaseData):
-                    self._return_value = value.__create_tmp__()
+                    self._return_value = value.__create_var__()
                     Assign(self._return_value, value)
                 else:
                     self._return_value = _PlaceHolder.CtValue
@@ -111,8 +111,6 @@ class Context:
 
         if self.inline:  # TODO 内联函数返回值处理
             curr = _current_ctx.get()
-            curr._tmp_id = self._tmp_id
-            curr._tmps.extend(self._tmps)
             curr.record_statement(Try(
                 sc_try=self.root_scope,
                 excepts=[ExcHandle((RtReturn,), Scope([]))],
@@ -122,11 +120,6 @@ class Context:
                 _offline=True))
 
         self._finished = True
-
-    def new_tmp_id(self) -> int:
-        assert not self._finished
-        self._tmp_id += 1
-        return self._tmp_id
 
     @property
     def finished(self) -> bool:

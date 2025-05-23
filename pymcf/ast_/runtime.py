@@ -204,7 +204,7 @@ class RtBaseData(ABC):
 
     @classmethod
     @abstractmethod
-    def __create_tmp__(cls) -> Self:
+    def __create_var__(cls) -> Self:
         ...
 
 class RtBaseIterator[V: RtBaseData](RtBaseData, Iterator, ABC):

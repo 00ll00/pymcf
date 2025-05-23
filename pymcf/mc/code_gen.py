@@ -103,13 +103,13 @@ def translate(op: operation, env: Env) -> Command | list[Command]:
                 case Sub():
                     return RemConst(target.__metadata__, value)
                 case Mult():
-                    return OpMul(target.__metadata__, env.get_const_score(value).__metadata__)
+                    return OpMul(target.__metadata__, env.get_const_score(value))
                 case Div():
-                    return OpDiv(target.__metadata__, env.get_const_score(value).__metadata__)
+                    return OpDiv(target.__metadata__, env.get_const_score(value))
                 case FloorDiv():
-                    return OpDiv(target.__metadata__, env.get_const_score(value).__metadata__)
+                    return OpDiv(target.__metadata__, env.get_const_score(value))
                 case Mod():
-                    return OpMod(target.__metadata__, env.get_const_score(value).__metadata__)
+                    return OpMod(target.__metadata__, env.get_const_score(value))
                 case _:
                     raise NotImplementedError
 

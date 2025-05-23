@@ -891,9 +891,9 @@ class ASTRewriter(NodeTransformer):
                 except RtBaseExc as e:
                     e.__record__()
             if isinstance(v_if, RtBaseData):
-                res = v_if.__create_tmp__()
+                res = v_if.__create_var__()
             elif isinstance(v_else, RtBaseData):
-                res = v_else.__create_tmp__()
+                res = v_else.__create_var__()
             else:
                 raise TypeError(f"运行期 if 表达式至少有一方的值为运行期量，得到 {v_if!r}, {v_else!r}")
             with enter_scope(sc_body):

@@ -124,7 +124,7 @@ class mcfunction:
     def __call__(self, *args, **kwargs):
         from .mc.environment import Env
         if self._inline:
-            with Context(name=f"{self._basename}@inlined", inline=self._inline, env=Env()) as ctx:
+            with Context(name=f"{self._basename}@inlined", inline=self._inline, env=None) as ctx:
                 self._ast_generator(*args, **kwargs)
             ctx.finish()
             return ctx.return_value
