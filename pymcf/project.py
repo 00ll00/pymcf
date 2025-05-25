@@ -15,6 +15,8 @@ from pymcf.mcfunction import mcfunction
 class ProjectCfg(Config):
     prj_tmp_dir: Path = Path("./.pymcf_tmp")
     prj_install_path: Path = Path("./pymcf_out")
+    dbg_viz_ir: bool = False
+    dbg_viz_ast: bool = False
 
 
 class Project:
@@ -52,8 +54,22 @@ class Project:
 
             for mcf in mcfunction._all:
                 for i, ctx in enumerate(mcf._arg_ctx.values()):
+                    if self._config.dbg_viz_ast:
+                        from pymcf.visualize import dump_context
+                        doc = dump_context(ctx)
+                        path = self._config.prj_tmp_dir / "viz" / self.name / "ast" / f"{mcf.name}.html"
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        with path.open("w", encoding="utf-8") as f:
+                            f.write(doc)
+
                     compiler = Compiler(self._config)
                     cbs = compiler.compile(ctx)
+
+                    if self._config.dbg_viz_ir:
+                        from pymcf.visualize import draw_ir
+                        path = self._config.prj_tmp_dir / "viz" / self.name / "ir" / f"{mcf.name}.svg"
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        draw_ir(cbs[0]).render(outfile=path)
 
                     tr = Translator(ctx.env)
 
