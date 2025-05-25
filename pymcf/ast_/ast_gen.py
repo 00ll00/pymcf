@@ -337,7 +337,7 @@ class ASTRewriter(NodeTransformer):
 
         def __init__(self, iterator: Any):
             super().__init__()
-            self.iterator = iterator
+            self.iterator = iter(iterator)
 
         def control_flow(self):
             if is_rt_iterator(self.iterator):

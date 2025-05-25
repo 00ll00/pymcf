@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 from contextlib import contextmanager
 from contextvars import ContextVar
 from numbers import Real
-from typing import Self, overload, SupportsInt
+from typing import Self, overload, SupportsInt, Iterable
 
 from pymcf.ast_ import Context, RtBaseData, RtBaseIterator, Assign, Inplace, RtStopIteration, Compare
 from pymcf.mcfunction import mcfunction
@@ -224,7 +224,7 @@ class RtIterator[V: RtData](RtBaseIterator[V], ABC):
     ...
 
 
-class Range(RtIterator[Score]):
+class RangeIterator(RtIterator[Score]):
 
     @overload
     def __init__(self, end: ScoreInitializer, /):
@@ -242,25 +242,25 @@ class Range(RtIterator[Score]):
             start = arg1
             stop = arg2
         self.start = Score(start)
-        self.stop = int(stop) if isinstance(stop, Real) else Score(stop)
-        self.step = int(step) if isinstance(step, Real) else Score(step)
+        self.stop = int(stop) if isinstance(stop, SupportsInt) else Score(stop)
+        self.step = int(step) if isinstance(step, SupportsInt) else Score(step)
 
     def __assign__(self, value):
-        if not isinstance(value, (Range, range)):
-            raise TypeError(f"不能将 {value.__class__.__name__} 赋值到 ScoreRange")
+        if not isinstance(value, RangeIterator):
+            raise TypeError(f"不能将 {value.__class__.__name__} 赋值到 ScoreIterator")
         self.start.__assign__(value.start)
-        if isinstance(value.stop, Real):
+        if isinstance(value.stop, SupportsInt):
             self.stop = int(value.stop)
         else:
             self.stop = Score(value.stop)
-        if isinstance(value.step, Real):
+        if isinstance(value.step, SupportsInt):
             self.step = int(value.step)
         else:
             self.step = Score(value.step)
 
     @classmethod
     def __create_var__(cls) -> Self:
-        return Range(None, None, None)
+        return RangeIterator(None, None, None)
 
     @mcfunction.inline
     def __next__(self) -> Score:
@@ -271,7 +271,58 @@ class Range(RtIterator[Score]):
             raise RtStopIteration()
 
     def __repr__(self):
-        return f"ScoreRange({self.start!r}, {self.stop!r}, {self.step!r})"
+        return f"RangeIterator({self.start!r}, {self.stop!r}, {self.step!r})"
+
+
+class Range(RtData, Iterable[Score]):
+
+    @overload
+    def __init__(self, end: ScoreInitializer, /):
+        ...
+
+    @overload
+    def __init__(self, start: ScoreInitializer, end: ScoreInitializer, step: ScoreInitializer = ..., /):
+        ...
+
+    def __init__(self, arg1, arg2=None, step=1, /):
+        if arg2 is None:
+            start = 0
+            stop = arg1
+        else:
+            start = arg1
+            stop = arg2
+        self.start = int(start) if isinstance(start, SupportsInt) else Score(start)
+        self.stop = int(stop) if isinstance(stop, SupportsInt) else Score(stop)
+        self.step = int(step) if isinstance(step, SupportsInt) else Score(step)
+
+    def __assign__(self, value):
+        if not isinstance(value, (Range, range)):
+            raise TypeError(f"不能将 {value.__class__.__name__} 赋值到 Range")
+        if isinstance(value.start, SupportsInt):
+            self.start = int(value.start)
+        else:
+            self.start = Score(value.start)
+        if isinstance(value.stop, SupportsInt):
+            self.stop = int(value.stop)
+        else:
+            self.stop = Score(value.stop)
+        if isinstance(value.step, SupportsInt):
+            self.step = int(value.step)
+        else:
+            self.step = Score(value.step)
+
+    @classmethod
+    def __create_var__(cls) -> Self:
+        return Range(None, None, None)
+
+    def __iter__(self) -> RangeIterator:
+        return RangeIterator(self.start, self.stop, self.step)
+
+    def __contains__(self, item):
+        """
+        x in range
+        """
+        raise NotImplementedError()
 
 
 class Entity(RtData[EntityRef]):
