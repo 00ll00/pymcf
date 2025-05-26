@@ -4,7 +4,7 @@ import inspect
 from types import FunctionType
 from typing import Any
 
-from . import Context, Scope, FormattedData
+from . import Constructor, Scope, FormattedData
 from . import syntactic
 from .runtime import *
 
@@ -19,7 +19,7 @@ def is_rt_exception(value) -> bool:
         return isinstance(value, RtBaseExc)
 
 def enter_scope(scope=None):
-    return Context.current_ctx().enter_scope(scope)
+    return Constructor.current_constr().enter_scope(scope)
 
 def get_pos(node) -> dict:
     if isinstance(node, list):

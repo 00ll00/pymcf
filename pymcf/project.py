@@ -78,7 +78,7 @@ class Project:
                         path.parent.mkdir(parents=True, exist_ok=True)
                         draw_ir(cbs[0]).render(outfile=path)
 
-                    tr = Translator(ctx.env)
+                    tr = Translator(ctx.ctx)
 
                     for cb in cbs:
                         mcf = tr.translate(cb)

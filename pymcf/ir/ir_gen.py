@@ -5,7 +5,7 @@ from typing import Any, Callable, Generator
 
 from pymcf.config import Config
 from .codeblock import BasicBlock, MatchJump, JmpEq, code_block
-from pymcf.ast_ import operation, Context, Scope, compiler_hint, If, For, Try, Call, RtBaseExc, \
+from pymcf.ast_ import operation, Constructor, Scope, compiler_hint, If, For, Try, Call, RtBaseExc, \
     RtStopIteration, RtContinue, RtBreak, Assign, Raise, While, RtBaseData
 from ..ast_.runtime import RtReturn
 
@@ -518,7 +518,7 @@ class Compiler:
     def __init__(self, config: IrCfg):
         self.config = config
 
-    def compile(self, ctx: Context) -> list[code_block]:
+    def compile(self, ctx: Constructor) -> list[code_block]:
         cb = Expander(ctx.root_scope, self.config.ir_bf, self.config, ctx.name).expand()
 
         for _ in range(self.config.ir_simplify):

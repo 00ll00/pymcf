@@ -77,8 +77,8 @@ class stmt(AST):
     def __init__(self, *_, _offline: bool = None, **__):
         super().__init__()
         if not _offline:
-            from .context import Context
-            ctx = Context.current_ctx()
+            from .constructor import Constructor
+            ctx = Constructor.current_constr()
             if ctx is None and _offline is not None:
                 raise RuntimeError(f"{self!r} 在线操作生成时未处于任何构建上下文中。")
             ctx.record_statement(self)
@@ -411,8 +411,8 @@ class Call(control_flow):
 
     @cached_property
     def excs(self):
-        from .context import Context
-        if isinstance(self.func, Context) and self.func.finished:
+        from .constructor import Constructor
+        if isinstance(self.func, Constructor) and self.func.finished:
             return self.func.excs
         # TODO 函数存在循环调用时获取函数真实异常集
         else:

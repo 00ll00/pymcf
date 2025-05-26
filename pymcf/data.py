@@ -4,13 +4,20 @@ from contextvars import ContextVar
 from numbers import Real
 from typing import Self, overload, SupportsInt, Iterable
 
-from pymcf.ast_ import Context, RtBaseData, RtBaseIterator, Assign, Inplace, RtStopIteration, Compare
+from pymcf.ast_ import Constructor, RtBaseData, RtBaseIterator, Assign, Inplace, RtStopIteration, Compare
 from pymcf.mcfunction import mcfunction
 from pymcf.mc.commands import Resolvable, ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NBTStorable, NbtRef
 
 
-class RtData[M: Resolvable](RtBaseData, ABC):
-    __metadata__: M
+class RtData(RtBaseData, ABC):
+    ...
+
+
+class RefWrapper[M: Resolvable](ABC):
+    @property
+    @abstractmethod
+    def __metadata__(self) -> M:
+        ...
 
 
 class NumberLike(ABC):
@@ -129,13 +136,37 @@ class NumberLike(ABC):
         return self
 
 
-ScoreBoard = ObjectiveRef
+class Entity(RefWrapper[EntityRef]):
+
+    def __init__(self, ref: EntityRef):
+        self.ref = ref
+
+    @property
+    def __metadata__(self) -> EntityRef:
+        return self.ref
+
+
 Name = NameRef
+
+
+class ScoreBoard(RefWrapper[ObjectiveRef]):
+
+    def __init__(self, ref: ObjectiveRef):
+        self.ref = ref
+
+    @property
+    def __metadata__(self) -> ObjectiveRef:
+        return self.ref
+
 
 type ScoreInitializer = NumberLike | SupportsInt | ScoreRef | None
 
 
-class Score(RtData[ScoreRef], NumberLike):
+class Score(RtData, RefWrapper[ScoreRef], NumberLike):
+
+    @property
+    def __metadata__(self) -> ScoreRef:
+        return ScoreRef(self.entity.__metadata__, self.objective.__metadata__)
 
     @overload
     def __init__(self, number: ScoreInitializer = None):
@@ -148,7 +179,9 @@ class Score(RtData[ScoreRef], NumberLike):
     def __init__(self, *args):
         match len(args):
             case 0 | 1:
-                self.__metadata__ = self._new_local_ref()
+                ref = self._new_local_ref()
+                self.entity = Entity(ref.target)
+                self.objective = ScoreBoard(ref.objective)
                 if len(args) == 1:
                     Assign(self, args[0])
             case 2 | 3:
@@ -160,7 +193,8 @@ class Score(RtData[ScoreRef], NumberLike):
                     objective = ObjectiveRef(args[1])
                 else:
                     objective = args[1]
-                self.__metadata__ = ScoreRef(target, objective)
+                self.entity = Entity(target)
+                self.objective = ScoreBoard(objective)
                 if len(args) == 3:
                     Assign(self, args[2])
             case _:
@@ -168,7 +202,7 @@ class Score(RtData[ScoreRef], NumberLike):
 
     @staticmethod
     def _new_local_ref() -> ScoreRef:
-        return Context.current_ctx().env.new_local_score()
+        return Constructor.current_constr().ctx.new_local_score()
 
     @classmethod
     def __create_var__(cls) -> Self:
@@ -216,11 +250,11 @@ class Score(RtData[ScoreRef], NumberLike):
 Bool = Score
 
 
-class Nbt(RtData[NbtRef]):
+class Nbt(RefWrapper[NbtRef]):
     ...
 
 
-class RtIterator[V: RtData](RtBaseIterator[V], ABC):
+class RtIterator[V: RtData](RtData, RtBaseIterator[V], ABC):
     ...
 
 
@@ -323,13 +357,3 @@ class Range(RtData, Iterable[Score]):
         x in range
         """
         raise NotImplementedError()
-
-
-class Entity(RtData[EntityRef]):
-
-    def __assign__(self, value):
-        pass
-
-    @classmethod
-    def __create_var__(cls):
-        ...

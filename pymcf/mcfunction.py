@@ -3,7 +3,7 @@ from contextvars import ContextVar
 from types import FunctionType, MethodType
 from typing import Self
 
-from pymcf.ast_ import Context, reform_func, Call
+from pymcf.ast_ import Constructor, reform_func, Call
 
 
 class CompileTimeError(BaseException):
@@ -112,7 +112,7 @@ class mcfunction:
         finally:
             _generating.set(False)
 
-        self._arg_ctx: dict[FuncArgs, Context] = {}
+        self._arg_ctx: dict[FuncArgs, Constructor] = {}
 
         self._tags = tags if tags is not None else set()
         self._entrance = entrance
@@ -131,7 +131,7 @@ class mcfunction:
     def __call__(self, *args, **kwargs):
         from .mc.environment import Env
         if self._inline:
-            with Context(name=f"{self._basename}@inlined", inline=self._inline, env=None) as ctx:
+            with Constructor(name=f"{self._basename}@inlined", inline=self._inline, ctx=None) as ctx:
                 self._ast_generator(*args, **kwargs)
             ctx.finish()
             return ctx.return_value
@@ -145,9 +145,9 @@ class mcfunction:
             else:
                 ext = "-" + str(len(self._arg_ctx))
 
-            last_ctx = Context.current_ctx()
+            last_ctx = Constructor.current_constr()
             ctx_name = f"{self._basename}{ext}"
-            with Context(name=ctx_name, inline=self._inline, env=Env(rooot_name=ctx_name)) as ctx:
+            with Constructor(name=ctx_name, inline=self._inline, ctx=Env(rooot_name=ctx_name)) as ctx:
                 self._ast_generator(*args, **kwargs)
             ctx.finish()
 

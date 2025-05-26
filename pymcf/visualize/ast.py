@@ -4,14 +4,14 @@ from typing import Any
 from dominate.tags import *
 from dominate.util import raw
 
-from pymcf.ast_ import NodeVisitor, Scope, operation, compiler_hint, If, Context, Raise, AST, \
+from pymcf.ast_ import NodeVisitor, Scope, operation, compiler_hint, If, Constructor, Raise, AST, \
     For, While, Try, Inplace, Call
 from .reprs import repr_operation, repr_compiler_hint
 
 
 class _CtxDumper(NodeVisitor):
 
-    def dump(self, ctx: Context) -> str:
+    def dump(self, ctx: Constructor) -> str:
         with html() as doc:
             with head():
                 style(raw(importlib.resources.read_text(__name__, 'ast.css')))
@@ -113,5 +113,5 @@ class _CtxDumper(NodeVisitor):
         div(repr(node.func), cls="call")
 
 
-def dump_context(ctx: Context) -> str:
+def dump_context(ctx: Constructor) -> str:
     return _CtxDumper().dump(ctx)
