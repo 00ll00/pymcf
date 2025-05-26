@@ -1,33 +1,46 @@
+import math
 from abc import abstractmethod, ABC, ABCMeta
-from typing import final, Self, Iterator, Iterable
+from typing import final, Self, Iterator, Iterable, SupportsInt
 
 
 class _RtBaseExcMeta(ABCMeta):
     @property
-    @abstractmethod
-    def errno(cls) -> int:
-        return cls._errno
+    def errno_range(cls) -> tuple[int, int]:
+        assert cls._errno_range is not NotImplemented
+        if isinstance(cls._errno_range, int):
+            return (cls._errno_range, cls._errno_range)
+        return cls._errno_range
 
     def __repr__(cls):
-        return f"<{cls.__qualname__}(errno={cls.errno})>"
+        return f"<{cls.__qualname__} {cls._errno_range}>"
 
-    def __int__(self) -> int:
-        return self.errno
 
 class RtBaseExc(BaseException, metaclass=_RtBaseExcMeta):
-    _errno = NotImplemented  # TODO 异常代号范围化
+    _errno_range = (-math.inf, math.inf)
+    _errno = NotImplemented
+    def __init__(self):
+        raise TypeError(f"type {self.__class__.__name__} cannot be instantiated")
     def __record__(self):
         from ._syntactic import Raise
+        self.__traceback__ = None  # 释放 __traceback__，减少内存占用 TODO 记录有用的 traceback 信息
         Raise(exc=self)
 
+    def __int__(self):
+        return self.errno
+
+    @property
+    def errno(self):
+        return self._errno
 
 class RtSysExc(RtBaseExc):
     """
     系统保留的异常
     """
+    _errno_range = (-math.inf, -1)
+    def __init__(self):
+        raise TypeError(f"type {self.__class__.__name__} cannot be instantiated")
 
-
-class _RtNormalExcMeta(_RtBaseExcMeta, ABC):
+class _RtNormalExcMeta(_RtBaseExcMeta):
 
     def __subclasscheck__(self, subclass):
         if subclass is RtAnyNormalExc:
@@ -41,24 +54,26 @@ class RtNormalExc(RtBaseExc, metaclass=_RtNormalExcMeta):
 
     通过继承此类构造新的运行期异常
     """
+    _errno_range = (1, math.inf)
 
 
 class RtCfExc(RtSysExc, ABC):
     """
     流程控制异常
     """
-
+    _errno_range = (-4, -2)
 
 @final
 class RtUnreachable(RtCfExc):
     """
     RtUnreachable 用于终止不可达代码的生成
     """
+    _errno_range = -42
     _errno = -42
     def __init_subclass__(cls, **kwargs):
         raise TypeError(f'RtUnreachable cannot be inherited')
     def __init__(self):
-        ...
+        pass
     def __record__(self):
         ...  # raise RtUnreachable 不需要被记录
 
@@ -70,37 +85,44 @@ class RtAnyNormalExc(RtNormalExc):
 
     不可继承，不可实例化
     """
-    _errno = -42
+    _errno_range = (1, math.inf)
     def __init_subclass__(cls, **kwargs):
-        raise TypeError("type 'RtAnyNormalExc' is not an acceptable base type")
-
-    def __init__(self):
-        raise TypeError("type 'RtAnyNormalExc' cannot be instantiated")
+        raise TypeError(f"type 'RtAnyNormalExc' is not an acceptable base type")
 
 
 @final
 class RtStopIteration(RtNormalExc):
+    _errno_range = -1
     _errno = -1
     def __init_subclass__(cls, **kwargs):
         raise TypeError("type 'RtStopIteration' is not an acceptable base type")
+    def __init__(self):
+        pass
 
 
 @final
 class RtContinue(RtCfExc):
+    _errno_range = -2
     _errno = -2
     def __init_subclass__(cls, **kwargs):
         raise TypeError("type 'RtContinue' is not an acceptable base type")
+    def __init__(self):
+        pass
 
 
 @final
 class RtBreak(RtCfExc):
+    _errno_range = -3
     _errno = -3
     def __init_subclass__(cls, **kwargs):
         raise TypeError("type 'RtBreak' is not an acceptable base type")
+    def __init__(self):
+        pass
 
 
 @final
 class RtReturn(RtCfExc):
+    _errno_range = -4
     _errno = -4
     def __init_subclass__(cls, **kwargs):
         raise TypeError("type 'RtReturn' is not an acceptable base type")
@@ -128,48 +150,62 @@ class ExcSet:
     满异常集合，可能出现任意 RtNormalExc 或无异常。用于描述异常未知的函数。
     """
 
-    def __init__(self, exc: _TBaseRtExc | Iterable[_TBaseRtExc] | Self | None):
-        self._set: set[_TBaseRtExc | None] = set()
-        if isinstance(exc, type):
-            self._set.add(exc)
+    def __init__(self, exc: RtBaseExc | _TBaseRtExc | Iterable[RtBaseExc | _TBaseRtExc] | Self | None, insts=None):
+        self._type_set: set[_TBaseRtExc | None] = set()
+        values: set[RtBaseExc]  = set(insts) if insts is not None else set()
+        if isinstance(exc, type | None):
+            self._type_set.add(exc)
         elif isinstance(exc, RtBaseExc):
-            self._set.add(type(exc))
+            self._type_set.add(type(exc))
+            values.add(exc)
         elif isinstance(exc, ExcSet):
-            self._set.update(exc._set)
-        elif exc is None:
-            self._set.add(exc)
+            self._type_set.update(exc._type_set)
+            values.update(exc._value_set)
         else:
             try:
-                self._set.update(exc)
+                for e in exc:
+                    if isinstance(e, type | None):
+                        self._type_set.add(e)
+                    elif isinstance(e, RtBaseExc):
+                        self._type_set.add(type(e))
+                        values.add(e)
             except:
                 raise ValueError(f'无效的初始化值: {exc!r}')
 
-        if len(self._set) == 0:
-            self._set.add(None)
+        if len(self._type_set) == 0:
+            self._type_set.add(None)
 
-        self._always = None not in self._set
-        self._might = len(self._set - {None}) > 0
+        self._always = None not in self._type_set
+        self._might = len(self._type_set - {None}) > 0
+
+        self._value_set = set()
+        for v in values:
+            if isinstance(v, tuple(self._type_set- {None})):
+                self._value_set.add(v)
 
     def remove(self, exc: _TBaseRtExc | set[_TBaseRtExc]) -> Self:
         if isinstance(exc, type):
             exc = {exc}
         assert RtAnyNormalExc not in exc
-        return ExcSet(self._set - exc)
+        return ExcSet(self._type_set - exc, insts=self._value_set)
 
     def remove_subclasses(self, exc: _TBaseRtExc| Iterable[_TBaseRtExc]) -> Self:
         if isinstance(exc, type):
             exc = (exc, )
         else:
             exc = tuple(exc)
-        res = ExcSet(e for e in self._set if e is None or not issubclass(e, exc))
-        has_any = RtAnyNormalExc in self._set and not issubclass(RtNormalExc, exc)  # 如果被移除的类包含 RtNormalExc 的基类，则可以移除 RtAnyNormalExc
+        res = ExcSet(e for e in self._type_set if e is None or not issubclass(e, exc))
+        has_any = RtAnyNormalExc in self._type_set and not issubclass(RtNormalExc, exc)  # 如果被移除的类包含 RtNormalExc 的基类，则可以移除 RtAnyNormalExc
         if not has_any:
-            res = ExcSet(res._set - {RtAnyNormalExc})
+            res = ExcSet(res._type_set - {RtAnyNormalExc}, insts=res._value_set)
         return res
 
     @property
-    def set(self) -> set[_TBaseRtExc | None]:
-        return self._set.copy()
+    def types(self) -> set[_TBaseRtExc | None]:
+        return self._type_set.copy()
+    @property
+    def values(self) -> set[RtBaseExc]:
+        return self._value_set.copy()
     @property
     def always(self) -> bool:
         return self._always

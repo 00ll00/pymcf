@@ -1,13 +1,87 @@
-from typing import SupportsInt
+import math
+from functools import reduce
+from typing import SupportsInt, Self
 
 from .commands import Command, RawCommand, OpAssign, Execute, ExecuteChain, DataGet, \
     SetConst, OpSub, ScoreRange, OpMul, OpAdd, OpDiv, OpMod, AddConst, RemConst, Function, NSName
 from .environment import Env
 from ..ast_ import operation, Raw, Assign, UnaryOp, Inplace, Compare, LtE, Gt, GtE, Eq, NotEq, Lt, UAdd, USub, Not, \
-    Invert, And, Or, Add, Sub, Mult, Div, FloorDiv, Mod
+    Invert, And, Or, Add, Sub, Mult, Div, FloorDiv, Mod, RtBaseExc
+from ..ast_.runtime import _RtBaseExcMeta
 from ..data import Score, Nbt
 from ..ir import BasicBlock, MatchJump, code_block
-from ..ir.codeblock import JmpEq
+from ..ir.codeblock import JmpEq, JmpNotEq
+
+
+class MultiRange:
+
+    EMPTY: Self
+
+    def __init__(self, vmin: int = -math.inf, vmax: int = math.inf, *, _valid: list[int] = None):
+        if _valid is None:
+            assert vmin <= vmax
+            self.valid = [vmin, vmax]
+        else:
+            _valid = list(_valid)
+            assert len(_valid) % 2 == 0
+            if len(_valid) > 2:
+                for i in range(len(_valid) - 2)[:0:-2]:
+                    if _valid[i] + 1 >= _valid[i + 1]:
+                        _valid.pop(i + 1)
+                        _valid.pop(i)
+            self.valid = _valid
+
+    def __invert__(self):
+        valid = []
+        if self.valid[0] != - math.inf:
+            valid.extend((-math.inf, self.valid[0] - 1))
+        for l, h in zip(self.valid[1::2], self.valid[2::2]):
+            valid.extend((l + 1, h - 1))
+        if self.valid[-1] != math.inf:
+            valid.extend((self.valid[-1] + 1, math.inf))
+        return MultiRange(_valid=valid)
+
+    def __or__(self, other: Self):
+        li = len(self.valid)
+        lj = len(other.valid)
+        if li == 0:
+            return MultiRange(_valid=other.valid)
+        if lj == 0:
+            return MultiRange(_valid=self.valid)
+        valid = []
+        i = j = 0
+        if self.valid[i] < other.valid[j]:
+            last = self.valid[i: i + 2]
+            i += 2
+        else:
+            last = other.valid[j: j + 2]
+            j += 2
+        while True:
+            if i >= li and j >= lj:
+                valid.extend(last)
+                return MultiRange(_valid=valid)
+            if j >= lj or i < li and self.valid[i] < other.valid[j]:
+                curr = self.valid[i: i + 2]
+                i += 2
+            else:
+                curr = other.valid[j: j + 2]
+                j += 2
+
+            if curr[0] > last[1]:
+                valid.extend(last)
+                last = curr
+            else:
+                last = min(curr[0], last[0]), max(curr[1], last[1])
+
+    def __and__(self, other: Self):
+        return ~(~self | ~other)
+
+    def valid_ranges(self) -> list[tuple[int, int]]:
+        valid = list(None if v in {math.inf, -math.inf} else v for v in self.valid)
+        return list(zip(valid[0::2], valid[1::2]))
+
+
+MultiRange.EMPTY = MultiRange(_valid=[])
 
 
 class MCF:
@@ -19,7 +93,6 @@ class MCF:
 
     def gen_code(self) -> str:
         return '\n'.join(cmd.resolve(self.env) for cmd in self.cmds)
-
 
 
 class Translator:
@@ -209,7 +282,42 @@ class Translator:
         return MCF(path, cmds, self.env)
 
     def gen_MachJump(self, cb: MatchJump):
-        raise NotImplementedError
+        path = self.env.function_name(cb)
+        cmds = []
+
+        def get_range(value) -> MultiRange:
+            if isinstance(value, tuple | set | list):
+                r = MultiRange.EMPTY
+                for v in value:
+                    r |= get_range(v)
+                return r
+            elif isinstance(value, int):
+                return MultiRange(value, value)
+            elif isinstance(value, _RtBaseExcMeta):
+                return MultiRange(*value.errno_range)
+            else:
+                raise NotImplementedError
+
+        for case in cb.cases:
+            if isinstance(case, JmpEq):
+                unless = False
+                r = get_range(case.value)
+                if len(r.valid_ranges()) > 1:
+                    unless = True
+                    r = ~r
+            elif isinstance(case,JmpNotEq):
+                unless = True
+                r = get_range(case.value)
+                if len((~r).valid_ranges()) == 1:
+                    unless = False
+                    r = ~r
+            else:
+                raise NotImplementedError
+            chain = ExecuteChain()
+            for vmin, vmax in r.valid_ranges():
+                chain = chain.cond('unless' if unless else 'if').score_range(cb.flag.__metadata__, ScoreRange(vmin, vmax))
+            cmds.append(chain.run(Function(case.target)))
+        return MCF(path, cmds, self.env)
 
     def translate(self, cb: code_block) -> MCF:
         if isinstance(cb, BasicBlock):

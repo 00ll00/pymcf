@@ -83,7 +83,7 @@ def repr_operator(op: operator | boolop | cmpop) -> str:
 def repr_operation(op: operation) -> str:
     match op:
         case Raw():
-            return repr(op.code)
+            return repr(' '.join(str(part) for part in op.code))
         case Assign():
             return f"{op.target!r} = {op.value!r}"
         case UnaryOp():

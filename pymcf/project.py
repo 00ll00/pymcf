@@ -6,6 +6,7 @@ from contextvars import ContextVar
 from pathlib import Path
 from shutil import rmtree
 
+from pymcf import exceptions
 from pymcf.config import Config
 from pymcf.ir import Compiler
 from pymcf.mc.code_gen import Translator
@@ -38,6 +39,10 @@ class Project:
         importlib.import_module(name)
 
     def build(self):
+        if self._config.ir_bf is None:
+            from pymcf.data import Score
+            self.config(ir_bf = Score("$bf", "__sys__"))
+
         rmtree(self._config.prj_tmp_dir, ignore_errors=True)
 
         pack_path = self._config.prj_install_path / f"{self.name}.zip"
@@ -51,6 +56,8 @@ class Project:
                     mcf()
                     for tag in mcf._tags:
                         function_tags[tag].append(mcf.name)
+
+            exceptions.confirm()
 
             for mcf in mcfunction._all:
                 for i, ctx in enumerate(mcf._arg_ctx.values()):

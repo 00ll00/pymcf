@@ -278,7 +278,7 @@ class Expander(NodeVisitor):
         cb_excepts = []
         for exc_handler in node.excepts:
             captures =set()
-            for e in node.sc_try.excs.set:
+            for e in node.sc_try.excs.types:
                 if e is not None and issubclass(e, exc_handler.eg):
                     captures.add(e)
 
@@ -346,15 +346,15 @@ class Expander(NodeVisitor):
     def visit_Raise(self, node: Raise):
         # TODO err stack
         if not self.inline_catch:
-            self.current_block().add_op(self.set_flag_op(node.exc_class))
+            self.current_block().add_op(self.set_flag_op(node.exc))
         else:
             cb_last_out = self.exit_block()
             for eg, handler in self._exc_handler_in[::-1]:
-                if issubclass(node.exc_class, eg):
+                if isinstance(node.exc, eg):
                     cb_last_out.direct = handler
                     break
             else:
-                cb_last_out.add_op(self.set_flag_op(node.exc_class))
+                cb_last_out.add_op(self.set_flag_op(node.exc))
             self.enter_block(name="AFTER_RAISE")
 
     def visit_Call(self, node: Call):
@@ -449,6 +449,11 @@ class EmptyCBRemover(CBSimplifier):
     消除空块和简化跳转逻辑
     """
     def simplify_BasicBlock(self, cb: BasicBlock) -> code_block | None:
+        if cb.true is cb.false and cb.direct is None:
+            # 判断后跳转的目标为同一个，可以跳过判断
+            cb.direct = cb.true
+            cb.cond = None
+
         if cb.true is None and cb.false is None:
             cb.cond = None
             self._mark_simplified()

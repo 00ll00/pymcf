@@ -4,7 +4,7 @@ import inspect
 from types import FunctionType
 from typing import Any
 
-from . import Context, Scope
+from . import Context, Scope, FormattedData
 from . import syntactic
 from .runtime import *
 
@@ -671,7 +671,7 @@ class ASTRewriter(NodeTransformer):
 
                         if len(real_eg) == 0:
                             continue  # 直接跳过无效的 handler
-                        for e in sc_try.excs.set:  # 使用原始 body 异常集判断是否有此类异常抛出
+                        for e in sc_try.excs.types:  # 使用原始 body 异常集判断是否有此类异常抛出
                             if e is not None and issubclass(e, real_eg):
                                 break
                         else:
@@ -685,7 +685,7 @@ class ASTRewriter(NodeTransformer):
                                 elif not is_rt_exception(self._last_exc):
                                     yield self.CF_RAISE, self._last_exc
                         excepts.append(syntactic.ExcHandle(eg=real_eg, sc_handle=sc_except))
-                        handlers_exc.update(sc_except.excs.set)
+                        handlers_exc.update(sc_except.excs.types)
 
                     with enter_scope() as sc_else:
                         if sc_try.excs.always:  # try 总抛出异常则不可能到达 else 块
@@ -1118,9 +1118,14 @@ class ASTRewriter(NodeTransformer):
         """
         return Raise(exc=self.add_call(RtReturn, [node.value if node.value is not None else Constant(None)]))
 
-    @staticmethod
-    def raw_handler(code, note=None):
-        syntactic.Raw(code=code)
+    def raw_handler(self, js: JoinedStr) -> expr:
+        exps = []
+        for v in js.values:
+            if isinstance(v, FormattedValue):
+                exps.append(self.add_call(FormattedData,  [v.value, v.format_spec if v.format_spec is not None else Constant(None)]))
+            else:
+                exps.append(v)
+        return self.add_call(syntactic.Raw, exps)
 
     def visit_Expr(self, node):
         node = self.generic_visit(node)
@@ -1128,13 +1133,13 @@ class ASTRewriter(NodeTransformer):
         if isinstance(node.value, JoinedStr):
             # 野生 fstr 处理为 Raw
             return Expr(
-                value=self.add_call(self.raw_handler, [node.value])
+                value=self.raw_handler(node.value),
             )
-        elif isinstance(node.value, Subscript) and isinstance(node.value.value, JoinedStr):
-            # 带切片的野生 fstr 处理为 Raw + note
-            return Expr(
-                value=self.add_call(self.raw_handler, [node.value.value, node.value.slice])
-            )
+        # elif isinstance(node.value, Subscript) and isinstance(node.value.value, JoinedStr):
+        #     # 带切片的野生 fstr 处理为 Raw + note
+        #     return Expr(
+        #         value=self.reform_joined_str(node.value.value, node.value.slice)
+        #     )
         else:
             return node
 

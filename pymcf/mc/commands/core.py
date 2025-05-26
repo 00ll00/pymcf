@@ -1,6 +1,9 @@
 import abc
 from collections import namedtuple
 
+from pymcf.ast_ import FormattedData
+
+
 class CommandBlock:
     def __init__(self, command, conditional=True, mode='CHAIN', auto=True,
                  opposite=False, single_use=True):
@@ -74,10 +77,10 @@ class Command(Resolvable):
     pass
 
 class RawCommand(Command):
-    def __init__(self, code: str):
+    def __init__(self, code: list):
         self.code = code
     def resolve(self, env):
-        return self.code
+        return "".join(c.data.__metadata__.resolve(env) if isinstance(c, FormattedData) else str(c) for c in self.code)
 
 class EntityRef(Resolvable, metaclass=abc.ABCMeta):
 

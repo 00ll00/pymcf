@@ -1,7 +1,7 @@
 import ast
 from abc import ABC, abstractmethod
 from ast import AST as _AST, unaryop, UAdd, USub, Not, Invert, boolop, And, Or, operator, Add, Sub, Mult, Div, FloorDiv, Mod, \
-    Pow, LShift, RShift, BitOr, BitXor, BitAnd, MatMult
+    Pow, LShift, RShift, BitOr, BitXor, BitAnd, MatMult, Is, IsNot, In, NotIn
 from functools import reduce
 from types import GenericAlias
 from typing import Any, Iterable, Self
@@ -94,7 +94,7 @@ class Scope(AST):
     @cached_property
     def excs(self) -> ExcSet:
         if self.flow:
-            s = reduce(lambda a, b: a | b, (st.excs.set for st in self.flow), set())
+            s = reduce(lambda a, b: a | b, (st.excs.types for st in self.flow), set())
             if self.flow[-1].excs.always:
                 s.discard(None)  # 若 flow 最后一个语句一定引发异常，则整个 scope 必然引发异常
             return ExcSet(s)
@@ -142,11 +142,21 @@ class control_flow(stmt, ABC):
     """
 
 
+class FormattedData:
+
+    def __init__(self, data: RtBaseData, fmt: str | None = None):
+        self.data = data
+        self.fmt = fmt
+
+    def __repr__(self):
+        return f"${{{self.data!r}{f':{self.fmt}' if self.fmt is not None else ''}}}"
+
+
 class Raw(operation):
     _fields = ("code",)
-    def __init__(self, code: str, *args, **kwargs):
+    def __init__(self, *code: list[str | FormattedData], **kwargs):
         self.code = code
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
     # TODO Raw 是否需要提供读写变量
     reads = ()
@@ -354,11 +364,9 @@ class If(control_flow):
         self.sc_else = sc_else
         super().__init__(*args, **kwargs)
 
-    @property
+    @cached_property
     def excs(self) -> ExcSet:
-        if "excs" not in self._cache:
-            self._cache["excs"] = ExcSet(self.sc_body.excs.set | self.sc_else.excs.set)
-        return self._cache["excs"]
+        return ExcSet(self.sc_body.excs.types | self.sc_else.excs.types)
 
 
 class For(control_flow):
@@ -370,15 +378,13 @@ class For(control_flow):
         self.sc_else = sc_else
         super().__init__(*args, **kwargs)
 
-    @property
+    @cached_property
     def excs(self) -> ExcSet:
-        if "excs" not in self._cache:
-            self._cache["excs"] = ExcSet(
-                self.sc_iter.excs.remove(RtStopIteration).set |
-                self.sc_body.excs.remove({RtContinue, RtBreak}).set |
-                self.sc_else.excs.set
-            )
-        return self._cache["excs"]
+        return ExcSet(
+            self.sc_iter.excs.remove(RtStopIteration).types |
+            self.sc_body.excs.remove({RtContinue, RtBreak}).types |
+            self.sc_else.excs.types
+        )
 
 
 class While(control_flow):
@@ -389,14 +395,12 @@ class While(control_flow):
         self.sc_else = sc_else
         super().__init__(*args, **kwargs)
 
-    @property
+    @cached_property
     def excs(self) -> ExcSet:
-        if "excs" not in self._cache:
-            self._cache["excs"] = ExcSet(
-                self.sc_body.excs.remove({RtContinue, RtBreak}).set |
-                self.sc_else.excs.set
-            )
-        return self._cache["excs"]
+        return ExcSet(
+            self.sc_body.excs.remove({RtContinue, RtBreak}).types |
+            self.sc_else.excs.types
+        )
 
 
 class Call(control_flow):
@@ -405,16 +409,14 @@ class Call(control_flow):
         self.func = func
         super().__init__(*args, **kwargs)
 
-    @property
+    @cached_property
     def excs(self):
-        if "excs" not in self._cache:
-            from .context import Context
-            if isinstance(self.func, Context) and self.func.finished:
-                self._cache["excs"] = self.func.excs
-            # TODO 函数存在循环调用时获取函数真实异常集
-            else:
-                self._cache["excs"] = ExcSet.ANY
-        return self._cache["excs"]
+        from .context import Context
+        if isinstance(self.func, Context) and self.func.finished:
+            return self.func.excs
+        # TODO 函数存在循环调用时获取函数真实异常集
+        else:
+            return ExcSet.ANY
 
 
 class ExcHandle(AST):
@@ -422,7 +424,6 @@ class ExcHandle(AST):
     def __init__(self, eg: tuple[_TBaseRtExc], sc_handle: Scope):
         self.eg = eg
         self.sc_handle = sc_handle
-
 
 
 class Try(control_flow):
@@ -434,28 +435,26 @@ class Try(control_flow):
         self.sc_finally = sc_finally
         super().__init__(*args, **kwargs)
 
-    @property
+    @cached_property
     def excs(self) -> ExcSet:
-        if "excs" not in self._cache:
-            if self.sc_finally.excs.always:
-                self._cache["excs"] = self.sc_finally.excs
-            else:
-                excs = self.sc_try.excs
-                handler_excs = []
-                for handler in self.excepts:
-                    excs = excs.remove_subclasses(handler.eg)
-                    for e in excs.set:
-                        if e is not None and issubclass(e, handler.eg):
-                            # handler 将被启用，记录其异常
-                            handler_excs.append(handler.sc_handle.excs.set)
-                            break
-                self._cache["excs"] = ExcSet(
-                    excs.set |
-                    reduce(lambda a, b: a | b, handler_excs, set()) |
-                    self.sc_else.excs.set |
-                    self.sc_finally.excs.set
-                )
-        return self._cache["excs"]
+        if self.sc_finally.excs.always:
+            return self.sc_finally.excs
+        else:
+            excs = self.sc_try.excs
+            handler_excs = set()
+            for handler in self.excepts:
+                excs = excs.remove_subclasses(handler.eg)
+                for e in self.sc_try.excs.types:
+                    if e is not None and issubclass(e, handler.eg):
+                        # handler 将被启用，记录其异常
+                        handler_excs.update(handler.sc_handle.excs.types)
+                        break
+            return ExcSet(
+                excs.types |
+                handler_excs |
+                self.sc_else.excs.types |
+                self.sc_finally.excs.types
+            )
 
 
 class Raise(control_flow):
@@ -474,8 +473,4 @@ class Raise(control_flow):
 
     @property
     def excs(self) -> ExcSet:
-        return ExcSet(self.exc_class)
-
-    @property
-    def exc_class(self) -> _TBaseRtExc:
-        return type(self.exc)
+        return ExcSet(self.exc)

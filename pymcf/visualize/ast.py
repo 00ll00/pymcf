@@ -18,7 +18,7 @@ class _CtxDumper(NodeVisitor):
             with body():
                 with table(cls="root"):
                     with tr(), td():
-                        div(ctx.name, title="\n".join(repr(e) for e in ctx.excs.set), cls="head_root")
+                        div(ctx.name, title="\n".join(repr(e) for e in ctx.excs.types), cls="head_root")
                     with tr(), td():
                         self.visit(ctx.root_scope)
         return str(doc)
@@ -43,7 +43,7 @@ class _CtxDumper(NodeVisitor):
                 for i, op in enumerate(node.flow):
                     with tr():
                         with td():
-                            div(f"{i+1}.", title="\n".join(repr(e) for e in op.excs.set), cls=("exc_always" if op.excs.always else "exc_might" if op.excs.might else "exc_never") + " lineno")
+                            div(f"{i+1}.", title="\n".join(repr(e) for e in op.excs.types), cls=("exc_always" if op.excs.always else "exc_might" if op.excs.might else "exc_never") + " lineno")
                         with td():
                             self.visit(op)
             else:
@@ -54,7 +54,7 @@ class _CtxDumper(NodeVisitor):
                         div(cls="pass")
 
     def visit_Raise(self, node: Raise):
-        div(repr(node.exc_class), cls="raise")
+        div(repr(node.exc), cls="raise")
 
     def visit_If(self, node: If):
         with table():
