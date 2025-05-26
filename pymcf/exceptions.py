@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+from .ast_ import RtBaseExc
 from .ast_.runtime import RtNormalExc, _RtNormalExcMeta
 
 _all_cls: list[type["RtExc"]] = []
@@ -30,8 +31,8 @@ class RtExc(RtNormalExc, metaclass=_RtExcMeta):
         self._errno = NotImplemented
         return self
 
-    def __init__(self, *_, **__):
-        pass
+    def __init__(self, *args, **kwargs):
+        super(RtBaseExc, self).__init__(*args, **kwargs)
 
     @property
     def errno(self):

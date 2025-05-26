@@ -150,62 +150,48 @@ class ExcSet:
     满异常集合，可能出现任意 RtNormalExc 或无异常。用于描述异常未知的函数。
     """
 
-    def __init__(self, exc: RtBaseExc | _TBaseRtExc | Iterable[RtBaseExc | _TBaseRtExc] | Self | None, insts=None):
-        self._type_set: set[_TBaseRtExc | None] = set()
-        values: set[RtBaseExc]  = set(insts) if insts is not None else set()
-        if isinstance(exc, type | None):
-            self._type_set.add(exc)
+    def __init__(self, exc: _TBaseRtExc | Iterable[_TBaseRtExc] | Self | None):
+        self._types: set[_TBaseRtExc | None] = set()
+        if isinstance(exc, type):
+            self._types.add(exc)
         elif isinstance(exc, RtBaseExc):
-            self._type_set.add(type(exc))
-            values.add(exc)
+            self._types.add(type(exc))
         elif isinstance(exc, ExcSet):
-            self._type_set.update(exc._type_set)
-            values.update(exc._value_set)
+            self._types.update(exc._types)
+        elif exc is None:
+            self._types.add(exc)
         else:
             try:
-                for e in exc:
-                    if isinstance(e, type | None):
-                        self._type_set.add(e)
-                    elif isinstance(e, RtBaseExc):
-                        self._type_set.add(type(e))
-                        values.add(e)
+                self._types.update(exc)
             except:
                 raise ValueError(f'无效的初始化值: {exc!r}')
 
-        if len(self._type_set) == 0:
-            self._type_set.add(None)
+        if len(self._types) == 0:
+            self._types.add(None)
 
-        self._always = None not in self._type_set
-        self._might = len(self._type_set - {None}) > 0
-
-        self._value_set = set()
-        for v in values:
-            if isinstance(v, tuple(self._type_set- {None})):
-                self._value_set.add(v)
+        self._always = None not in self._types
+        self._might = len(self._types - {None}) > 0
 
     def remove(self, exc: _TBaseRtExc | set[_TBaseRtExc]) -> Self:
         if isinstance(exc, type):
             exc = {exc}
         assert RtAnyNormalExc not in exc
-        return ExcSet(self._type_set - exc, insts=self._value_set)
+        return ExcSet(self._types - exc)
 
     def remove_subclasses(self, exc: _TBaseRtExc| Iterable[_TBaseRtExc]) -> Self:
         if isinstance(exc, type):
             exc = (exc, )
         else:
             exc = tuple(exc)
-        res = ExcSet(e for e in self._type_set if e is None or not issubclass(e, exc))
-        has_any = RtAnyNormalExc in self._type_set and not issubclass(RtNormalExc, exc)  # 如果被移除的类包含 RtNormalExc 的基类，则可以移除 RtAnyNormalExc
+        res = ExcSet(e for e in self._types if e is None or not issubclass(e, exc))
+        has_any = RtAnyNormalExc in self._types and not issubclass(RtNormalExc, exc)  # 如果被移除的类包含 RtNormalExc 的基类，则可以移除 RtAnyNormalExc
         if not has_any:
-            res = ExcSet(res._type_set - {RtAnyNormalExc}, insts=res._value_set)
+            res = ExcSet(res._types - {RtAnyNormalExc})
         return res
 
     @property
     def types(self) -> set[_TBaseRtExc | None]:
-        return self._type_set.copy()
-    @property
-    def values(self) -> set[RtBaseExc]:
-        return self._value_set.copy()
+        return self._types.copy()
     @property
     def always(self) -> bool:
         return self._always
