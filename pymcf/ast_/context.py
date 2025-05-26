@@ -84,7 +84,7 @@ class Context:
                 else:
                     self._return_value = _PlaceHolder.CtValue
             else:
-                self._return_value = self._return_type.__create_tmp__()
+                self._return_value = self._return_type.__create_var__()
                 Assign(self._return_value, value)
         else:
             if self._return_value is _PlaceHolder.CtValue:
