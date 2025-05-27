@@ -32,7 +32,7 @@ class Function(Command):
         self.token = token
 
     def resolve(self, scope, fmt=None):
-        return 'function %s' % scope.function_name(self.token)
+        return 'function %s' % scope.function_nsname(self.token)
 
 class FunctionTag(Command):
 

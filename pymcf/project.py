@@ -1,100 +1,149 @@
 import importlib
 import json
+import os
 import zipfile
 from collections import defaultdict
-from contextvars import ContextVar
 from pathlib import Path
 from shutil import rmtree
+from typing import final, Any
 
 from pymcf import exceptions
+from pymcf.ast_ import Constructor, Scope
 from pymcf.config import Config
 from pymcf.ir import Compiler
 from pymcf.mc.code_gen import Translator
+from pymcf.mc.scope import MCFScope
 from pymcf.mcfunction import mcfunction
 
 
 class ProjectCfg(Config):
     prj_tmp_dir: Path = Path("./.pymcf_tmp")
-    prj_install_path: Path = Path("./pymcf_out")
+    prj_install_dir: Path = Path("./pymcf_out")
+    prj_pack_format: int = 71
+
+    tag_func_load: str = "load"
+    tag_func_tick: str = "tick"
+
     dbg_viz_ir: bool = False
     dbg_viz_ast: bool = False
 
 
+@final
 class Project:
 
-    def __init__(self, name):
+    _project = None
+
+    def __init__(self, name, description=None, **config):
+        Project._project = self
         self.name = name
-        self._config: ProjectCfg = Config()
+        self.description = description or name
+
+        self._config: ProjectCfg = Config(**config)
+
+        self.scb_rec: dict[str, tuple[str, Any]] = {}
+        self.scb_init_constr = Constructor(
+            name=f"__init__/scoreboard",
+            scope=MCFScope(name=f"__init__/scoreboard", tags={self._config.tag_func_load}),
+            inline=False,
+        )
+
+        self.const_rec: dict[int, "Score"] = {}
 
     @staticmethod
-    def current() -> "Project":
-        return _project.get()
+    def instance() -> "Project":
+        return Project._project
 
-    def config(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self._config, k, v)
-
-    def add_module(self, name):
-        _project.set(self)
+    @staticmethod
+    def add_module(name):
         importlib.import_module(name)
 
     def build(self):
         if self._config.ir_bf is None:
             from pymcf.data import Score
-            self.config(ir_bf = Score("$bf", "__sys__"))
+            self._config.ir_bf = Score("$bf", "__sys__")
 
         rmtree(self._config.prj_tmp_dir, ignore_errors=True)
 
-        pack_path = self._config.prj_install_path / f"{self.name}.zip"
-        pack_path.parent.mkdir(parents=True, exist_ok=True)
-        with zipfile.PyZipFile(pack_path, 'w', zipfile.ZIP_DEFLATED) as pack:
+        function_tags = defaultdict(list)
 
-            function_tags = defaultdict(list)
+        # start construct
+        for mcf in mcfunction._all:
+            if mcf._entrance:
+                mcf()
 
-            for mcf in mcfunction._all:
-                if mcf._entrance:
-                    mcf()
-                    for tag in mcf._tags:
-                        function_tags[tag].append(mcf.name)
+        # TODO namespace
+        for scope in Scope._all:
+            scope.namespace = self.name
 
-            exceptions.confirm()
+        # confirm errno
+        exceptions.confirm()
 
-            for mcf in mcfunction._all:
-                for i, scope in enumerate(mcf._arg_scope.values()):
-                    if self._config.dbg_viz_ast:
-                        from pymcf.visualize import dump_context
-                        doc = dump_context(scope)
-                        path = self._config.prj_tmp_dir / "viz" / self.name / "ast" / f"{scope.name}.html"
-                        path.parent.mkdir(parents=True, exist_ok=True)
-                        with path.open("w", encoding="utf-8") as f:
-                            f.write(doc)
+        pack_dir_path = self._config.prj_tmp_dir / "datapack"
 
-                    compiler = Compiler(self._config)
-                    cbs = compiler.compile(scope)
+        def build_scope(scope: MCFScope):
+            assert scope.finished
+            if self._config.dbg_viz_ast:
+                from pymcf.visualize import dump_context
+                doc = dump_context(scope)
+                path = self._config.prj_tmp_dir / "viz" / self.name / "ast" / f"{scope.name}.html"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with path.open("w", encoding="utf-8") as f:
+                    f.write(doc)
 
-                    if self._config.dbg_viz_ir:
-                        from pymcf.visualize import draw_ir
-                        path = self._config.prj_tmp_dir / "viz" / self.name / "ir" / f"{scope.name}.dot"
-                        path.parent.mkdir(parents=True, exist_ok=True)
-                        draw_ir(cbs[0]).save(path)
+            compiler = Compiler(self._config)
+            cbs = compiler.compile(scope)
 
-                    tr = Translator(scope)
+            if self._config.dbg_viz_ir:
+                from pymcf.visualize import draw_ir
+                path = self._config.prj_tmp_dir / "viz" / self.name / "ir" / f"{scope.name}.dot"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                draw_ir(cbs[0]).save(path)
 
-                    for cb in cbs:
-                        mcf = tr.translate(cb)
-                        arch_path = Path("data") / self.name / "function" / f"{mcf.name}.mcfunction"
-                        file_path = self._config.prj_tmp_dir / "datapack" / arch_path
-                        file_path.parent.mkdir(parents=True, exist_ok=True)
-                        with open(file_path, "wt") as f:
-                            f.write(mcf.gen_code())
-                        pack.write(file_path, arch_path)
+            tr = Translator(scope)
 
-            for tag, functions in function_tags.items():
-                arch_path = Path("data") / self.name / "tags" / f"{tag}.json"
-                file_path = self._config.prj_tmp_dir / "datapack" / arch_path
+            for cb in cbs:
+                mcf = tr.translate(cb)
+                file_path = pack_dir_path / "data" / self.name / "function" / f"{mcf.name}.mcfunction"
                 file_path.parent.mkdir(parents=True, exist_ok=True)
-                json.dump(functions, open(file_path, "wt"), indent=4)
-                pack.write(file_path, arch_path)
+                with open(file_path, "wt") as f:
+                    f.write(mcf.gen_code())
 
+        for s in Scope._all:
+            s: MCFScope
+            for tag in s.tags:
+                function_tags[tag].append(f"{s.namespace}:{s.name}")
+            if s is self.scb_init_constr.scope:
+                continue  # 未构建完成
+            build_scope(s)
 
-_project: ContextVar[Project | None] = ContextVar("project", default=None)
+        self.scb_init_constr.finish()
+        build_scope(self.scb_init_constr.scope)
+
+        # 整理 tags
+        for tag, functions in function_tags.items():
+            assert type(tag) is str
+            file_path = pack_dir_path / "data" / self.name / "tags" / "function" / f"{tag}.json"
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            json.dump({"values": functions}, open(file_path, "wt"), indent=4)
+
+        # 写 pack.mcmeta
+        json.dump(
+            {
+                "pack": {
+                    "description": self.description,
+                    "pack_format": self._config.prj_pack_format,
+                }
+            },
+            (pack_dir_path / "pack.mcmeta").open("wt"),
+            indent=4,
+        )
+
+        # 打包 zip
+        arch_path = self._config.prj_install_dir / f"{self.name}.zip"
+        arch_path.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.PyZipFile(arch_path, 'w', zipfile.ZIP_DEFLATED) as pack:
+            for root, dirs, files in os.walk(pack_dir_path):
+                for file in files:
+                    abs_file_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(abs_file_path, start=pack_dir_path)
+                    pack.write(abs_file_path, arcname=rel_path)

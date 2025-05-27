@@ -1,5 +1,5 @@
 import ast
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, ABCMeta
 from ast import AST as _AST, unaryop, UAdd, USub, Not, Invert, boolop, And, Or, operator, Add, Sub, Mult, Div, FloorDiv, Mod, \
     Pow, LShift, RShift, BitOr, BitXor, BitAnd, MatMult, Is, IsNot, In, NotIn
 from functools import reduce
@@ -141,19 +141,29 @@ class control_flow(stmt, ABC):
     """
 
 
-class FormattedData:
+class Resolvable(metaclass=ABCMeta):
 
-    def __init__(self, data: Any, fmt: str | None = None):
+    @abstractmethod
+    def resolve(self, scope, fmt=None):
+        pass
+
+
+class FormattedData(Resolvable):
+
+    def __init__(self, data: Resolvable, fmt: str | None = None):
         self.data = data
         self.fmt = fmt
 
     def __repr__(self):
         return f"${{{self.data!r}{f':{self.fmt}' if self.fmt is not None else ''}}}"
 
+    def resolve(self, scope, fmt=None):
+        return self.data.resolve(scope, self.fmt)
+
 
 class Raw(operation):
     _fields = ("code",)
-    def __init__(self, *code: str | FormattedData, **kwargs):
+    def __init__(self, *code: str | Resolvable, **kwargs):
         self.code = code
         super().__init__(**kwargs)
 

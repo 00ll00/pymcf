@@ -1,3 +1,4 @@
+import abc
 from collections import defaultdict
 from typing import Self
 
@@ -50,7 +51,11 @@ class Config:
                 raise TypeError(
                     f"{cls.__qualname__}.{key} 的定义与 {', '.join(c.__qualname__ for c in _items[key].def_cls)} 存在冲突")
 
-        cls.__new__ = Config.__new__
+        def no_instance(cls, *_, **__):
+            raise TypeError(f"{cls.__qualname__} cannot be instantiated")
+
+        cls.__new__ = no_instance
+
         return cls
 
     def push(self, cfg: Self): ...

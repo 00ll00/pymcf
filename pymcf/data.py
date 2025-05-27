@@ -4,10 +4,11 @@ from contextvars import ContextVar
 from numbers import Real
 from typing import Self, overload, SupportsInt, Iterable
 
-from pymcf.ast_ import Constructor, RtBaseVar, RtBaseIterator, Assign, Inplace, RtStopIteration, Compare
+from pymcf.ast_ import Constructor, RtBaseVar, RtBaseIterator, Assign, Inplace, RtStopIteration, Compare, Raw, \
+    FormattedData
 from pymcf.mcfunction import mcfunction
 from pymcf.mc.commands import Resolvable, ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NBTStorable, NbtRef, \
-    RefWrapper, TextScoreComponent
+    RefWrapper, TextScoreComponent, TextComponent, ScoreboardAdd
 
 
 class RtVar(RtBaseVar, ABC):
@@ -132,8 +133,18 @@ class NumberLike(ABC):
 
 class Entity(RefWrapper[EntityRef]):
 
-    def __init__(self, ref: EntityRef):
-        self.ref = ref
+    @overload
+    def __init__(self, entity: Self): ...
+    @overload
+    def __init__(self, ref: EntityRef): ...
+
+    def __init__(self, arg1):
+        if isinstance(arg1, EntityRef):
+            self.ref = arg1
+        elif isinstance(arg1, Entity):
+            self.ref = arg1.ref
+        else:
+            raise TypeError()
 
     @property
     def __metadata__(self) -> EntityRef:
@@ -148,19 +159,39 @@ class ScoreBoard(RefWrapper[ObjectiveRef]):
     @overload
     def __init__(self, ref: ObjectiveRef): ...
     @overload
-    def __init__(self, name: str): ...
+    def __init__(self, name: str, criteria: str = "dummy", display_name: str | TextComponent = None): ...
     @overload
     def __init__(self, scb: Self): ...
 
-    def __init__(self, arg):
-        if isinstance(arg, ObjectiveRef):
-            self.ref = arg
-        elif isinstance(arg, str):
-            self.ref = ObjectiveRef(name=arg)
-        elif isinstance(arg, ScoreBoard):
-            self.ref = arg.ref
+    def __init__(self, *args):
+        if len(args) == 1:
+            if isinstance(args[0], ObjectiveRef):
+                self.ref = args[0]
+            elif isinstance(args[0], ScoreBoard):
+                self.ref = args[0].ref
+            elif isinstance(args[0], str):
+                self.__init__(args[0], "dummy", None)
+            else:
+                raise TypeError()
+        elif len(args) == 2:
+            self.__init__(args[0], args[1], None)
+        elif len(args) == 3:
+            name, criteria, display_name = args
+            self.try_add_new_scb(name, criteria, display_name)
+            self.ref = ObjectiveRef(name=name)
         else:
             raise TypeError()
+
+    @staticmethod
+    def try_add_new_scb(name, criteria, display_name):
+        from pymcf.project import Project
+        prj = Project.instance()
+        if name in prj.scb_rec:
+            assert criteria == prj.scb_rec[name][0]
+        else:
+            prj.scb_rec[name] = (criteria, display_name)
+            with prj.scb_init_constr:
+                Raw(ScoreboardAdd(ObjectiveRef(name=name), criteria, display_name))
 
     @property
     def __metadata__(self) -> ObjectiveRef:
@@ -174,35 +205,27 @@ class Score(RtVar, RefWrapper[ScoreRef], NumberLike):
 
     @property
     def __metadata__(self) -> ScoreRef:
-        return ScoreRef(self.entity.__metadata__, self.objective.__metadata__)
+        return ScoreRef(self.target.__metadata__, self.objective.__metadata__)
 
     @overload
     def __init__(self, number: ScoreInitializer = None):
         ...
 
     @overload
-    def __init__(self, target: EntityRef | str, objective: ObjectiveRef | str, number: NumberLike | Real = None):
+    def __init__(self, target: Entity | EntityRef | str, objective: ScoreBoard | ObjectiveRef | str, number: NumberLike | Real = None):
         ...
 
     def __init__(self, *args):
         match len(args):
             case 0 | 1:
                 ref = self._new_local_ref()
-                self.entity = Entity(ref.target)
+                self.target = Entity(ref.target)
                 self.objective = ScoreBoard(ref.objective)
                 if len(args) == 1:
                     Assign(self, args[0])
             case 2 | 3:
-                if isinstance(args[0], str):
-                    target = NameRef(args[0])
-                else:
-                    target = args[0]
-                if isinstance(args[1], str):
-                    objective = ObjectiveRef(args[1])
-                else:
-                    objective = args[1]
-                self.entity = Entity(target)
-                self.objective = ScoreBoard(objective)
+                self.target = Entity(args[0]) if not isinstance(args[0], str) else Entity(NameRef(args[0]))
+                self.objective = ScoreBoard(args[1])
                 if len(args) == 3:
                     Assign(self, args[2])
             case _:
@@ -226,7 +249,7 @@ class Score(RtVar, RefWrapper[ScoreRef], NumberLike):
         if fmt is None:
             return super().resolve(scope, fmt)
         elif fmt == "json":
-            return TextScoreComponent(self.__metadata__).resolve(scope, fmt)
+            return TextScoreComponent(self.__metadata__).resolve_str(scope)
         else:
             raise ValueError(f"unknown score format {fmt!r}.")
 

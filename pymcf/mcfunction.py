@@ -153,7 +153,7 @@ class mcfunction:
 
             last_constr = Constructor.current_constr()
             func_name = f"{self._basename}{ext}"
-            with Constructor(name=func_name, inline=self._inline, scope=MCFScope(name=func_name)) as constr:
+            with Constructor(name=func_name, inline=self._inline, scope=MCFScope(name=func_name, tags=self._tags)) as constr:
                 self._ast_generator(*args, **kwargs)
             constr.finish()
 

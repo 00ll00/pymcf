@@ -88,6 +88,7 @@ class MCF:
 
     def __init__(self, name: str, cmds: list[Command], scope: MCFScope):
         self.name = name
+        self.nsname = scope.name + ":" + self.name
         self.cmds = cmds
         self.scope = scope
 
@@ -191,13 +192,13 @@ class Translator:
                     case Sub():
                         return RemConst(target.__metadata__, value)
                     case Mult():
-                        return OpMul(target.__metadata__, self.scope.get_const_score(value))
+                        return OpMul(target.__metadata__, self.scope.get_const_score(value).__metadata__)
                     case Div():
-                        return OpDiv(target.__metadata__, self.scope.get_const_score(value))
+                        return OpDiv(target.__metadata__, self.scope.get_const_score(value).__metadata__)
                     case FloorDiv():
-                        return OpDiv(target.__metadata__, self.scope.get_const_score(value))
+                        return OpDiv(target.__metadata__, self.scope.get_const_score(value).__metadata__)
                     case Mod():
-                        return OpMod(target.__metadata__, self.scope.get_const_score(value))
+                        return OpMod(target.__metadata__, self.scope.get_const_score(value).__metadata__)
                     case _:
                         raise NotImplementedError
 
@@ -278,10 +279,12 @@ class Translator:
             cmds.append(Function(cb.direct))
         if cb.cond is not None:
             assert isinstance(cb.cond, Score)
-            cmds.append(ExecuteChain().cond('if').score_range(cb.cond.__metadata__, ScoreRange(0, 0))
-                                .run(Function(cb.false)))
-            cmds.append(ExecuteChain().cond('unless').score_range(cb.cond.__metadata__, ScoreRange(0, 0))
-                                .run(Function(cb.true)))
+            if cb.false is not None:
+                cmds.append(ExecuteChain().cond('if').score_range(cb.cond.__metadata__, ScoreRange(0, 0))
+                                    .run(Function(cb.false)))
+            if cb.true is not None:
+                cmds.append(ExecuteChain().cond('unless').score_range(cb.cond.__metadata__, ScoreRange(0, 0))
+                                    .run(Function(cb.true)))
         return MCF(path, cmds, self.scope)
 
     def gen_MachJump(self, cb: MatchJump):

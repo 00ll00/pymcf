@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Self
 
 from .runtime import RtContinue, RtBreak
 from .syntactic import Block, stmt, ExcSet
@@ -6,8 +6,13 @@ from .syntactic import Block, stmt, ExcSet
 
 class Scope:
 
+    _all: list[Self] = []
+
     def __init__(self, name: str):
+        Scope._all.append(self)
+
         self.name = name
+        self.namespace = None  # TODO
 
         self.rt_args = {}
         self._return_value = None
@@ -15,8 +20,8 @@ class Scope:
         self._root_block = Block()
         self._block_stack = [self._root_block]
 
-        self._finished = False
         self._excs = None
+        self._finished = False
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.name!r})"

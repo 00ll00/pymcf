@@ -66,6 +66,27 @@ class ObjectiveRef(Resolvable):
     def resolve(self, scope, fmt=None):
         return self.objective
 
+class ScoreboardAdd(Command):
+
+    def __init__(self, ref: ObjectiveRef, criteria: str, display_name=None):
+        from . import TextComponent
+        assert isinstance(ref, ObjectiveRef)
+        assert isinstance(criteria, str)
+        assert isinstance(display_name, None | str | TextComponent)
+        self.ref = ref
+        self.criteria = criteria
+        self.display_name = display_name
+
+    def resolve(self, scope, fmt=None):
+        from . import TextComponent
+        res = f"scoreboard objectives add {self.ref.resolve(scope, None)} {self.criteria}"
+        if self.display_name is not None:
+            if isinstance(self.display_name, str):
+                res += f" {self.display_name!r}"
+            elif isinstance(self.display_name, TextComponent):
+                res += " " + self.display_name.resolve(scope)
+        return res
+
 class ScoreRef(Resolvable):
 
     def __init__(self, target, objective):

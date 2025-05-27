@@ -1,7 +1,7 @@
 import abc
 from collections import namedtuple
 
-from pymcf.ast_ import FormattedData
+from pymcf.ast_ import FormattedData, Resolvable
 
 
 class CommandBlock:
@@ -16,12 +16,6 @@ class CommandBlock:
 
     def resolve(self, scope):
         return self.command.resolve(scope, None)
-
-class Resolvable(metaclass=abc.ABCMeta):
-
-    @abc.abstractmethod
-    def resolve(self, scope, fmt=None):
-        pass
 
 
 class RefWrapper[M: Resolvable](Resolvable, abc.ABC):
@@ -88,16 +82,16 @@ class Command(Resolvable):
     pass
 
 class RawCommand(Command):
-    def __init__(self, code: tuple[str | FormattedData, ...]):
+    def __init__(self, code: tuple[str | Resolvable, ...]):
         self.code = code
     def resolve(self, scope, fmt=None):
         res = ""
         for c in self.code:
             if isinstance(c, str):
                 res = res + c
-            elif isinstance(c, FormattedData):
-                assert isinstance(c.data, Resolvable)
-                res += str(c.data.resolve(scope, c.fmt))
+            elif isinstance(c, Resolvable):
+                assert isinstance(c, Resolvable)
+                res += str(c.resolve(scope, None))
         return res
 
 class EntityRef(Resolvable, metaclass=abc.ABCMeta):

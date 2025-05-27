@@ -17,16 +17,14 @@ class Tellraw(Command):
                                   self.text.resolve_str(scope))
 
 class TextComponent(Resolvable):
-    pass
+    def resolve_str(self, scope):
+        return json.dumps(self.resolve(scope, None), separators=(',', ':'))
 
 class TextComponentHolder(TextComponent):
 
     def __init__(self, style, children):
         self.style = style
         self.children = children
-
-    def resolve_str(self, scope):
-        return json.dumps(self.resolve(scope, None), separators=(',', ':'))
 
     def resolve(self, scope, fmt=None):
         text = {}
