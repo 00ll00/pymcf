@@ -15,22 +15,33 @@ class CommandBlock:
         self.single_use = single_use
 
     def resolve(self, scope):
-        return self.command.resolve(scope)
+        return self.command.resolve(scope, None)
 
 class Resolvable(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         pass
+
+
+class RefWrapper[M: Resolvable](Resolvable, abc.ABC):
+    @property
+    @abc.abstractmethod
+    def __metadata__(self) -> M:
+        ...
+
+    def resolve(self, scope, fmt=None):
+        return self.__metadata__.resolve(scope, fmt)
+
 
 class SimpleResolve(Resolvable):
 
     def __init__(self, *args):
         self.args = args
 
-    def resolve(self, scope):
-        return ' '.join(map(lambda el: el.resolve(scope) \
-                             if isinstance(el, Resolvable) \
+    def resolve(self, scope, fmt=None):
+        return ' '.join(map(lambda el: el.resolve(scope, None) \
+            if isinstance(el, Resolvable) \
                              else el, self.args))
 
 class NSName(namedtuple('NSName', 'namespace name')):
@@ -77,10 +88,17 @@ class Command(Resolvable):
     pass
 
 class RawCommand(Command):
-    def __init__(self, code: list):
+    def __init__(self, code: tuple[str | FormattedData, ...]):
         self.code = code
-    def resolve(self, scope):
-        return "".join(c.data.__metadata__.resolve(scope) if isinstance(c, FormattedData) else str(c) for c in self.code)
+    def resolve(self, scope, fmt=None):
+        res = ""
+        for c in self.code:
+            if isinstance(c, str):
+                res = res + c
+            elif isinstance(c, FormattedData):
+                assert isinstance(c.data, Resolvable)
+                res += str(c.data.resolve(scope, c.fmt))
+        return res
 
 class EntityRef(Resolvable, metaclass=abc.ABCMeta):
 
@@ -99,11 +117,10 @@ class NameRef(EntityRef):
         assert type(name) == str
         self.name = name
 
-    @property
     def is_single_entity(self, scope):
         return True
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         return self.name
 
 class WorldPos(Resolvable):
@@ -135,7 +152,7 @@ class WorldPos(Resolvable):
         from .nbt import BlockReference
         return BlockReference(self)
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         return '%s %s %s' % (self.x, self.y, self.z)
 
 class RelativeCoord:
@@ -170,7 +187,7 @@ class GlobalEntity(EntityRef):
     def is_single_entity(self, scope):
         return True
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         return scope.global_entity(self.namespace)
 
 class _PosUtil(EntityRef):
@@ -178,7 +195,7 @@ class _PosUtil(EntityRef):
     def is_single_entity(self, scope):
         return True
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         return scope.pos_util_entity()
 
 PosUtil = _PosUtil()
@@ -189,7 +206,7 @@ class _UtilBlockPos(WorldPos):
         self.block_pos = True
         self.is_zero_tick = is_zero_tick
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         if self.is_zero_tick:
             return scope.get_zero_tick_block()
         return scope.get_util_block()
@@ -202,7 +219,7 @@ class TeamName(Resolvable):
     def __init__(self, name):
         self.name = name
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         return scope.team_name(self.name)
 
 class Bossbar(Resolvable):
@@ -210,7 +227,7 @@ class Bossbar(Resolvable):
     def __init__(self, name):
         self.name = name
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         return scope.bossbar(self.name)
 
 class AdvancementRef(Resolvable):
@@ -218,5 +235,5 @@ class AdvancementRef(Resolvable):
     def __init__(self, name):
         self.name = name
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         return scope.advancement_name(self.name)

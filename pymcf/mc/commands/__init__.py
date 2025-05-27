@@ -9,7 +9,7 @@ class Cmd(Command):
     def __init__(self, cmd):
         self.command = cmd
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         cmd = self.command
         # This should be refactored eventually
         # Support set_scoreboard_tracking() and text_set_click_run()
@@ -31,7 +31,7 @@ class Function(Command):
     def __init__(self, token):
         self.token = token
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         return 'function %s' % scope.function_name(self.token)
 
 class FunctionTag(Command):
@@ -40,7 +40,7 @@ class FunctionTag(Command):
         assert isinstance(tag_name, NSName)
         self._name = tag_name
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         return 'function #' + scope.func_tag_name(self._name)
 
 class Teleport(Command):
@@ -50,8 +50,8 @@ class Teleport(Command):
         self.args = [target]
         self.args.extend(more)
 
-    def resolve(self, scope):
-        return 'tp %s' % ' '.join(a.resolve(scope) for a in self.args)
+    def resolve(self, scope, fmt=None):
+        return 'tp %s' % ' '.join(a.resolve(scope, None) for a in self.args)
 
 class Clone(Command):
 
@@ -60,10 +60,10 @@ class Clone(Command):
         self.src1 = src1
         self.dest = dest
 
-    def resolve(self, scope):
-        return 'clone %s %s %s' % (self.src0.resolve(scope),
-                                   self.src1.resolve(scope),
-                                   self.dest.resolve(scope))
+    def resolve(self, scope, fmt=None):
+        return 'clone %s %s %s' % (self.src0.resolve(scope, None),
+                                   self.src1.resolve(scope, None),
+                                   self.dest.resolve(scope, None))
 
 class Setblock(Command):
 
@@ -72,9 +72,9 @@ class Setblock(Command):
         self.pos = pos
         self.block = block
 
-    def resolve(self, scope):
-        return 'setblock %s %s' % (self.pos.resolve(scope),
-                                   self.block.resolve(scope))
+    def resolve(self, scope, fmt=None):
+        return 'setblock %s %s' % (self.pos.resolve(scope, None),
+                                   self.block.resolve(scope, None))
 
 class TeamModify(Command):
 
@@ -87,8 +87,8 @@ class TeamModify(Command):
         self.attr = attr
         self.value = value
 
-    def resolve(self, scope):
-        return 'team modify %s %s %s' % (self.team.resolve(scope), self.attr,
+    def resolve(self, scope, fmt=None):
+        return 'team modify %s %s %s' % (self.team.resolve(scope, None), self.attr,
                                          self.value)
 
 class JoinTeam(Command):
@@ -99,9 +99,9 @@ class JoinTeam(Command):
         self.team = team
         self.members = members
 
-    def resolve(self, scope):
-        members = (' ' + self.members.resolve(scope)) if self.members else ''
-        return 'team join %s%s' % (self.team.resolve(scope), members)
+    def resolve(self, scope, fmt=None):
+        members = (' ' + self.members.resolve(scope, None)) if self.members else ''
+        return 'team join %s%s' % (self.team.resolve(scope, None), members)
 
 class BossbarSet(Command):
 
@@ -111,9 +111,9 @@ class BossbarSet(Command):
         self.prop = prop
         self.value = value
 
-    def resolve(self, scope):
-        value = (' ' + self.value.resolve(scope)) if self.value else ''
-        return 'bossbar set %s %s%s' % (self.bar.resolve(scope), self.prop,
+    def resolve(self, scope, fmt=None):
+        value = (' ' + self.value.resolve(scope, None)) if self.value else ''
+        return 'bossbar set %s %s%s' % (self.bar.resolve(scope, None), self.prop,
                                         value)
 
 class Kill(Command):
@@ -122,8 +122,8 @@ class Kill(Command):
         assert isinstance(target, EntityRef)
         self.target = target
 
-    def resolve(self, scope):
-        return 'kill %s' % self.target.resolve(scope)
+    def resolve(self, scope, fmt=None):
+        return 'kill %s' % self.target.resolve(scope, None)
 
 class ReplaceItem(Command):
 
@@ -134,10 +134,10 @@ class ReplaceItem(Command):
         self.item = item
         self.amount = amount
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         amount = (' %d' % self.amount) if self.amount is not None else ''
-        return 'replaceitem %s %s %s%s' % (self.ref.resolve(scope), self.slot,
-                                           self.item.resolve(scope), amount)
+        return 'replaceitem %s %s %s%s' % (self.ref.resolve(scope, None), self.slot,
+                                           self.item.resolve(scope, None), amount)
 
 class GiveItem(Command):
 
@@ -147,9 +147,9 @@ class GiveItem(Command):
         self.item = item
         self.count = count
 
-    def resolve(self, scope):
-        return 'give %s %s %d' % (self.targets.resolve(scope),
-                                  self.item.resolve(scope), self.count)
+    def resolve(self, scope, fmt=None):
+        return 'give %s %s %d' % (self.targets.resolve(scope, None),
+                                  self.item.resolve(scope, None), self.count)
 
 class ClearItem(Command):
 
@@ -159,9 +159,9 @@ class ClearItem(Command):
         self.item = item
         self.max_count = max_count
 
-    def resolve(self, scope):
-        return 'clear %s %s %d' % (self.targets.resolve(scope),
-                                   self.item.resolve(scope), self.max_count)
+    def resolve(self, scope, fmt=None):
+        return 'clear %s %s %d' % (self.targets.resolve(scope, None),
+                                   self.item.resolve(scope, None), self.max_count)
 
 class EffectGive(Command):
 
@@ -173,9 +173,9 @@ class EffectGive(Command):
         self.amp = amp if amp is not None else 0
         self.hide = hide if hide is not None else False
 
-    def resolve(self, scope):
-        return 'effect give %s %s %d %d %s' % (self.target.resolve(scope),
-               self.effect, self.seconds, self.amp,
+    def resolve(self, scope, fmt=None):
+        return 'effect give %s %s %d %d %s' % (self.target.resolve(scope, None),
+                                               self.effect, self.seconds, self.amp,
                'true' if self.hide else 'false')
 
 class Particle(Command):
@@ -189,10 +189,10 @@ class Particle(Command):
         self.mode = mode
         self.players = players
 
-    def resolve(self, scope):
-        players = (' ' + self.players.resolve(scope)) if self.players else ''
+    def resolve(self, scope, fmt=None):
+        players = (' ' + self.players.resolve(scope, None)) if self.players else ''
         return 'particle %s %s %s %f %d %s%s' % (self.name,
-                                                 self.pos.resolve(scope), self.delta.resolve(scope),
+                                                 self.pos.resolve(scope, None), self.delta.resolve(scope, None),
                                                  self.speed, self.count, self.mode, players)
 
 class Title(Command):
@@ -203,10 +203,10 @@ class Title(Command):
         self.action = action
         self.args = args
 
-    def resolve(self, scope):
-        args = (' ' + SimpleResolve(*self.args).resolve(scope)) \
+    def resolve(self, scope, fmt=None):
+        args = (' ' + SimpleResolve(*self.args).resolve(scope, None)) \
                if self.args else ''
-        return 'title %s %s%s' % (self.target.resolve(scope), self.action, args)
+        return 'title %s %s%s' % (self.target.resolve(scope, None), self.action, args)
 
 class Summon(Command):
 
@@ -216,10 +216,10 @@ class Summon(Command):
         self.pos = pos
         self.data = data
 
-    def resolve(self, scope):
-        pos = (' ' + self.pos.resolve(scope)) if self.pos else \
+    def resolve(self, scope, fmt=None):
+        pos = (' ' + self.pos.resolve(scope, None)) if self.pos else \
               (' ~ ~ ~' if self.data else '')
-        data = (' ' + self.data.resolve(scope)) if self.data else ''
+        data = (' ' + self.data.resolve(scope, None)) if self.data else ''
         return 'summon %s%s%s' % (self.name, pos, data)
 
 class Advancement(Command):
@@ -232,9 +232,9 @@ class Advancement(Command):
         self.range = range
         self.args = args
 
-    def resolve(self, scope):
-        args = (' ' + SimpleResolve(*self.args).resolve(scope)) \
+    def resolve(self, scope, fmt=None):
+        args = (' ' + SimpleResolve(*self.args).resolve(scope, None)) \
                if self.args else ''
         return 'advancement %s %s %s%s' % (self.action,
-                                            self.target.resolve(scope),
+                                           self.target.resolve(scope, None),
                                             self.range, args)

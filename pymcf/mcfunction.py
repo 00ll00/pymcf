@@ -97,6 +97,7 @@ class mcfunction:
                  tags: set[str] = None,
                  entrance: bool = False,
                  inline: bool = False,
+                 func_name: str = None,
                  **kwargs,
                  ):
         self.__name__ = _func.__name__
@@ -118,9 +119,12 @@ class mcfunction:
         self._entrance = entrance
         self._inline = inline
 
-        basename = _func.__qualname__
-        if _func.__module__ != "__main__":
-            basename = _func.__module__ + '.' + basename
+        if func_name is None:
+            basename = _func.__qualname__
+            if _func.__module__ != "__main__":
+                basename = _func.__module__ + '.' + basename
+        else:
+            basename = func_name
 
         self._basename = get_valid_name(basename)
         if self._inline:

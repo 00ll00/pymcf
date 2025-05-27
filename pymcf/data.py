@@ -6,18 +6,12 @@ from typing import Self, overload, SupportsInt, Iterable
 
 from pymcf.ast_ import Constructor, RtBaseVar, RtBaseIterator, Assign, Inplace, RtStopIteration, Compare
 from pymcf.mcfunction import mcfunction
-from pymcf.mc.commands import Resolvable, ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NBTStorable, NbtRef
+from pymcf.mc.commands import Resolvable, ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NBTStorable, NbtRef, \
+    RefWrapper, TextScoreComponent
 
 
 class RtVar(RtBaseVar, ABC):
     ...
-
-
-class RefWrapper[M: Resolvable](ABC):
-    @property
-    @abstractmethod
-    def __metadata__(self) -> M:
-        ...
 
 
 class NumberLike(ABC):
@@ -226,7 +220,15 @@ class Score(RtVar, RefWrapper[ScoreRef], NumberLike):
         Assign(target=self, value=value)
 
     def __repr__(self):
-        return f"Score({self.__metadata__.resolve(None)})"
+        return f"Score({self.__metadata__.resolve(None, None)})"
+
+    def resolve(self, scope, fmt=None):
+        if fmt is None:
+            return super().resolve(scope, fmt)
+        elif fmt == "json":
+            return TextScoreComponent(self.__metadata__).resolve(scope, fmt)
+        else:
+            raise ValueError(f"unknown score format {fmt!r}.")
 
     def __bool_and__(self, other):
         res = Bool.__create_var__()

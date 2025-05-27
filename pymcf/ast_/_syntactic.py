@@ -8,7 +8,6 @@ from typing import Any, Iterable, Self
 
 from .runtime import ExcSet, RtBaseVar, RtStopIteration, RtContinue, RtBreak, RtBaseExc, _TBaseRtExc
 
-
 _NOT_FOUND = object()
 
 
@@ -144,7 +143,7 @@ class control_flow(stmt, ABC):
 
 class FormattedData:
 
-    def __init__(self, data: RtBaseVar, fmt: str | None = None):
+    def __init__(self, data: Any, fmt: str | None = None):
         self.data = data
         self.fmt = fmt
 
@@ -154,7 +153,7 @@ class FormattedData:
 
 class Raw(operation):
     _fields = ("code",)
-    def __init__(self, *code: list[str | FormattedData], **kwargs):
+    def __init__(self, *code: str | FormattedData, **kwargs):
         self.code = code
         super().__init__(**kwargs)
 

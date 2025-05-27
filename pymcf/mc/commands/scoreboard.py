@@ -1,3 +1,5 @@
+import json
+
 from .core import Command, Resolvable, EntityRef, GlobalEntity
 
 class Scoreboard(Command):
@@ -11,9 +13,9 @@ class Scoreboard(Command):
         self.var = varref
         self.value = value
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         return 'scoreboard players %s %s %d' % (
-            self.op, self.var.resolve(scope), self.value)
+            self.op, self.var.resolve(scope, None), self.value)
 
 class SetConst(Scoreboard):
     op = 'set'
@@ -31,8 +33,8 @@ class GetValue(Command):
         assert isinstance(scoreref, ScoreRef)
         self.ref = scoreref
 
-    def resolve(self, scope):
-        return 'scoreboard players get %s' % self.ref.resolve(scope)
+    def resolve(self, scope, fmt=None):
+        return 'scoreboard players get %s' % self.ref.resolve(scope, None)
 
 class Operation(Command):
     def __init__(self, left, right):
@@ -41,9 +43,9 @@ class Operation(Command):
         self.left = left
         self.right = right
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         return 'scoreboard players operation %s %s %s' % (
-            self.left.resolve(scope), self.op, self.right.resolve(scope))
+            self.left.resolve(scope, None), self.op, self.right.resolve(scope, None))
 
 class OpAssign(Operation): op = '='
 class OpAdd(Operation): op = '+='
@@ -61,7 +63,7 @@ class ObjectiveRef(Resolvable):
         assert type(name) == str
         self.objective = name
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         return self.objective
 
 class ScoreRef(Resolvable):
@@ -72,7 +74,7 @@ class ScoreRef(Resolvable):
         self.target = target
         self.objective = objective
 
-    def resolve(self, scope):
+    def resolve(self, scope, fmt=None):
         return '%s %s' % (self.target.resolve(scope),
                           self.objective.resolve(scope))
 

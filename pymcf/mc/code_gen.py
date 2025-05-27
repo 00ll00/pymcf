@@ -92,7 +92,7 @@ class MCF:
         self.scope = scope
 
     def gen_code(self) -> str:
-        return '\n'.join(cmd.resolve(self.scope) for cmd in self.cmds)
+        return '\n'.join(cmd.resolve(self.scope, None) for cmd in self.cmds)
 
 
 class Translator:
