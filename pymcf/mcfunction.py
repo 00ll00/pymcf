@@ -3,7 +3,7 @@ from contextvars import ContextVar
 from types import FunctionType, MethodType
 from typing import Self
 
-from pymcf.ast_ import Constructor, reform_func, Call
+from pymcf.ast_ import Constructor, reform_func, Call, Scope
 
 
 class CompileTimeError(BaseException):
@@ -112,7 +112,7 @@ class mcfunction:
         finally:
             _generating.set(False)
 
-        self._arg_ctx: dict[FuncArgs, Constructor] = {}
+        self._arg_scope: dict[FuncArgs, Scope] = {}
 
         self._tags = tags if tags is not None else set()
         self._entrance = entrance
@@ -123,41 +123,43 @@ class mcfunction:
             basename = _func.__module__ + '.' + basename
 
         self._basename = get_valid_name(basename)
-        if entrance:
+        if self._inline:
+            self.name = self._basename + "@inlined"
+        else:
             self.name = self._basename
 
         mcfunction._all.append(self)
 
     def __call__(self, *args, **kwargs):
-        from .mc.environment import Env
+        from .mc.scope import MCFScope
         if self._inline:
-            with Constructor(name=f"{self._basename}@inlined", inline=self._inline, ctx=None) as ctx:
+            with Constructor(name=self._basename, inline=self._inline, scope=Constructor.current_constr().scope) as constr:
                 self._ast_generator(*args, **kwargs)
-            ctx.finish()
-            return ctx.return_value
+            constr.finish()
+            return constr.return_value
         else:
             func_arg = FuncArgs(self._signature.bind(*args, **kwargs).arguments)
-            if func_arg in self._arg_ctx:
-                return self._arg_ctx[func_arg].return_value
+            if func_arg in self._arg_scope:
+                return self._arg_scope[func_arg].return_value
 
-            if self._entrance and len(self._arg_ctx) == 0:
+            if self._entrance and len(self._arg_scope) == 0:
                 ext = ""
             else:
-                ext = "-" + str(len(self._arg_ctx))
+                ext = "-" + str(len(self._arg_scope))
 
-            last_ctx = Constructor.current_constr()
-            ctx_name = f"{self._basename}{ext}"
-            with Constructor(name=ctx_name, inline=self._inline, ctx=Env(rooot_name=ctx_name)) as ctx:
+            last_constr = Constructor.current_constr()
+            func_name = f"{self._basename}{ext}"
+            with Constructor(name=func_name, inline=self._inline, scope=MCFScope(name=func_name)) as constr:
                 self._ast_generator(*args, **kwargs)
-            ctx.finish()
+            constr.finish()
 
             if not self._entrance and not self._inline:
-                assert last_ctx is not None
-                last_ctx.record_statement(Call(ctx, _offline=True))
+                assert last_constr is not None
+                last_constr.record_statement(Call(constr.scope, _offline=True))
 
-            self._arg_ctx[func_arg] = ctx
+            self._arg_scope[func_arg] = constr.scope
 
-            return ctx.return_value
+            return constr.return_value
 
     def __get__(self, instance, owner):
         if instance is None:

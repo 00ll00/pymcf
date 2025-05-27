@@ -60,25 +60,25 @@ class Project:
             exceptions.confirm()
 
             for mcf in mcfunction._all:
-                for i, ctx in enumerate(mcf._arg_ctx.values()):
+                for i, scope in enumerate(mcf._arg_scope.values()):
                     if self._config.dbg_viz_ast:
                         from pymcf.visualize import dump_context
-                        doc = dump_context(ctx)
-                        path = self._config.prj_tmp_dir / "viz" / self.name / "ast" / f"{mcf.name}.html"
+                        doc = dump_context(scope)
+                        path = self._config.prj_tmp_dir / "viz" / self.name / "ast" / f"{scope.name}.html"
                         path.parent.mkdir(parents=True, exist_ok=True)
                         with path.open("w", encoding="utf-8") as f:
                             f.write(doc)
 
                     compiler = Compiler(self._config)
-                    cbs = compiler.compile(ctx)
+                    cbs = compiler.compile(scope)
 
                     if self._config.dbg_viz_ir:
                         from pymcf.visualize import draw_ir
-                        path = self._config.prj_tmp_dir / "viz" / self.name / "ir" / f"{mcf.name}.svg"
+                        path = self._config.prj_tmp_dir / "viz" / self.name / "ir" / f"{scope.name}.dot"
                         path.parent.mkdir(parents=True, exist_ok=True)
-                        draw_ir(cbs[0]).render(outfile=path)
+                        draw_ir(cbs[0]).save(path)
 
-                    tr = Translator(ctx.ctx)
+                    tr = Translator(scope)
 
                     for cb in cbs:
                         mcf = tr.translate(cb)

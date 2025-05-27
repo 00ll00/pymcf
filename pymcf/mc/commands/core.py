@@ -20,7 +20,7 @@ class CommandBlock:
 class Resolvable(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
-    def resolve(self, env):
+    def resolve(self, scope):
         pass
 
 class SimpleResolve(Resolvable):
@@ -28,8 +28,8 @@ class SimpleResolve(Resolvable):
     def __init__(self, *args):
         self.args = args
 
-    def resolve(self, env):
-        return ' '.join(map(lambda el: el.resolve(env) \
+    def resolve(self, scope):
+        return ' '.join(map(lambda el: el.resolve(scope) \
                              if isinstance(el, Resolvable) \
                              else el, self.args))
 
@@ -79,8 +79,8 @@ class Command(Resolvable):
 class RawCommand(Command):
     def __init__(self, code: list):
         self.code = code
-    def resolve(self, env):
-        return "".join(c.data.__metadata__.resolve(env) if isinstance(c, FormattedData) else str(c) for c in self.code)
+    def resolve(self, scope):
+        return "".join(c.data.__metadata__.resolve(scope) if isinstance(c, FormattedData) else str(c) for c in self.code)
 
 class EntityRef(Resolvable, metaclass=abc.ABCMeta):
 
@@ -103,7 +103,7 @@ class NameRef(EntityRef):
     def is_single_entity(self, scope):
         return True
 
-    def resolve(self, env):
+    def resolve(self, scope):
         return self.name
 
 class WorldPos(Resolvable):
@@ -135,7 +135,7 @@ class WorldPos(Resolvable):
         from .nbt import BlockReference
         return BlockReference(self)
 
-    def resolve(self, env):
+    def resolve(self, scope):
         return '%s %s %s' % (self.x, self.y, self.z)
 
 class RelativeCoord:
@@ -170,16 +170,16 @@ class GlobalEntity(EntityRef):
     def is_single_entity(self, scope):
         return True
 
-    def resolve(self, env):
-        return env.global_entity(self.namespace)
+    def resolve(self, scope):
+        return scope.global_entity(self.namespace)
 
 class _PosUtil(EntityRef):
 
     def is_single_entity(self, scope):
         return True
 
-    def resolve(self, env):
-        return env.pos_util_entity()
+    def resolve(self, scope):
+        return scope.pos_util_entity()
 
 PosUtil = _PosUtil()
 
@@ -189,10 +189,10 @@ class _UtilBlockPos(WorldPos):
         self.block_pos = True
         self.is_zero_tick = is_zero_tick
 
-    def resolve(self, env):
+    def resolve(self, scope):
         if self.is_zero_tick:
-            return env.get_zero_tick_block()
-        return env.get_util_block()
+            return scope.get_zero_tick_block()
+        return scope.get_util_block()
 
 UtilBlockPos = _UtilBlockPos(False)
 ZeroTickBlockPos = _UtilBlockPos(True)
@@ -202,21 +202,21 @@ class TeamName(Resolvable):
     def __init__(self, name):
         self.name = name
 
-    def resolve(self, env):
-        return env.team_name(self.name)
+    def resolve(self, scope):
+        return scope.team_name(self.name)
 
 class Bossbar(Resolvable):
 
     def __init__(self, name):
         self.name = name
 
-    def resolve(self, env):
-        return env.bossbar(self.name)
+    def resolve(self, scope):
+        return scope.bossbar(self.name)
 
 class AdvancementRef(Resolvable):
 
     def __init__(self, name):
         self.name = name
 
-    def resolve(self, env):
-        return env.advancement_name(self.name)
+    def resolve(self, scope):
+        return scope.advancement_name(self.name)

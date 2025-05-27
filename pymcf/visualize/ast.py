@@ -4,23 +4,23 @@ from typing import Any
 from dominate.tags import *
 from dominate.util import raw
 
-from pymcf.ast_ import NodeVisitor, Scope, operation, compiler_hint, If, Constructor, Raise, AST, \
+from pymcf.ast_ import NodeVisitor, Block, operation, compiler_hint, If, Scope, Raise, AST, \
     For, While, Try, Inplace, Call
 from .reprs import repr_operation, repr_compiler_hint
 
 
-class _CtxDumper(NodeVisitor):
+class _ScopeDumper(NodeVisitor):
 
-    def dump(self, ctx: Constructor) -> str:
+    def dump(self, scope: Scope) -> str:
         with html() as doc:
             with head():
                 style(raw(importlib.resources.read_text(__name__, 'ast.css')))
             with body():
                 with table(cls="root"):
                     with tr(), td():
-                        div(ctx.name, title="\n".join(repr(e) for e in ctx.excs.types), cls="head_root")
+                        div(scope.name, title="\n".join(repr(e) for e in scope.excs.types), cls="head_root")
                     with tr(), td():
-                        self.visit(ctx.root_scope)
+                        self.visit(scope._root_block)
         return str(doc)
 
     def visit(self, node: AST):
@@ -35,8 +35,8 @@ class _CtxDumper(NodeVisitor):
         else:
             super().visit(node)
 
-    def visit_Scope(self, node: Scope):
-        with table(cls="scope"):
+    def visit_Block(self, node: Block):
+        with table(cls="block"):
             with colgroup():
                 col(width=str((len(str(len(node.flow)+1))+1) * 10) + "px")
             if node.flow:
@@ -47,7 +47,7 @@ class _CtxDumper(NodeVisitor):
                         with td():
                             self.visit(op)
             else:
-                with tr(cls="scope_line"):
+                with tr(cls="block_line"):
                     with td():
                         div(f"0.", cls="exc_never")
                     with td():
@@ -61,57 +61,57 @@ class _CtxDumper(NodeVisitor):
             with tr(), td():
                 div(repr(node.condition), cls="if_cond cf")
             with tr(), td():
-                self.visit(node.sc_body)
+                self.visit(node.blk_body)
             with tr(), td():
                 div(cls="else cf")
             with tr(), td():
-                self.visit(node.sc_else)
+                self.visit(node.blk_else)
 
     def visit_For(self, node: For):
         with table():
             with tr(), td():
                 div(repr(node.iterator), cls="for_iter cf")
             with tr(), td():
-                self.visit(node.sc_body)
+                self.visit(node.blk_body)
             with tr(), td():
                 div(cls="else cf")
             with tr(), td():
-                self.visit(node.sc_else)
+                self.visit(node.blk_else)
 
     def visit_While(self, node: While):
         with table():
             with tr(), td():
                 div(repr(node.condition), cls="while_cond cf")
             with tr(), td():
-                self.visit(node.sc_body)
+                self.visit(node.blk_body)
             with tr(), td():
                 div(cls="else cf")
             with tr(), td():
-                self.visit(node.sc_else)
+                self.visit(node.blk_else)
 
     def visit_Try(self, node: Try):
         with table():
             with tr(), td():
                 div(cls="try cf")
             with tr(), td():
-                self.visit(node.sc_try)
+                self.visit(node.blk_try)
             for handler in node.excepts:
                 with tr(), td():
                     div(repr(handler.eg), cls="except cf")
                 with tr(), td():
-                    self.visit(handler.sc_handle)
+                    self.visit(handler.blk_handle)
             with tr(), td():
                 div(cls="else cf")
             with tr(), td():
-                self.visit(node.sc_else)
+                self.visit(node.blk_else)
             with tr(), td():
                 div(cls="finally cf")
             with tr(), td():
-                self.visit(node.sc_finally)
+                self.visit(node.blk_finally)
 
     def visit_Call(self, node: Call):
         div(repr(node.func), cls="call")
 
 
-def dump_context(ctx: Constructor) -> str:
-    return _CtxDumper().dump(ctx)
+def dump_context(scope: Scope) -> str:
+    return _ScopeDumper().dump(scope)

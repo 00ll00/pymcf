@@ -6,7 +6,7 @@ from functools import reduce
 from types import GenericAlias
 from typing import Any, Iterable, Self
 
-from .runtime import ExcSet, RtBaseData, RtStopIteration, RtContinue, RtBreak, RtBaseExc, _TBaseRtExc
+from .runtime import ExcSet, RtBaseVar, RtStopIteration, RtContinue, RtBreak, RtBaseExc, _TBaseRtExc
 
 
 _NOT_FOUND = object()
@@ -84,7 +84,7 @@ class stmt(AST):
             ctx.record_statement(self)
 
 
-class Scope(AST):
+class Block(AST):
     _fields = ("flow",)
 
     def __init__(self, flow: Iterable[stmt] = None):
@@ -96,7 +96,7 @@ class Scope(AST):
         if self.flow:
             s = reduce(lambda a, b: a | b, (st.excs.types for st in self.flow), set())
             if self.flow[-1].excs.always:
-                s.discard(None)  # 若 flow 最后一个语句一定引发异常，则整个 scope 必然引发异常
+                s.discard(None)  # 若 flow 最后一个语句一定引发异常，则整个 block 必然引发异常
             return ExcSet(s)
         else:
             return ExcSet.EMPTY
@@ -118,20 +118,20 @@ class operation(stmt, ABC):
     excs = ExcSet.EMPTY
 
     @cached_property
-    def reads(self) -> tuple[RtBaseData, ...]:
+    def reads(self) -> tuple[RtBaseVar, ...]:
         res = []
         for k in self._reads:
             v = getattr(self, k)
-            if isinstance(v, RtBaseData):
+            if isinstance(v, RtBaseVar):
                 res.append(v)
         return tuple(res)
 
     @cached_property
-    def writes(self) -> tuple[RtBaseData, ...]:
+    def writes(self) -> tuple[RtBaseVar, ...]:
         res = []
         for k in self._writes:
             v = getattr(self, k)
-            assert isinstance(v, RtBaseData)
+            assert isinstance(v, RtBaseVar)
             res.append(v)
         return tuple(res)
 
@@ -144,7 +144,7 @@ class control_flow(stmt, ABC):
 
 class FormattedData:
 
-    def __init__(self, data: RtBaseData, fmt: str | None = None):
+    def __init__(self, data: RtBaseVar, fmt: str | None = None):
         self.data = data
         self.fmt = fmt
 
@@ -357,49 +357,49 @@ class Compare(operation):
 
 
 class If(control_flow):
-    _fields = ("condition", "sc_body", "sc_else")
-    def __init__(self, condition: Any, sc_body: Scope, sc_else: Scope, *args, **kwargs):
+    _fields = ("condition", "blk_body", "blk_else")
+    def __init__(self, condition: Any, blk_body: Block, blk_else: Block, *args, **kwargs):
         self.condition = condition
-        self.sc_body = sc_body
-        self.sc_else = sc_else
+        self.blk_body = blk_body
+        self.blk_else = blk_else
         super().__init__(*args, **kwargs)
 
     @cached_property
     def excs(self) -> ExcSet:
-        return ExcSet(self.sc_body.excs.types | self.sc_else.excs.types)
+        return ExcSet(self.blk_body.excs.types | self.blk_else.excs.types)
 
 
 class For(control_flow):
-    _fields = ("iterator", "sc_iter", "sc_body", "sc_else")
-    def __init__(self, iterator: Any, sc_iter: Scope, sc_body: Scope, sc_else: Scope, *args, **kwargs):
+    _fields = ("iterator", "blk_iter", "blk_body", "blk_else")
+    def __init__(self, iterator: Any, blk_iter: Block, blk_body: Block, blk_else: Block, *args, **kwargs):
         self.iterator = iterator
-        self.sc_iter = sc_iter
-        self.sc_body = sc_body
-        self.sc_else = sc_else
+        self.blk_iter = blk_iter
+        self.blk_body = blk_body
+        self.blk_else = blk_else
         super().__init__(*args, **kwargs)
 
     @cached_property
     def excs(self) -> ExcSet:
         return ExcSet(
-            self.sc_iter.excs.remove(RtStopIteration).types |
-            self.sc_body.excs.remove({RtContinue, RtBreak}).types |
-            self.sc_else.excs.types
+            self.blk_iter.excs.remove(RtStopIteration).types |
+            self.blk_body.excs.remove({RtContinue, RtBreak}).types |
+            self.blk_else.excs.types
         )
 
 
 class While(control_flow):
-    _fields = ("condition", "sc_body", "sc_else")
-    def __init__(self, condition: Any, sc_body: Scope, sc_else: Scope, *args, **kwargs):
+    _fields = ("condition", "blk_body", "blk_else")
+    def __init__(self, condition: Any, blk_body: Block, blk_else: Block, *args, **kwargs):
         self.condition = condition
-        self.sc_body = sc_body
-        self.sc_else = sc_else
+        self.blk_body = blk_body
+        self.blk_else = blk_else
         super().__init__(*args, **kwargs)
 
     @cached_property
     def excs(self) -> ExcSet:
         return ExcSet(
-            self.sc_body.excs.remove({RtContinue, RtBreak}).types |
-            self.sc_else.excs.types
+            self.blk_body.excs.remove({RtContinue, RtBreak}).types |
+            self.blk_else.excs.types
         )
 
 
@@ -411,8 +411,8 @@ class Call(control_flow):
 
     @cached_property
     def excs(self):
-        from .constructor import Constructor
-        if isinstance(self.func, Constructor) and self.func.finished:
+        from .constructor import Scope
+        if isinstance(self.func, Scope) and self.func.finished:
             return self.func.excs
         # TODO 函数存在循环调用时获取函数真实异常集
         else:
@@ -420,40 +420,40 @@ class Call(control_flow):
 
 
 class ExcHandle(AST):
-    _fields = ("eg", "sc_handle")
-    def __init__(self, eg: tuple[_TBaseRtExc], sc_handle: Scope):
+    _fields = ("eg", "blk_handle")
+    def __init__(self, eg: tuple[_TBaseRtExc], blk_handle: Block):
         self.eg = eg
-        self.sc_handle = sc_handle
+        self.blk_handle = blk_handle
 
 
 class Try(control_flow):
-    _fields = ("sc_try", "excepts", "sc_else", "sc_finally")
-    def __init__(self, sc_try: Scope, excepts: list[ExcHandle], sc_else: Scope, sc_finally: Scope, *args, **kwargs):
-        self.sc_try = sc_try
+    _fields = ("blk_try", "excepts", "blk_else", "blk_finally")
+    def __init__(self, blk_try: Block, excepts: list[ExcHandle], blk_else: Block, blk_finally: Block, *args, **kwargs):
+        self.blk_try = blk_try
         self.excepts = excepts
-        self.sc_else = sc_else
-        self.sc_finally = sc_finally
+        self.blk_else = blk_else
+        self.blk_finally = blk_finally
         super().__init__(*args, **kwargs)
 
     @cached_property
     def excs(self) -> ExcSet:
-        if self.sc_finally.excs.always:
-            return self.sc_finally.excs
+        if self.blk_finally.excs.always:
+            return self.blk_finally.excs
         else:
-            excs = self.sc_try.excs
+            excs = self.blk_try.excs
             handler_excs = set()
             for handler in self.excepts:
                 excs = excs.remove_subclasses(handler.eg)
-                for e in self.sc_try.excs.types:
+                for e in self.blk_try.excs.types:
                     if e is not None and issubclass(e, handler.eg):
                         # handler 将被启用，记录其异常
-                        handler_excs.update(handler.sc_handle.excs.types)
+                        handler_excs.update(handler.blk_handle.excs.types)
                         break
             return ExcSet(
                 excs.types |
                 handler_excs |
-                self.sc_else.excs.types |
-                self.sc_finally.excs.types
+                self.blk_else.excs.types |
+                self.blk_finally.excs.types
             )
 
 

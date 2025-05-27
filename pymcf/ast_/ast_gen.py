@@ -4,7 +4,7 @@ import inspect
 from types import FunctionType
 from typing import Any
 
-from . import Constructor, Scope, FormattedData
+from . import Constructor, Block, FormattedData
 from . import syntactic
 from .runtime import *
 
@@ -18,8 +18,8 @@ def is_rt_exception(value) -> bool:
     else:
         return isinstance(value, RtBaseExc)
 
-def enter_scope(scope=None):
-    return Constructor.current_constr().enter_scope(scope)
+def enter_block(block=None):
+    return Constructor.current_constr().enter_block(block)
 
 def get_pos(node) -> dict:
     if isinstance(node, list):
@@ -222,15 +222,15 @@ class ASTRewriter(NodeTransformer):
             self.condition = condition
 
         def control_flow(self):
-            if isinstance(self.condition, RtBaseData):
-                with enter_scope() as sc_body:
+            if isinstance(self.condition, RtBaseVar):
+                with enter_block() as blk_body:
                     yield self.CF_IF, None
                     if self._last_exc is not None:
                         if isinstance(self._last_exc, RtBaseExc):
                             self._last_exc.__record__()
                         else:
                             yield self.CF_RAISE, self._last_exc
-                with enter_scope() as sc_else:
+                with enter_block() as blk_else:
                     yield self.CF_ELSE, None
                     if self._last_exc is not None:
                         if isinstance(self._last_exc, RtBaseExc):
@@ -238,7 +238,7 @@ class ASTRewriter(NodeTransformer):
                         else:
                             yield self.CF_RAISE, self._last_exc
 
-                excs = syntactic.If(self.condition, sc_body, sc_else).excs
+                excs = syntactic.If(self.condition, blk_body, blk_else).excs
                 if excs.always:
                     yield self.CF_RAISE, RtUnreachable()
 
@@ -341,19 +341,19 @@ class ASTRewriter(NodeTransformer):
 
         def control_flow(self):
             if is_rt_iterator(self.iterator):
-                with enter_scope() as sc_iter:
+                with enter_block() as blk_iter:
                     try:
                         item = self.iterator.__next__()
                     except RtBaseExc as e:
                         e.__record__()
-                excs_iter = sc_iter.excs.remove(RtStopIteration)
+                excs_iter = blk_iter.excs.remove(RtStopIteration)
                 assert not excs_iter.might, "RtIterator 不能抛出 RtStopIteration 以外的异常。"
-                if sc_iter.excs.always:  # 使用 sc_iter 的 exec 避免误判 RtStopIteration
+                if blk_iter.excs.always:  # 使用 blk_iter 的 exec 避免误判 RtStopIteration
                     # iter 总是抛出异常
-                    syntactic.For(self.iterator, sc_iter, Scope(), Scope())
+                    syntactic.For(self.iterator, blk_iter, Block(), Block())
                     return
 
-                with enter_scope() as sc_body:
+                with enter_block() as blk_body:
                     yield self.CF_FOR, item, None
                     if self._last_exc is not None:
                         if isinstance(self._last_exc, RtBaseExc):
@@ -361,7 +361,7 @@ class ASTRewriter(NodeTransformer):
                         else:
                             yield self.CF_RAISE, None, self._last_exc
 
-                with enter_scope() as sc_else:
+                with enter_block() as blk_else:
                     yield self.CF_ELSE, None, None
                     if self._last_exc is not None:
                         if isinstance(self._last_exc, RtBaseExc):
@@ -369,7 +369,7 @@ class ASTRewriter(NodeTransformer):
                         else:
                             yield self.CF_RAISE, None, self._last_exc
 
-                excs = syntactic.For(self.iterator, sc_iter, sc_body, sc_else).excs
+                excs = syntactic.For(self.iterator, blk_iter, blk_body, blk_else).excs
                 if excs.always:
                     yield self.CF_RAISE, RtUnreachable()
             else:
@@ -481,9 +481,9 @@ class ASTRewriter(NodeTransformer):
         def control_flow(self):
             while True:
                 yield self.CF_COND, None
-                if self.fist_loop and isinstance(self.condition, RtBaseData):
+                if self.fist_loop and isinstance(self.condition, RtBaseVar):
                     self.fist_loop = False
-                    with enter_scope() as sc_body:
+                    with enter_block() as blk_body:
                         yield self.CF_WHILE, None
                         if self._last_exc is not None:
                             if isinstance(self._last_exc, RtBaseExc):
@@ -491,7 +491,7 @@ class ASTRewriter(NodeTransformer):
                             elif not is_rt_exception(self._last_exc):
                                 yield self.CF_RAISE, self._last_exc
 
-                    with enter_scope() as sc_else:
+                    with enter_block() as blk_else:
                         yield self.CF_ELSE, None
                         if self._last_exc is not None:
                             if isinstance(self._last_exc, RtBaseExc):
@@ -499,13 +499,13 @@ class ASTRewriter(NodeTransformer):
                             elif not is_rt_exception(self._last_exc):
                                 yield self.CF_RAISE, self._last_exc
 
-                    excs = syntactic.While(self.condition, sc_body, sc_else).excs
+                    excs = syntactic.While(self.condition, blk_body, blk_else).excs
                     if excs.always:
                         yield self.CF_RAISE, RtUnreachable()
                     break
                 else:
                     self.fist_loop = False
-                    if isinstance(self.condition, RtBaseData):
+                    if isinstance(self.condition, RtBaseVar):
                         raise TypeError("编译期 while 循环不能使用运行期变量作为判断条件")
                     if self.condition:
                         yield self.CF_WHILE, None
@@ -636,7 +636,7 @@ class ASTRewriter(NodeTransformer):
 
         def control_flow(self):
             # if self.is_rt_try:
-                with enter_scope() as sc_try:
+                with enter_block() as blk_try:
                     yield self.CF_TRY, None
                     if self._last_exc is not None:
                         if isinstance(self._last_exc, RtBaseExc):
@@ -644,7 +644,7 @@ class ASTRewriter(NodeTransformer):
                         elif not is_rt_exception(self._last_exc):
                             yield self.CF_RAISE, self._last_exc
 
-                excs_body = sc_try.excs
+                excs_body = blk_try.excs
                 for eg in self.captures:
                     excs_body = excs_body.remove_subclasses(eg)
 
@@ -653,7 +653,7 @@ class ASTRewriter(NodeTransformer):
 
                 if excs_body.always:
                     # body 总是抛异常且未被捕获（？）
-                    sc_else = Scope()
+                    blk_else = Block()
                 else:
                     handled = set()
                     for i, eg in enumerate(self.captures):
@@ -671,24 +671,24 @@ class ASTRewriter(NodeTransformer):
 
                         if len(real_eg) == 0:
                             continue  # 直接跳过无效的 handler
-                        for e in sc_try.excs.types:  # 使用原始 body 异常集判断是否有此类异常抛出
+                        for e in blk_try.excs.types:  # 使用原始 body 异常集判断是否有此类异常抛出
                             if e is not None and issubclass(e, real_eg):
                                 break
                         else:
                             continue  # body 不会抛出此类异常，跳过此 handler
 
-                        with enter_scope() as sc_except:
+                        with enter_block() as blk_except:
                             yield self.CF_EXCEPT + i, None
                             if self._last_exc is not None:
                                 if isinstance(self._last_exc, RtBaseExc):
                                     self._last_exc.__record__()
                                 elif not is_rt_exception(self._last_exc):
                                     yield self.CF_RAISE, self._last_exc
-                        excepts.append(syntactic.ExcHandle(eg=real_eg, sc_handle=sc_except))
-                        handlers_exc.update(sc_except.excs.types)
+                        excepts.append(syntactic.ExcHandle(eg=real_eg, blk_handle=blk_except))
+                        handlers_exc.update(blk_except.excs.types)
 
-                    with enter_scope() as sc_else:
-                        if sc_try.excs.always:  # try 总抛出异常则不可能到达 else 块
+                    with enter_block() as blk_else:
+                        if blk_try.excs.always:  # try 总抛出异常则不可能到达 else 块
                             yield self.CF_ELSE, None
                             if self._last_exc is not None:
                                 if isinstance(self._last_exc, RtBaseExc):
@@ -696,7 +696,7 @@ class ASTRewriter(NodeTransformer):
                                 elif not is_rt_exception(self._last_exc):
                                     yield self.CF_RAISE, self._last_exc
 
-                with enter_scope() as sc_finally:
+                with enter_block() as blk_finally:
                     yield self.CF_FINALLY, None
                     if self._last_exc is not None:
                         if isinstance(self._last_exc, RtBaseExc):
@@ -704,7 +704,7 @@ class ASTRewriter(NodeTransformer):
                         elif not is_rt_exception(self._last_exc):
                             yield self.CF_RAISE, self._last_exc
 
-                excs = syntactic.Try(sc_try, excepts, sc_else, sc_finally).excs
+                excs = syntactic.Try(blk_try, excepts, blk_else, blk_finally).excs
                 if excs.always:
                     yield self.CF_RAISE, RtUnreachable()
             # else:
@@ -878,30 +878,30 @@ class ASTRewriter(NodeTransformer):
 
     @staticmethod
     def handle_ifexp(condition, br_if, br_else):
-        if isinstance(condition, RtBaseData):
+        if isinstance(condition, RtBaseVar):
             v_if = v_else = None
-            with enter_scope() as sc_body:
+            with enter_block() as blk_body:
                 try:
                     v_if = br_if()
                 except RtBaseExc as e:
                     e.__record__()
-            with enter_scope() as sc_else:
+            with enter_block() as blk_else:
                 try:
                     v_else = br_if()
                 except RtBaseExc as e:
                     e.__record__()
-            if isinstance(v_if, RtBaseData):
+            if isinstance(v_if, RtBaseVar):
                 res = v_if.__create_var__()
-            elif isinstance(v_else, RtBaseData):
+            elif isinstance(v_else, RtBaseVar):
                 res = v_else.__create_var__()
             else:
                 raise TypeError(f"运行期 if 表达式至少有一方的值为运行期量，得到 {v_if!r}, {v_else!r}")
-            with enter_scope(sc_body):
+            with enter_block(blk_body):
                 res.__assign__(v_if)
-            with enter_scope(sc_else):
+            with enter_block(blk_else):
                 res.__assign__(v_else)
 
-            excs = syntactic.If(condition, sc_body, sc_else).excs
+            excs = syntactic.If(condition, blk_body, blk_else).excs
             if excs.always:
                 raise RtUnreachable()
             return res
@@ -933,7 +933,7 @@ class ASTRewriter(NodeTransformer):
     def handle_and(*values):
         r = values[0]
         for v in values[1:]:
-            if isinstance(r, RtBaseData) or isinstance(v, RtBaseData):
+            if isinstance(r, RtBaseVar) or isinstance(v, RtBaseVar):
                 if hasattr(r, "__bool_and__"):
                     try:
                         r = r.__bool_and__(v)
@@ -955,7 +955,7 @@ class ASTRewriter(NodeTransformer):
     def handle_or(*values):
         r = values[0]
         for v in values[1:]:
-            if isinstance(r, RtBaseData) or isinstance(v, RtBaseData):
+            if isinstance(r, RtBaseVar) or isinstance(v, RtBaseVar):
                 if hasattr(r, "__bool_or__"):
                     tmp = r.__bool_or__(v)
                     if tmp is not NotImplemented:
@@ -992,7 +992,7 @@ class ASTRewriter(NodeTransformer):
         return self.add_call(handler, node.values)
 
     def assign_handler(self, target, value):
-        if isinstance(target, RtBaseData):
+        if isinstance(target, RtBaseVar):
             target.__assign__(value)
             return True
         return False

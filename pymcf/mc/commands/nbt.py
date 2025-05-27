@@ -9,7 +9,7 @@ class NbtPath(Resolvable):
         # TODO path validation
         return self.__class__(self.path + childpath)
 
-    def resolve(self, env):
+    def resolve(self, scope):
         return self.path
 
     def __eq__(self, other):
@@ -22,8 +22,8 @@ class NbtPath(Resolvable):
 
 class Path(NbtPath):
 
-    def resolve(self, env):
-        return env.custom_nbt_path(self.path)
+    def resolve(self, scope):
+        return scope.custom_nbt_path(self.path)
 
 class SubPath(Path):
 
@@ -70,9 +70,9 @@ class EntityReference(NBTStorable):
         assert isinstance(target, EntityRef)
         self.target = target
 
-    def resolve(self, env):
-        assert self.target.is_single_entity(env)
-        return 'entity %s' % self.target.resolve(env)
+    def resolve(self, scope):
+        assert self.target.is_single_entity(scope)
+        return 'entity %s' % self.target.resolve(scope)
 
     def as_text(self, scope):
         assert self.target.is_single_entity(scope)
@@ -84,8 +84,8 @@ class BlockReference(NBTStorable):
         assert isinstance(pos, WorldPos) and pos.block_pos
         self.pos = pos
 
-    def resolve(self, env):
-        return 'block %s' % self.pos.resolve(env)
+    def resolve(self, scope):
+        return 'block %s' % self.pos.resolve(scope)
 
     def as_text(self, scope):
         return {'block': self.pos.resolve(scope)}
@@ -95,8 +95,8 @@ class Storage(NBTStorable):
     def __init__(self, namespace=None):
         self.namespace = namespace
 
-    def resolve(self, env):
-        return 'storage %s' % env.storage(self.namespace)
+    def resolve(self, scope):
+        return 'storage %s' % scope.storage(self.namespace)
 
     def as_text(self, scope):
         return {'storage': scope.storage(self.namespace)}
@@ -109,8 +109,8 @@ class NbtRef(Resolvable):
         self.target = target
         self.path = path
 
-    def resolve(self, env):
-        return f"{self.target.resolve(env)} {self.path.resolve(env)}"
+    def resolve(self, scope):
+        return f"{self.target.resolve(scope)} {self.path.resolve(scope)}"
 
 
 class GlobalNBT(NBTStorable):
@@ -121,8 +121,8 @@ class GlobalNBT(NBTStorable):
     def proxy(self, scope):
         return scope.global_nbt(self.namespace)
 
-    def resolve(self, env):
-        return self.proxy(env).resolve(env)
+    def resolve(self, scope):
+        return self.proxy(scope).resolve(scope)
 
     def as_text(self, scope):
         return self.proxy(scope).as_text(scope)
@@ -137,10 +137,10 @@ class DataGet(Command):
         self.scale = None if scale is None else \
                      int(scale) if scale == int(scale) else scale
 
-    def resolve(self, env):
+    def resolve(self, scope):
         scale = ' %s' % self.scale if self.scale is not None else ''
-        return 'data get %s %s%s' % (self.target.resolve(env),
-                                     self.path.resolve(env), scale)
+        return 'data get %s %s%s' % (self.target.resolve(scope),
+                                     self.path.resolve(scope), scale)
 
 class DataMerge(Command):
 
@@ -149,9 +149,9 @@ class DataMerge(Command):
         self.ref = ref
         self.nbt = nbt
 
-    def resolve(self, env):
-        return 'data merge %s %s' % (self.ref.resolve(env),
-                                     self.nbt.resolve(env))
+    def resolve(self, scope):
+        return 'data merge %s %s' % (self.ref.resolve(scope),
+                                     self.nbt.resolve(scope))
 
 class DataModify(Command):
 
@@ -162,17 +162,17 @@ class DataModify(Command):
         self.action = action
         self.init(*rest)
 
-    def resolve(self, env):
+    def resolve(self, scope):
         return 'data modify %s %s %s' % (
-            self.ref.resolve(env), self.path.resolve(env), self.action)
+            self.ref.resolve(scope), self.path.resolve(scope), self.action)
 
 class DataModifyValue(DataModify):
 
     def init(self, val):
         self.val = val
 
-    def resolve(self, env):
-        return '%s value %s' % (super().resolve(env), self.val.resolve(env))
+    def resolve(self, scope):
+        return '%s value %s' % (super().resolve(scope), self.val.resolve(scope))
 
 class DataModifyFrom(DataModify):
 
@@ -181,9 +181,9 @@ class DataModifyFrom(DataModify):
         self.fromref = ref
         self.frompath = path
 
-    def resolve(self, env):
-        return '%s from %s %s' % (super().resolve(env),
-                                  self.fromref.resolve(env), self.frompath.resolve(env))
+    def resolve(self, scope):
+        return '%s from %s %s' % (super().resolve(scope),
+                                  self.fromref.resolve(scope), self.frompath.resolve(scope))
 
 class DataModifyStack(DataModifyValue):
 
@@ -198,6 +198,6 @@ class DataRemove(Command):
         self.ref = ref
         self.path = path
 
-    def resolve(self, env):
-        return 'data remove %s %s' % (self.ref.resolve(env),
-                                      self.path.resolve(env))
+    def resolve(self, scope):
+        return 'data remove %s %s' % (self.ref.resolve(scope),
+                                      self.path.resolve(scope))

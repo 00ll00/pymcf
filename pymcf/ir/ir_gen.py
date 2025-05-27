@@ -5,8 +5,8 @@ from typing import Any, Callable, Generator
 
 from pymcf.config import Config
 from .codeblock import BasicBlock, MatchJump, JmpEq, code_block
-from pymcf.ast_ import operation, Constructor, Scope, compiler_hint, If, For, Try, Call, RtBaseExc, \
-    RtStopIteration, RtContinue, RtBreak, Assign, Raise, While, RtBaseData
+from pymcf.ast_ import operation, Constructor, Block, compiler_hint, If, For, Try, Call, RtBaseExc, \
+    RtStopIteration, RtContinue, RtBreak, Assign, Raise, While, RtBaseVar, Scope
 from ..ast_.runtime import RtReturn
 
 
@@ -33,13 +33,13 @@ class IrCfg(Config):
     应用 IR 流程简化算法的迭代次数。
     """
 
-    ir_bf: RtBaseData
+    ir_bf: RtBaseVar
 
 
 class Expander(NodeVisitor):
 
-    def __init__(self, scope: Scope, break_flag: Any, config: IrCfg, root_name: str = "root"):
-        self.scope = scope
+    def __init__(self, block: Block, break_flag: Any, config: IrCfg, root_name: str = "root"):
+        self.block = block
         self.root = BasicBlock(root_name)
         self.config = config
         self.cb_stack: list[BasicBlock] = [self.root]
@@ -61,9 +61,9 @@ class Expander(NodeVisitor):
 
     def can_inline_catch(self) -> bool:
         # 存在不为空的 finally 块时无法进行异常内联
-        for node in ast.walk(self.scope):
+        for node in ast.walk(self.block):
             if isinstance(node, Try):
-                if len(node.sc_finally.flow) > 0:
+                if len(node.blk_finally.flow) > 0:
                     return False
         return True
 
@@ -98,14 +98,14 @@ class Expander(NodeVisitor):
 
     def expand(self) -> BasicBlock:
         """
-        将 self.scope 展开为 CodeBlock
+        将 self.block 展开为 CodeBlock
         :return: 根节点 block
         """
-        self.visit(self.scope)
+        self.visit(self.block)
         assert len(self.cb_stack) == 1
         return self.root
 
-    def visit_Scope(self, node: Scope):
+    def visit_Block(self, node: Block):
         super().generic_visit(node)
 
     def generic_visit(self, node: Any) -> Any:
@@ -116,11 +116,11 @@ class Expander(NodeVisitor):
         cb_last_out = self.exit_block()
 
         cb_body_in = self.enter_block(name="if_body")
-        self.visit(node.sc_body)
+        self.visit(node.blk_body)
         cb_body_out = self.exit_block()
 
         cb_else_in = self.enter_block(name="if_else")
-        self.visit(node.sc_else)
+        self.visit(node.blk_else)
         cb_else_out = self.exit_block()
 
         cb_last_out.cond = node.condition
@@ -129,15 +129,15 @@ class Expander(NodeVisitor):
 
         cb_next_in = self.enter_block(name="if_next")
 
-        if not self.inline_catch and node.sc_body.excs.might:
-            if not node.sc_body.excs.always:
+        if not self.inline_catch and node.blk_body.excs.might:
+            if not node.blk_body.excs.always:
                 cb_body_out.cond = self.bf
                 cb_body_out.false = cb_next_in
         else:
             cb_body_out.direct = cb_next_in
 
-        if not self.inline_catch and  node.sc_else.excs.might:
-            if not node.sc_else.excs.always:
+        if not self.inline_catch and  node.blk_else.excs.might:
+            if not node.blk_else.excs.always:
                 cb_else_out.cond = self.bf
                 cb_else_out.false = cb_next_in
         else:
@@ -147,12 +147,12 @@ class Expander(NodeVisitor):
         cb_last_out = self.exit_block()
 
         cb_else_in = self.enter_block(name="for_else")
-        self.visit(node.sc_else)
+        self.visit(node.blk_else)
         cb_else_out = self.exit_block()
 
         cb_iter_in = self.enter_block(name="for_iter")
         self.push_exc_handler((RtStopIteration,), cb_else_in)
-        self.visit(node.sc_iter)
+        self.visit(node.blk_iter)
         self.pop_exc_handler()
         cb_iter_out = self.exit_block()
 
@@ -162,7 +162,7 @@ class Expander(NodeVisitor):
         self.push_exc_handler((RtContinue,), cb_iter_in)
         self.push_exc_handler((RtBreak,), cb_next_in)
         # self.add_op(self.clear_flag_op()) #  进入 body 时清空 bf  TODO bf 的清理方式
-        self.visit(node.sc_body)
+        self.visit(node.blk_body)
         self.pop_exc_handler()
         self.pop_exc_handler()
         cb_body_out = self.exit_block()
@@ -170,14 +170,14 @@ class Expander(NodeVisitor):
         cb_catch_iter = BasicBlock(name="for_catch_iter")
         cb_catch_body = BasicBlock(name="for_catch_body")
 
-        cb_iter = cb_catch_iter if not self.inline_catch and node.sc_iter.excs.might else cb_iter_in
-        cb_body = cb_catch_body if not self.inline_catch and node.sc_body.excs.might else cb_body_in
+        cb_iter = cb_catch_iter if not self.inline_catch and node.blk_iter.excs.might else cb_iter_in
+        cb_body = cb_catch_body if not self.inline_catch and node.blk_body.excs.might else cb_body_in
 
-        if not self.inline_catch and node.sc_iter.excs.might:
+        if not self.inline_catch and node.blk_iter.excs.might:
             cb_last_out.direct = cb_catch_iter
             cb_catch_iter.direct = cb_iter_in
 
-            if node.sc_iter.excs.always:
+            if node.blk_iter.excs.always:
                 cb_catch_iter.direct = cb_else_in
             else:
                 cb_catch_iter.cond = self.bf  # TODO iter 中是否需要允许抛出 RtStopIteration 以外的异常
@@ -187,7 +187,7 @@ class Expander(NodeVisitor):
             cb_last_out.direct = cb_iter_in
             cb_iter_out.direct = cb_body
 
-        if not self.inline_catch and node.sc_body.excs.might:
+        if not self.inline_catch and node.blk_body.excs.might:
             cb_jump = MatchJump(self.bf, [
                 # JmpEq(RtStopIteration, cb_else_in),  # TODO for 的 iterator 是否只允许抛出 RtStopIteration
                 JmpEq(RtContinue, cb_iter_in),
@@ -201,8 +201,8 @@ class Expander(NodeVisitor):
         else:
             cb_body_out.direct = cb_iter
 
-        if not self.inline_catch and node.sc_else.excs.might:
-            if not node.sc_else.excs.always:
+        if not self.inline_catch and node.blk_else.excs.might:
+            if not node.blk_else.excs.always:
                 cb_else_out.cond = self.bf
                 cb_else_out.false = cb_next_in
         else:
@@ -217,16 +217,16 @@ class Expander(NodeVisitor):
         cb_body_in = self.enter_block(name="while_body")
         self.push_exc_handler((RtContinue,), cb_body_in)
         self.push_exc_handler((RtBreak,), cb_next_in)
-        self.visit(node.sc_body)
+        self.visit(node.blk_body)
         self.pop_exc_handler()
         self.pop_exc_handler()
         cb_body_out = self.exit_block()
 
         cb_else_in = self.enter_block(name="while_else")
-        self.visit(node.sc_else)
+        self.visit(node.blk_else)
         cb_else_out = self.exit_block()
 
-        if not self.inline_catch and node.sc_body.excs.might:
+        if not self.inline_catch and node.blk_body.excs.might:
             cb_test = BasicBlock(name="while_test")
             cb_catch = BasicBlock(name="while_catch")
             cb_jump = MatchJump(self.bf, [
@@ -257,8 +257,8 @@ class Expander(NodeVisitor):
             cb_body_out.true = cb_body_in
             cb_body_out.false = cb_else_in
 
-        if not self.inline_catch and node.sc_else.excs.might:
-            if not node.sc_else.excs.always:
+        if not self.inline_catch and node.blk_else.excs.might:
+            if not node.blk_else.excs.always:
                 cb_else_out.cond = self.bf
                 cb_else_out.false = cb_next_in
         else:
@@ -271,26 +271,26 @@ class Expander(NodeVisitor):
         cb_catch = BasicBlock(name="try_catch")
 
         cb_finally_in = self.enter_block(name="try_finally")
-        self.visit(node.sc_finally)
+        self.visit(node.blk_finally)
         cb_finally_out = self.exit_block()
 
         # 优先于 body 构造 handler 块，使 InlinedRaise 能够识别对应的块
         cb_excepts = []
         for exc_handler in node.excepts:
             captures =set()
-            for e in node.sc_try.excs.types:
+            for e in node.blk_try.excs.types:
                 if e is not None and issubclass(e, exc_handler.eg):
                     captures.add(e)
 
             cb_exc_in = self.enter_block(name="try_except")
             # cb_exc_in.add_op(self.clear_flag_op())  # TODO
-            self.visit(exc_handler.sc_handle)
+            self.visit(exc_handler.blk_handle)
             cb_exc_out = self.exit_block()
             cb_exc_out.direct = cb_finally_in
             cb_excepts.append((cb_exc_in, exc_handler.eg, captures))
 
         cb_else_in = self.enter_block(name="try_else")
-        self.visit(node.sc_else)
+        self.visit(node.blk_else)
         cb_else_out = self.exit_block()
 
         cb_jump = MatchJump(self.bf, [
@@ -309,7 +309,7 @@ class Expander(NodeVisitor):
         cb_body_in = self.enter_block(name="try_body")
         for cb_exc_in, eg, _ in cb_excepts[::-1]:
             self.push_exc_handler(eg, cb_exc_in)
-        self.visit(node.sc_try)
+        self.visit(node.blk_try)
         for _ in range(len(cb_excepts)):
             self.pop_exc_handler()
         cb_body_out = self.exit_block()
@@ -318,7 +318,7 @@ class Expander(NodeVisitor):
 
         cb_next_in = self.enter_block(name="try_next")
 
-        if not self.inline_catch and node.sc_try.excs.might:
+        if not self.inline_catch and node.blk_try.excs.might:
             cb_last_out.direct = cb_catch
             cb_catch.direct = cb_body_in
             cb_catch.cond = self.bf
@@ -332,11 +332,11 @@ class Expander(NodeVisitor):
 
         # TODO 处理 finally 异常覆盖问题
         if self.inline_catch:
-            assert not node.sc_finally.excs.might, "启用 ir_inline_catch 时 finally 块不能存在呈递流程控制语句（continue, break, return 或抛出异常）"
+            assert not node.blk_finally.excs.might, "启用 ir_inline_catch 时 finally 块不能存在呈递流程控制语句（continue, break, return 或抛出异常）"
             cb_finally_out.direct = cb_next_in
         else:
-            if not node.sc_finally.excs.always:
-                if node.sc_else.excs.might or node.sc_finally.excs.might or any(h.sc_handle.excs.might for h in node.excepts):
+            if not node.blk_finally.excs.always:
+                if node.blk_else.excs.might or node.blk_finally.excs.might or any(h.blk_handle.excs.might for h in node.excepts):
                     cb_finally_out.cond = self.bf
                     cb_finally_out.false = cb_next_in
                 else:
@@ -518,8 +518,8 @@ class Compiler:
     def __init__(self, config: IrCfg):
         self.config = config
 
-    def compile(self, ctx: Constructor) -> list[code_block]:
-        cb = Expander(ctx.root_scope, self.config.ir_bf, self.config, ctx.name).expand()
+    def compile(self, ctx: Scope) -> list[code_block]:
+        cb = Expander(ctx._root_block, self.config.ir_bf, self.config, ctx.name).expand()
 
         for _ in range(self.config.ir_simplify):
             simplifier = EmptyCBRemover(cb)

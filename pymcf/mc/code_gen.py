@@ -4,7 +4,7 @@ from typing import SupportsInt, Self
 
 from .commands import Command, RawCommand, OpAssign, Execute, ExecuteChain, DataGet, \
     SetConst, OpSub, ScoreRange, OpMul, OpAdd, OpDiv, OpMod, AddConst, RemConst, Function, NSName
-from .environment import Env
+from .scope import MCFScope
 from ..ast_ import operation, Raw, Assign, UnaryOp, Inplace, Compare, LtE, Gt, GtE, Eq, NotEq, Lt, UAdd, USub, Not, \
     Invert, And, Or, Add, Sub, Mult, Div, FloorDiv, Mod, RtBaseExc
 from ..ast_.runtime import _RtBaseExcMeta
@@ -86,19 +86,19 @@ MultiRange.EMPTY = MultiRange(_valid=[])
 
 class MCF:
 
-    def __init__(self, name: str, cmds: list[Command], env: Env):
+    def __init__(self, name: str, cmds: list[Command], scope: MCFScope):
         self.name = name
         self.cmds = cmds
-        self.env = env
+        self.scope = scope
 
     def gen_code(self) -> str:
-        return '\n'.join(cmd.resolve(self.env) for cmd in self.cmds)
+        return '\n'.join(cmd.resolve(self.scope) for cmd in self.cmds)
 
 
 class Translator:
 
-    def __init__(self, env: Env):
-        self.env = env
+    def __init__(self, scope: MCFScope):
+        self.scope = scope
 
 
     def translate_op(self, op: operation) -> Command | list[Command]:
@@ -191,13 +191,13 @@ class Translator:
                     case Sub():
                         return RemConst(target.__metadata__, value)
                     case Mult():
-                        return OpMul(target.__metadata__, self.env.get_const_score(value))
+                        return OpMul(target.__metadata__, self.scope.get_const_score(value))
                     case Div():
-                        return OpDiv(target.__metadata__, self.env.get_const_score(value))
+                        return OpDiv(target.__metadata__, self.scope.get_const_score(value))
                     case FloorDiv():
-                        return OpDiv(target.__metadata__, self.env.get_const_score(value))
+                        return OpDiv(target.__metadata__, self.scope.get_const_score(value))
                     case Mod():
-                        return OpMod(target.__metadata__, self.env.get_const_score(value))
+                        return OpMod(target.__metadata__, self.scope.get_const_score(value))
                     case _:
                         raise NotImplementedError
 
@@ -262,7 +262,7 @@ class Translator:
         raise NotImplementedError
 
     def gen_BasicBlcok(self, cb: BasicBlock) -> MCF:
-        path = self.env.function_name(cb)
+        path = self.scope.function_name(cb)
         cmds = []
         for op in cb.ops:
             if isinstance(op, operation):
@@ -279,10 +279,10 @@ class Translator:
                                 .run(Function(cb.false)))
             cmds.append(ExecuteChain().cond('unless').score_range(cb.cond.__metadata__, ScoreRange(0, 0))
                                 .run(Function(cb.true)))
-        return MCF(path, cmds, self.env)
+        return MCF(path, cmds, self.scope)
 
     def gen_MachJump(self, cb: MatchJump):
-        path = self.env.function_name(cb)
+        path = self.scope.function_name(cb)
         cmds = []
 
         def get_range(value) -> MultiRange:
@@ -317,7 +317,7 @@ class Translator:
             for vmin, vmax in r.valid_ranges():
                 chain = chain.cond('unless' if unless else 'if').score_range(cb.flag.__metadata__, ScoreRange(vmin, vmax))
             cmds.append(chain.run(Function(case.target)))
-        return MCF(path, cmds, self.env)
+        return MCF(path, cmds, self.scope)
 
     def translate(self, cb: code_block) -> MCF:
         if isinstance(cb, BasicBlock):

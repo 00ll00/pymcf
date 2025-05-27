@@ -204,7 +204,7 @@ ExcSet.EMPTY = ExcSet(None)
 ExcSet.ANY = ExcSet({None, RtAnyNormalExc})
 
 
-class RtBaseData(ABC):
+class RtBaseVar(ABC):
 
     def __bool_and__(self, other):
         """
@@ -229,9 +229,8 @@ class RtBaseData(ABC):
     def __create_var__(cls) -> Self:
         ...
 
-class RtBaseIterator[V: RtBaseData](RtBaseData, Iterator, ABC):
+class RtBaseIterator[V: RtBaseVar](Iterator[V], ABC):
 
-    @final
     def __iter__(self):
         return self
 
@@ -240,3 +239,10 @@ class RtBaseIterator[V: RtBaseData](RtBaseData, Iterator, ABC):
         """
         此方法构造迭代器的迭代流程，并且返回迭代对象
         """
+
+
+class RtIterable[V: RtBaseVar](Iterable[V], ABC):
+
+    @abstractmethod
+    def __iter__(self) -> RtBaseIterator[V]:
+        ...

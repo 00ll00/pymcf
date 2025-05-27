@@ -4,12 +4,12 @@ from contextvars import ContextVar
 from numbers import Real
 from typing import Self, overload, SupportsInt, Iterable
 
-from pymcf.ast_ import Constructor, RtBaseData, RtBaseIterator, Assign, Inplace, RtStopIteration, Compare
+from pymcf.ast_ import Constructor, RtBaseVar, RtBaseIterator, Assign, Inplace, RtStopIteration, Compare
 from pymcf.mcfunction import mcfunction
 from pymcf.mc.commands import Resolvable, ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NBTStorable, NbtRef
 
 
-class RtData(RtBaseData, ABC):
+class RtVar(RtBaseVar, ABC):
     ...
 
 
@@ -151,8 +151,22 @@ Name = NameRef
 
 class ScoreBoard(RefWrapper[ObjectiveRef]):
 
-    def __init__(self, ref: ObjectiveRef):
-        self.ref = ref
+    @overload
+    def __init__(self, ref: ObjectiveRef): ...
+    @overload
+    def __init__(self, name: str): ...
+    @overload
+    def __init__(self, scb: Self): ...
+
+    def __init__(self, arg):
+        if isinstance(arg, ObjectiveRef):
+            self.ref = arg
+        elif isinstance(arg, str):
+            self.ref = ObjectiveRef(name=arg)
+        elif isinstance(arg, ScoreBoard):
+            self.ref = arg.ref
+        else:
+            raise TypeError()
 
     @property
     def __metadata__(self) -> ObjectiveRef:
@@ -162,7 +176,7 @@ class ScoreBoard(RefWrapper[ObjectiveRef]):
 type ScoreInitializer = NumberLike | SupportsInt | ScoreRef | None
 
 
-class Score(RtData, RefWrapper[ScoreRef], NumberLike):
+class Score(RtVar, RefWrapper[ScoreRef], NumberLike):
 
     @property
     def __metadata__(self) -> ScoreRef:
@@ -202,7 +216,7 @@ class Score(RtData, RefWrapper[ScoreRef], NumberLike):
 
     @staticmethod
     def _new_local_ref() -> ScoreRef:
-        return Constructor.current_constr().ctx.new_local_score()
+        return Constructor.current_constr().scope.new_local_score()
 
     @classmethod
     def __create_var__(cls) -> Self:
@@ -228,7 +242,7 @@ class Score(RtData, RefWrapper[ScoreRef], NumberLike):
 
     @mcfunction.inline
     def __pow__(self, power, modulo=None):
-        if isinstance(power, RtBaseData):
+        if isinstance(power, RtBaseVar):
             res = Score(1)
             for _ in Range(power):
                 res *= self
@@ -254,7 +268,7 @@ class Nbt(RefWrapper[NbtRef]):
     ...
 
 
-class RtIterator[V: RtData](RtData, RtBaseIterator[V], ABC):
+class RtIterator[V: RtVar](RtVar, RtBaseIterator[V], ABC):
     ...
 
 
@@ -308,7 +322,7 @@ class RangeIterator(RtIterator[Score]):
         return f"RangeIterator({self.start!r}, {self.stop!r}, {self.step!r})"
 
 
-class Range(RtData, Iterable[Score]):
+class Range(RtVar, Iterable[Score]):
 
     @overload
     def __init__(self, end: ScoreInitializer, /):

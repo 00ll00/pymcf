@@ -1,13 +1,14 @@
 from .commands import ScoreRef, NameRef, ObjectiveRef
+from ..ast_.constructor import Scope
 
 
-class Env:
+class MCFScope(Scope):
 
-    def __init__(self, rooot_name: str):
+    def __init__(self, name: str):
+        super().__init__(name)
         self.consts = {}
         self.locals = []
         self.cb_name = {}
-        self.root_name = rooot_name
         self.sys_obj = ObjectiveRef("__sys__")
 
     def get_const_score(self, const: int) -> ScoreRef:
@@ -24,5 +25,5 @@ class Env:
     def function_name(self, cb) -> str:
         if cb not in self.cb_name:
             index = len(self.cb_name)
-            self.cb_name[cb] = self.root_name if index == 0 else f"{self.root_name}/sub-{index}"
+            self.cb_name[cb] = self.name if index == 0 else f"{self.name}/sub-{index}"
         return self.cb_name[cb]
