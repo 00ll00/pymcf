@@ -34,6 +34,15 @@ class Function(Command):
     def resolve(self, scope, fmt=None):
         return 'function %s' % scope.function_nsname(self.token)
 
+class ReturnRun(Command):
+
+    def __init__(self, cmd):
+        assert isinstance(cmd, Command)
+        self.cmd = cmd
+
+    def resolve(self, scope, fmt=None):
+        return f"return run {self.cmd.resolve(scope, None)}"
+
 class FunctionTag(Command):
 
     def __init__(self, tag_name):

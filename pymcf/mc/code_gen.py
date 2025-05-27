@@ -3,7 +3,7 @@ from functools import reduce
 from typing import SupportsInt, Self
 
 from .commands import Command, RawCommand, OpAssign, Execute, ExecuteChain, DataGet, \
-    SetConst, OpSub, ScoreRange, OpMul, OpAdd, OpDiv, OpMod, AddConst, RemConst, Function, NSName
+    SetConst, OpSub, ScoreRange, OpMul, OpAdd, OpDiv, OpMod, AddConst, RemConst, Function, NSName, ReturnRun
 from .scope import MCFScope
 from ..ast_ import operation, Raw, Assign, UnaryOp, Inplace, Compare, LtE, Gt, GtE, Eq, NotEq, Lt, UAdd, USub, Not, \
     Invert, And, Or, Add, Sub, Mult, Div, FloorDiv, Mod, RtBaseExc, Call
@@ -281,7 +281,7 @@ class Translator:
             assert isinstance(cb.cond, Score)
             if cb.false is not None:
                 cmds.append(ExecuteChain().cond('if').score_range(cb.cond.__metadata__, ScoreRange(0, 0))
-                                    .run(Function(cb.false)))
+                                    .run(ReturnRun(Function(cb.false))))
             if cb.true is not None:
                 cmds.append(ExecuteChain().cond('unless').score_range(cb.cond.__metadata__, ScoreRange(0, 0))
                                     .run(Function(cb.true)))
