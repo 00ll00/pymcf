@@ -6,7 +6,7 @@ from .commands import Command, RawCommand, OpAssign, Execute, ExecuteChain, Data
     SetConst, OpSub, ScoreRange, OpMul, OpAdd, OpDiv, OpMod, AddConst, RemConst, Function, NSName
 from .scope import MCFScope
 from ..ast_ import operation, Raw, Assign, UnaryOp, Inplace, Compare, LtE, Gt, GtE, Eq, NotEq, Lt, UAdd, USub, Not, \
-    Invert, And, Or, Add, Sub, Mult, Div, FloorDiv, Mod, RtBaseExc
+    Invert, And, Or, Add, Sub, Mult, Div, FloorDiv, Mod, RtBaseExc, Call
 from ..ast_.runtime import _RtBaseExcMeta
 from ..data import Score, Nbt
 from ..ir import BasicBlock, MatchJump, code_block
@@ -259,13 +259,16 @@ class Translator:
                         raise NotImplementedError
 
 
+        elif isinstance(op, Call):
+            return Function(op.func)
+
         raise NotImplementedError
 
     def gen_BasicBlcok(self, cb: BasicBlock) -> MCF:
         path = self.scope.function_name(cb)
         cmds = []
         for op in cb.ops:
-            if isinstance(op, operation):
+            if isinstance(op, operation | Call):
                 cmd = self.translate_op(op)
                 if isinstance(cmd, list):
                     cmds.extend(cmd)

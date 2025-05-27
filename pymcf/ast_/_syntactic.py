@@ -412,11 +412,14 @@ class Call(control_flow):
     @cached_property
     def excs(self):
         from .constructor import Scope
-        if isinstance(self.func, Scope) and self.func.finished:
-            return self.func.excs
-        # TODO 函数存在循环调用时获取函数真实异常集
+        if isinstance(self.func, Scope):
+            if self.func.finished:
+                return self.func.excs
+            else:
+                # TODO 函数存在循环调用时获取函数真实异常集
+                return ExcSet.ANY
         else:
-            return ExcSet.ANY
+            raise NotImplementedError
 
 
 class ExcHandle(AST):
