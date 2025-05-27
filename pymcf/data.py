@@ -22,59 +22,59 @@ class NumberLike(ABC):
     def __create_var__(cls):
         ...
 
-    def __add__(self, other):
-        res = self.__create_var__()
+    def __add__(self, other, _rev=False):
+        res = other.__create_var__() if _rev else self.__create_var__()
         Assign(res, self)
         Inplace.Add(res, other)
         return res
 
     def __radd__(self, other):
-        return self.__class__.__add__(other, self)
+        return self.__class__.__add__(other, self, _rev=True)
 
-    def __sub__(self, other):
-        res = self.__create_var__()
+    def __sub__(self, other, _rev=False):
+        res = other.__create_var__() if _rev else self.__create_var__()
         Assign(res, self)
         Inplace.Sub(res, other)
         return res
 
     def __rsub__(self, other):
-        return self.__class__.__sub__(other, self)
+        return self.__class__.__sub__(other, self, _rev=True)
 
-    def __mul__(self, other):
-        res = self.__create_var__()
+    def __mul__(self, other, _rev=False):
+        res = other.__create_var__() if _rev else self.__create_var__()
         Assign(res, self)
         Inplace.Mult(res, other)
         return res
 
     def __rmul__(self, other):
-        return self.__class__.__mul__(other, self)
+        return self.__class__.__mul__(other, self, _rev=True)
 
-    def __floordiv__(self, other):
-        res = self.__create_var__()
+    def __floordiv__(self, other, _rev=False):
+        res = other.__create_var__() if _rev else self.__create_var__()
         Assign(res, self)
         Inplace.FloorDiv(res, other)
         return res
 
     def __rfloordiv__(self, other):
-        return self.__class__.__floordiv__(other, self)
+        return self.__class__.__floordiv__(other, self, _rev=True)
 
-    def __truediv__(self, other):
-        res = self.__create_var__()
+    def __truediv__(self, other, _rev=False):
+        res = other.__create_var__() if _rev else self.__create_var__()
         Assign(res, self)
         Inplace.Div(res, other)
         return res
 
     def __rtruediv__(self, other):
-        return self.__class__.__truediv__(other, self)
+        return self.__class__.__truediv__(other, self, _rev=True)
 
-    def __mod__(self, other):
-        res = self.__create_var__()
+    def __mod__(self, other, _rev=False):
+        res = other.__create_var__() if _rev else self.__create_var__()
         Assign(res, self)
         Inplace.Mod(res, other)
         return res
 
     def __rmod__(self, other):
-        return self.__class__.__mod__(other, self)
+        return self.__class__.__mod__(other, self, _rev=True)
 
     def __ne__(self, other):
         res = Bool.__create_var__()
