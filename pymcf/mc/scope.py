@@ -34,12 +34,16 @@ class MCFScope(Scope):
         self.locals.append(score)
         return score
 
-    def function_name(self, cb) -> str:
+    @property
+    def nsname(self):
+        return f"{self.namespace}:{self.name}"
+
+    def sub_name(self, cb) -> str:
         if cb not in self.cb_name:
             index = len(self.cb_name)
             self.cb_name[cb] = self.name if index == 0 else f"{self.name}/sub-{index}"
         return self.cb_name[cb]
 
-    def function_nsname(self, cb) -> str:
-        name = self.function_name(cb)
+    def sub_nsname(self, cb) -> str:
+        name = self.sub_name(cb)
         return f"{self.namespace}:{name}"

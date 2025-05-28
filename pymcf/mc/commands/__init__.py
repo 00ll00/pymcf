@@ -4,6 +4,8 @@ from .nbt import *
 from .scoreboard import *
 from .selector import *
 from .text import *
+from ..scope import MCFScope
+
 
 class Cmd(Command):
     def __init__(self, cmd):
@@ -32,7 +34,14 @@ class Function(Command):
         self.token = token
 
     def resolve(self, scope, fmt=None):
-        return 'function %s' % scope.function_nsname(self.token)
+        from pymcf.ir import code_block
+        if isinstance(self.token, code_block):
+            # 是 code_block 时一定是当前 scope 内的 code_block
+            return 'function %s' % scope.sub_nsname(self.token)
+        elif isinstance(self.token, MCFScope):
+            return 'function %s' % self.token.nsname
+        else:
+            raise NotImplementedError
 
 class ReturnRun(Command):
 

@@ -127,9 +127,9 @@ class mcfunction:
         self._inline = inline
 
         if func_name is None:
-            basename = _func.__qualname__
+            basename = _func.__qualname__.lower()
             if _func.__module__ != "__main__":
-                basename = _func.__module__ + '.' + basename
+                basename = _func.__module__.lower() + '.' + basename
         else:
             basename = func_name
 

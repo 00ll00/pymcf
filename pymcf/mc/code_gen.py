@@ -101,7 +101,6 @@ class Translator:
     def __init__(self, scope: MCFScope):
         self.scope = scope
 
-
     def translate_op(self, op: operation) -> Command | list[Command]:
         if isinstance(op, Raw):
             return RawCommand(op.code)
@@ -273,7 +272,7 @@ class Translator:
         raise NotImplementedError
 
     def gen_BasicBlcok(self, cb: BasicBlock) -> MCF:
-        path = self.scope.function_name(cb)
+        path = self.scope.sub_name(cb)
         cmds = []
         for op in cb.ops:
             if isinstance(op, operation | Call):
@@ -295,7 +294,7 @@ class Translator:
         return MCF(path, cmds, self.scope)
 
     def gen_MachJump(self, cb: MatchJump):
-        path = self.scope.function_name(cb)
+        path = self.scope.sub_name(cb)
         cmds = []
 
         def get_range(value) -> MultiRange:
