@@ -338,8 +338,9 @@ class RangeIterator(RtIterator[Score]):
     @mcfunction.inline
     def __next__(self) -> Score:
         if self.start < self.stop:
+            curr = Score(self.start)
             self.start += self.step
-            return self.start
+            return curr
         else:
             raise RtStopIteration()
 
