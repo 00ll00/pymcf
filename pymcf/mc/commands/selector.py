@@ -1,56 +1,10 @@
+from typing import Literal, overload, Any, Self
+
 from .core import Resolvable, EntityRef
 from .scoreboard import ObjectiveRef
 
-def make_selector(selector, **kwargs):
-    output = '@' + selector
-    if not kwargs:
-        return output
 
-    def str_pairs(items):
-        output = []
-        for key, value in items:
-            if type(value) == dict:
-                value = '{%s}' % str_pairs(value.items())
-            output.append('%s=%s' % (key, value))
-        return ','.join(output)
-
-    return '%s[%s]' % (output, str_pairs(kwargs.items()))
-
-class Selector(EntityRef):
-
-    def __init__(self, type, args=None):
-        assert type in 'aespr'
-        self.type = type
-        assert args is None or isinstance(args, SelectorArgs)
-        self.args = args
-
-    def resolve_params(self, scope):
-        if not self.args:
-            return {}
-        return self.args.resolve(scope, None)
-
-    def is_single_entity(self, scope):
-        if self.type in 'spr':
-            return True
-        params = self.resolve_params(scope)
-        return 'limit' in params and params['limit'] == '1'
-
-    def resolve(self, scope, fmt=None):
-        if self is scope.executor.__metadata__:
-            return "@s"
-        return make_selector(self.type, **self.resolve_params(scope))
-
-class SelectorArgs(Resolvable):
-    pass
-
-class SimpleSelectorArgs(SelectorArgs):
-    def __init__(self, args):
-        self.args = args
-
-    def resolve(self, scope, fmt=None):
-        return dict(self.args)
-
-class ScoreRange(Resolvable):
+class NumRange(Resolvable):
 
     def __init__(self, min=None, max=None):
         assert min is not None or max is not None
@@ -67,11 +21,22 @@ class ScoreRange(Resolvable):
             range += '..'
         return range
 
+
+class SelectorArgs(Resolvable):
+    pass
+
+class SimpleSelectorArgs(SelectorArgs):
+    def __init__(self, args):
+        self.args = args
+
+    def resolve(self, scope, fmt=None):
+        return dict(self.args)
+
 class SelRange(SelectorArgs):
     def __init__(self, objective, min=None, max=None):
         assert isinstance(objective, ObjectiveRef)
         self.objective = objective
-        self.range = ScoreRange(min, max)
+        self.range = NumRange(min, max)
 
     def resolve(self, scope, fmt=None):
         return {'scores': {self.objective.resolve(scope, None):
@@ -146,3 +111,141 @@ class SelNbt(SelectorArgs):
 
     def resolve(self, scope, fmt=None):
         return {'nbt': self.stringify_nbt(self.nbt_spec, scope)}
+
+
+class SelectorProto:
+    advancements: Any = None
+    distance: NumRange = None
+    dx: int = None
+    dy: int = None
+    dz: int = None
+    gamemode: Literal["adventure", "creative", "spectator", "survival", "!adventure", "!creative", "!spectator", "!survival"] = None
+    level: int = None
+    limit: int = None
+    name: str = None
+    nbt: list[SelNbt] | SelNbt = None
+    predicate: Any = None
+    scores: list[SelRange] | SelRange = None
+    sort: Literal["arbitrary", "furthest", "nearest", "random"] = None
+    tag: list[str] | str = None
+    team: str = None
+    type: str = None
+    x: int = None
+    x_rotation: NumRange = None
+    y: int = None
+    y_rotation: NumRange = None
+    z: int = None
+
+class Selector(EntityRef, SelectorProto):
+
+    _NotAvailable = object()
+
+    _kind: Literal['a', 'e', 'n', 'p', 'r', 's'] = None
+    _multi_key = {"nbt", "tag", "predicate", }
+    _solid: dict = {}
+    _soft: dict = {}
+
+    @overload
+    def __init__(
+            self,
+            advancements=None,
+            distance: NumRange = None,
+            dx: int = None,
+            dy: int = None,
+            dz: int = None,
+            gamemode: Literal["adventure", "creative", "spectator", "survival", "!adventure", "!creative", "!spectator", "!survival",] = None,
+            level: int = None,
+            limit: int = None,
+            name: str = None,
+            nbt: list[SelNbt] | SelNbt = None,
+            predicate=None,
+            scores: list[SelRange] | SelRange = None,
+            sort: Literal["arbitrary", "furthest", "nearest", "random"] = None,
+            tag: list[str] | str = None,
+            team: str = None,
+            type: str = None,
+            x: int = None,
+            x_rotation: NumRange = None,
+            y: int = None,
+            y_rotation: NumRange = None,
+            z: int = None,
+    ): ...
+
+    def __init__(self, **kwargs):
+        assert self._kind is not None
+        self.__dict__.update({k: Selector._NotAvailable for k in self._solid})
+        self._update(kwargs)
+
+    def _update(self, kwargs):
+        for k, v in kwargs.copy().items():
+            if v is self._NotAvailable:
+                kwargs.pop(k)
+
+        for k in kwargs:
+            if self.__dict__.get(k) is Selector._NotAvailable:
+                raise KeyError()
+
+        for k in kwargs:
+            if k in self._multi_key and not isinstance(kwargs[k], list):
+                kwargs[k] = [kwargs[k]]
+
+        self.__dict__.update(kwargs)
+
+    def is_single_entity(self, scope):
+        if self._kind in 'spr':
+            return True
+        return self.limit == 1
+
+    def resolve(self, scope, fmt=None):
+        if self is scope.executor.__metadata__:
+            return "@s"
+        res = '@' + self._kind
+        items = []
+        for k, v in self.__dict__.items():
+            if v is not None and v is not Selector._NotAvailable:
+                if k not in self._multi_key:
+                    v = [v]
+                for vv in v:
+                    items.append(f"{k}={vv.resolve(scope, None) if isinstance(vv, Resolvable) else repr(vv)}")
+        if len(items) == 0:
+            return res
+        return f"{res}[{','.join(items)}]"
+
+    def copy(self):
+        return type(self)(**self.__dict__)
+
+    def merge(self, other: Self | None):
+        """
+        将一个新选择器的约束添加到此选择器，返回一个新的选择器
+        """
+        if other is None:
+            return self
+        res = self.copy()
+        res._update(other.__dict__)
+        return res
+
+
+class AtA(Selector):
+    _kind = 'a'
+    _solid = {"type": "minecraft:player"}
+
+class AtE(Selector):
+    _kind = 'e'
+
+class AtP(Selector):
+    _kind = 'p'
+    _solid = {"type": "minecraft:player"}
+    _soft = {"sort": "nearest"}
+
+class AtS(Selector):
+    _kind = 's'
+    _solid = {"limit": 1, "sort": "arbitrary"}
+
+class AtN(Selector):
+    _kind = 'n'
+    _soft = {"sort": "nearest"}
+
+class AtR(Selector):
+    _kind = 'r'
+    _solid = {"type": "minecraft:player"}
+    _soft = {"sort": "random"}

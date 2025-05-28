@@ -3,7 +3,7 @@ from functools import reduce
 from typing import SupportsInt, Self
 
 from .commands import Command, RawCommand, OpAssign, Execute, ExecuteChain, DataGet, \
-    SetConst, OpSub, ScoreRange, OpMul, OpAdd, OpDiv, OpMod, AddConst, RemConst, Function, NSName, ReturnRun
+    SetConst, OpSub, NumRange, OpMul, OpAdd, OpDiv, OpMod, AddConst, RemConst, Function, NSName, ReturnRun
 from .scope import MCFScope
 from ..ast_ import operation, Raw, Assign, UnaryOp, Inplace, Compare, LtE, Gt, GtE, Eq, NotEq, Lt, UAdd, USub, Not, \
     Invert, And, Or, Add, Sub, Mult, Div, FloorDiv, Mod, RtBaseExc, Call
@@ -140,7 +140,7 @@ class Translator:
                             ]
                         case Not():
                             return (ExecuteChain().store('success').score(target.__metadata__)
-                                           .cond('if').score_range(value.__metadata__, ScoreRange(0, 0)).finish())
+                                    .cond('if').score_range(value.__metadata__, NumRange(0, 0)).finish())
                         case Invert():
                             raise NotImplementedError
                 raise NotImplementedError
@@ -157,7 +157,7 @@ class Translator:
                     case And():
                         return OpMul(target.__metadata__, value.__metadata__)
                     case Or():
-                        return (ExecuteChain().cond('if').score_range(target.__metadata__, ScoreRange(0, 0))
+                        return (ExecuteChain().cond('if').score_range(target.__metadata__, NumRange(0, 0))
                                        .run(OpAssign(target.__metadata__, value.__metadata__)))
                     case Add():
                         return OpAdd(target.__metadata__, value.__metadata__)
@@ -239,22 +239,22 @@ class Translator:
                 match cmp:
                     case Eq():
                         return (ExecuteChain().store('success').score(target.__metadata__)
-                                       .cond('if').score_range(left.__metadata__, ScoreRange(right, right)).finish())
+                                .cond('if').score_range(left.__metadata__, NumRange(right, right)).finish())
                     case NotEq():
                         return (ExecuteChain().store('success').score(target.__metadata__)
-                                       .cond('unless').score_range(left.__metadata__, ScoreRange(right, right)).finish())
+                                .cond('unless').score_range(left.__metadata__, NumRange(right, right)).finish())
                     case Lt():
                         return (ExecuteChain().store('success').score(target.__metadata__)
-                                       .cond('if').score_range(left.__metadata__, ScoreRange(None, right - 1)).finish())
+                                .cond('if').score_range(left.__metadata__, NumRange(None, right - 1)).finish())
                     case LtE():
                         return (ExecuteChain().store('success').score(target.__metadata__)
-                                       .cond('if').score_range(left.__metadata__, ScoreRange(None, right)).finish())
+                                .cond('if').score_range(left.__metadata__, NumRange(None, right)).finish())
                     case Gt():
                         return (ExecuteChain().store('success').score(target.__metadata__)
-                                       .cond('if').score_range(left.__metadata__, ScoreRange(right + 1, None)).finish())
+                                .cond('if').score_range(left.__metadata__, NumRange(right + 1, None)).finish())
                     case GtE():
                         return (ExecuteChain().store('success').score(target.__metadata__)
-                                       .cond('if').score_range(left.__metadata__, ScoreRange(right, None)).finish())
+                                .cond('if').score_range(left.__metadata__, NumRange(right, None)).finish())
                     case _:
                         raise NotImplementedError
 
@@ -286,10 +286,10 @@ class Translator:
         if cb.cond is not None:
             assert isinstance(cb.cond, Score)
             if cb.false is not None:
-                cmds.append(ExecuteChain().cond('if').score_range(cb.cond.__metadata__, ScoreRange(0, 0))
+                cmds.append(ExecuteChain().cond('if').score_range(cb.cond.__metadata__, NumRange(0, 0))
                                     .run(ReturnRun(Function(cb.false))))
             if cb.true is not None:
-                cmds.append(ExecuteChain().cond('unless').score_range(cb.cond.__metadata__, ScoreRange(0, 0))
+                cmds.append(ExecuteChain().cond('unless').score_range(cb.cond.__metadata__, NumRange(0, 0))
                                     .run(Function(cb.true)))
         return MCF(path, cmds, self.scope)
 
@@ -327,7 +327,7 @@ class Translator:
                 raise NotImplementedError
             chain = ExecuteChain()
             for vmin, vmax in r.valid_ranges():
-                chain = chain.cond('unless' if unless else 'if').score_range(cb.flag.__metadata__, ScoreRange(vmin, vmax))
+                chain = chain.cond('unless' if unless else 'if').score_range(cb.flag.__metadata__, NumRange(vmin, vmax))
             cmds.append(chain.run(ReturnRun(Function(case.target))))
         return MCF(path, cmds, self.scope)
 

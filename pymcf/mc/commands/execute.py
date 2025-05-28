@@ -3,7 +3,7 @@ from typing import Literal
 from .core import Command, Resolvable, EntityRef, SimpleResolve, WorldPos
 from .nbt import NBTStorable
 from .scoreboard import ScoreRef
-from .selector import ScoreRange
+from .selector import NumRange
 
 class Execute(Command):
 
@@ -111,7 +111,7 @@ class ExecuteChain:
 
         def score_range(self, scoreref, range):
             assert isinstance(scoreref, ScoreRef)
-            assert isinstance(range, ScoreRange)
+            assert isinstance(range, NumRange)
             return self.add('score', scoreref, 'matches', range)
 
         def block(self, pos, block):

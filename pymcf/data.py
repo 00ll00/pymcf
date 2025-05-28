@@ -8,7 +8,7 @@ from pymcf.ast_ import Constructor, RtBaseVar, RtBaseIterator, Assign, Inplace, 
     FormattedData
 from pymcf.mcfunction import mcfunction
 from pymcf.mc.commands import Resolvable, ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NBTStorable, NbtRef, \
-    RefWrapper, TextScoreComponent, TextComponent, ScoreboardAdd, Selector, ComboSelectorArgs
+    RefWrapper, TextScoreComponent, TextComponent, ScoreboardAdd, Selector, ComboSelectorArgs, SimpleSelectorArgs, AtE
 
 
 class RtVar(RtBaseVar, ABC):
@@ -131,14 +131,9 @@ class NumberLike(ABC):
         return self
 
 
-def selector_merge(base: Selector, other: Selector) -> Selector:
-    #TODO
-    return Selector(type='e', args=ComboSelectorArgs(base.args, other.args))
-
-
 class Entity(RefWrapper[EntityRef]):
 
-    __base_selector__ = Selector(type='e')
+    __base_selector__ = AtE()
 
     def __new__(cls, *args, _ref=None, **kwargs):
         self = super().__new__(cls)
@@ -164,8 +159,8 @@ class Entity(RefWrapper[EntityRef]):
         return self.ref
 
     @classmethod
-    def foreach[E: Entity](cls: type[E]) -> E:
-        return cls.__new__(cls, _ref=cls.__base_selector__)
+    def foreach[E: Entity](cls: type[E], selector=None) -> E:
+        return cls.__new__(cls, _ref=cls.__base_selector__.merge(selector))
 
 
 class ScoreBoard(RefWrapper[ObjectiveRef]):
