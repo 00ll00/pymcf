@@ -4,7 +4,7 @@ import inspect
 from types import FunctionType
 from typing import Any
 
-from . import Constructor, Block, FormattedData
+from . import Constructor, Block, FormattedData, Resolvable
 from . import syntactic
 from .runtime import *
 
@@ -1126,9 +1126,25 @@ class ASTRewriter(NodeTransformer):
 
     def raw_handler(self, js: JoinedStr) -> expr:
         exps = []
+
+        def handle_fmt_spec(data, fmt, conversion):
+            if isinstance(data, Resolvable):
+                return FormattedData(data, fmt)
+            else:
+                if fmt is not None:
+                    data = format(data, fmt)
+                if conversion == ord('r'):
+                    return repr(data)
+                if conversion == ord('a'):
+                    return ascii(data)
+                if conversion == ord('s'):
+                    return str(data)
+                else:
+                    return str(data)
+
         for v in js.values:
             if isinstance(v, FormattedValue):
-                exps.append(self.add_call(FormattedData,  [v.value, v.format_spec if v.format_spec is not None else Constant(None)]))
+                exps.append(self.add_call(handle_fmt_spec,  [v.value, (v.format_spec if v.format_spec is not None else Constant(None)), Constant(v.conversion)]))
             else:
                 exps.append(v)
         return self.add_call(syntactic.Raw, exps)

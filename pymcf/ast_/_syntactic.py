@@ -4,7 +4,7 @@ from ast import AST as _AST, unaryop, UAdd, USub, Not, Invert, boolop, And, Or, 
     Pow, LShift, RShift, BitOr, BitXor, BitAnd, MatMult, Is, IsNot, In, NotIn
 from functools import reduce
 from types import GenericAlias
-from typing import Any, Iterable, Self
+from typing import Any, Iterable, Self, Literal
 
 from .runtime import ExcSet, RtBaseVar, RtStopIteration, RtContinue, RtBreak, RtBaseExc, _TBaseRtExc
 
@@ -150,15 +150,24 @@ class Resolvable(metaclass=ABCMeta):
 
 class FormattedData(Resolvable):
 
-    def __init__(self, data: Resolvable, fmt: str | None = None):
+    def __init__(self, data: Resolvable, fmt: str | None = None, conversion: Literal['s', 'r', 'a'] = 's'):
         self.data = data
         self.fmt = fmt
+        self.conversion = conversion
 
     def __repr__(self):
         return f"${{{self.data!r}{f':{self.fmt}' if self.fmt is not None else ''}}}"
 
     def resolve(self, scope, fmt=None):
-        return self.data.resolve(scope, self.fmt)
+        resolved = self.data.resolve(scope, self.fmt)
+        if self.conversion == 's':
+            return str(resolved)
+        elif self.conversion == 'r':
+            return repr(resolved)
+        elif self.conversion == 'a':
+            return ascii(resolved)
+        else:
+            raise ValueError()
 
 
 class Raw(operation):

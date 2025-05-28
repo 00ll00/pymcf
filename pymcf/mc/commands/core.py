@@ -90,7 +90,6 @@ class RawCommand(Command):
             if isinstance(c, str):
                 res = res + c
             elif isinstance(c, Resolvable):
-                assert isinstance(c, Resolvable)
                 res += str(c.resolve(scope, None))
         return res
 
