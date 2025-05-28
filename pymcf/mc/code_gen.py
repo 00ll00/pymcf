@@ -322,7 +322,7 @@ class Translator:
             chain = ExecuteChain()
             for vmin, vmax in r.valid_ranges():
                 chain = chain.cond('unless' if unless else 'if').score_range(cb.flag.__metadata__, ScoreRange(vmin, vmax))
-            cmds.append(chain.run(Function(case.target)))
+            cmds.append(chain.run(ReturnRun(Function(case.target))))
         return MCF(path, cmds, self.scope)
 
     def translate(self, cb: code_block) -> MCF:

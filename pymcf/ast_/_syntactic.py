@@ -397,19 +397,24 @@ class For(control_flow):
 
 
 class While(control_flow):
-    _fields = ("condition", "blk_body", "blk_else")
-    def __init__(self, condition: Any, blk_body: Block, blk_else: Block, *args, **kwargs):
+    _fields = ("condition", "blk_cond", "blk_body", "blk_else")
+    def __init__(self, condition: Any, blk_cond: Block, blk_body: Block, blk_else: Block, *args, **kwargs):
         self.condition = condition
+        self.blk_cond = blk_cond
         self.blk_body = blk_body
         self.blk_else = blk_else
         super().__init__(*args, **kwargs)
 
     @cached_property
     def excs(self) -> ExcSet:
-        return ExcSet(
-            self.blk_body.excs.remove({RtContinue, RtBreak}).types |
-            self.blk_else.excs.types
-        )
+        if self.blk_cond.excs.always:
+            return self.blk_cond.excs
+        else:
+            return ExcSet(
+                self.blk_cond.excs.types |
+                self.blk_body.excs.remove({RtContinue, RtBreak}).types |
+                self.blk_else.excs.types
+            )
 
 
 class Call(control_flow):

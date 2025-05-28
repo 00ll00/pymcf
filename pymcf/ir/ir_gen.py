@@ -214,6 +214,10 @@ class Expander(NodeVisitor):
 
         cb_next_in = self.enter_block(name="while_next")
 
+        cb_cond_in = self.enter_block(name="while_cond")
+        self.visit(node.blk_cond)
+        cb_cond_out = self.exit_block()
+
         cb_body_in = self.enter_block(name="while_body")
         self.push_exc_handler((RtContinue,), cb_body_in)
         self.push_exc_handler((RtBreak,), cb_next_in)
@@ -238,7 +242,8 @@ class Expander(NodeVisitor):
             cb_test.true = cb_catch
             cb_test.false = cb_else_in
 
-            cb_body_out.direct = cb_test
+            cb_body_out.cond = self.bf
+            cb_body_out.false = cb_cond_in
 
             # cb_next_in.add_op(self.clear_flag_op())  # TODO
             # cb_test.add_op(self.clear_flag_op())
@@ -247,15 +252,17 @@ class Expander(NodeVisitor):
             cb_catch.cond = self.bf
             cb_catch.true = cb_jump
 
-            cb_last_out.direct = cb_test
-        else:
-            cb_last_out.cond = node.condition
-            cb_last_out.true = cb_body_in
-            cb_last_out.false = cb_else_in
+            cb_last_out.direct = cb_cond_in
 
-            cb_body_out.cond = node.condition
-            cb_body_out.true = cb_body_in
-            cb_body_out.false = cb_else_in
+            cb_cond_out.cond = self.bf
+            cb_cond_out.false = cb_test
+        else:
+            cb_last_out.direct = cb_cond_in
+            cb_cond_out.cond = node.condition
+            cb_cond_out.true = cb_body_in
+            cb_cond_out.false = cb_else_in
+
+            cb_body_out.direct = cb_cond_in
 
         if not self.inline_catch and node.blk_else.excs.might:
             if not node.blk_else.excs.always:

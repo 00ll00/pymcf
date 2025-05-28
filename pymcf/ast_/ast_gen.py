@@ -480,7 +480,13 @@ class ASTRewriter(NodeTransformer):
 
         def control_flow(self):
             while True:
-                yield self.CF_COND, None
+                with enter_block() as blk_cond:
+                    yield self.CF_COND, None
+                    if self._last_exc is not None:
+                        if isinstance(self._last_exc, RtBaseExc):
+                            self._last_exc.__record__()
+                        else:
+                            yield self.CF_RAISE, self._last_exc
                 if self.fist_loop and isinstance(self.condition, RtBaseVar):
                     self.fist_loop = False
                     with enter_block() as blk_body:
@@ -499,7 +505,7 @@ class ASTRewriter(NodeTransformer):
                             elif not is_rt_exception(self._last_exc):
                                 yield self.CF_RAISE, self._last_exc
 
-                    excs = syntactic.While(self.condition, blk_body, blk_else).excs
+                    excs = syntactic.While(self.condition, blk_cond, blk_body, blk_else).excs
                     if excs.always:
                         yield self.CF_RAISE, RtUnreachable()
                     break
