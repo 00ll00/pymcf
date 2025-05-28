@@ -261,7 +261,14 @@ class Translator:
 
 
         elif isinstance(op, Call):
-            return Function(op.func)
+            # call 涉及上下文切换
+            scope = op.func
+            assert isinstance(scope, MCFScope)
+            if scope.executor is None or scope.executor == self.scope.executor:
+                return Function(op.func)
+            else:
+                return ExecuteChain().as_entity(scope.executor.__metadata__).run(Function(op.func))
+
 
         raise NotImplementedError
 

@@ -43,7 +43,7 @@ class Project:
         self.scb_rec: dict[str, tuple[str, Any]] = {}
         self.scb_init_constr = Constructor(
             name=f"__init__/scoreboard",
-            scope=MCFScope(name=f"__init__/scoreboard", tags={self._config.tag_func_load}),
+            scope=MCFScope(name=f"__init__/scoreboard", tags={self._config.tag_func_load}, executor=None),
             inline=False,
         )
 
@@ -137,6 +137,12 @@ class Project:
             (pack_dir_path / "pack.mcmeta").open("wt"),
             indent=4,
         )
+
+        # 添加 minecraft:#tick/load
+        mc_func_tag_path = pack_dir_path / "data/minecraft/tags/function/"
+        mc_func_tag_path.mkdir(parents=True, exist_ok=True)
+        json.dump({"values": [f"#{self.name}:tick"]}, open(mc_func_tag_path / "tick.json", "w"), indent=4)
+        json.dump({"values": [f"#{self.name}:load"]}, open(mc_func_tag_path / "load.json", "w"), indent=4)
 
         # 打包 zip
         arch_path = self._config.prj_install_dir / f"{self.name}.zip"

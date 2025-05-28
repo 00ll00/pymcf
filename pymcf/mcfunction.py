@@ -29,19 +29,19 @@ type _CtArg = (
 
 
 class FuncArgs:
-    def __init__(self, mcf_args: dict[str, _CtArg]) -> None:
-        self.mcf_args = mcf_args
+    def __init__(self, args: dict[str, _CtArg]) -> None:
+        self.args = args
 
     def __eq__(self, other: Self) -> bool:
         # TODO
         # with set_eq_identifier(True):
-        return self.mcf_args == other.mcf_args
+        return self.args == other.args
         # return False
 
     def __hash__(self) -> int:
         # TODO
         h = 0
-        for k, v in self.mcf_args.items():
+        for k, v in self.args.items():
             h ^= hash(k)
             try:
                 h ^= hash(v)
@@ -57,6 +57,13 @@ def get_valid_name(func_name: str) -> str:
             .replace(">", "-")
             .replace(".", "/"))
 
+
+class Executor:
+    """
+    包装实体，作为第一个参数传入 mcfunction 时表示此方法调用时需要切换执行者
+    """
+    def __init__(self, entity):
+        self.entity = entity
 
 # noinspection PyPep8Naming
 class mcfunction:
@@ -136,6 +143,11 @@ class mcfunction:
 
     def __call__(self, *args, **kwargs):
         from .mc.scope import MCFScope
+        executor = None
+        if len(args) > 0 and isinstance(args[0], Executor):
+            assert not self._inline
+            executor = args[0].entity
+            args = (executor, *args[1:])
         if self._inline:
             with Constructor(name=self._basename, inline=self._inline, scope=Constructor.current_constr().scope) as constr:
                 self._ast_generator(*args, **kwargs)
@@ -153,7 +165,7 @@ class mcfunction:
 
             last_constr = Constructor.current_constr()
             func_name = f"{self._basename}{ext}"
-            with Constructor(name=func_name, inline=self._inline, scope=MCFScope(name=func_name, tags=self._tags)) as constr:
+            with Constructor(name=func_name, inline=self._inline, scope=MCFScope(name=func_name, executor=executor, tags=self._tags)) as constr:
                 self._ast_generator(*args, **kwargs)
             constr.finish()
 
@@ -168,7 +180,7 @@ class mcfunction:
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        return MethodType(self, instance)
+        return MethodType(self, Executor(instance))
 
     @staticmethod
     def inline(_func=None, /, **kwargs):

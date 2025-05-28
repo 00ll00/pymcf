@@ -14,7 +14,6 @@ class Scope:
         self.name = name
         self.namespace = None  # TODO
 
-        self.rt_args = {}
         self._return_value = None
 
         self._root_block = Block()

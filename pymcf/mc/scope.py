@@ -1,15 +1,16 @@
 from functools import cached_property
 
-from .commands import NameRef
+from .commands import NameRef, Selector
 from ..ast_ import Assign
 from ..ast_.constructor import Scope
-from ..data import ScoreBoard, Score
+from ..data import ScoreBoard, Score, Entity
 
 
 class MCFScope(Scope):
 
-    def __init__(self, name: str, tags: set[str] = None):
+    def __init__(self, name: str, tags: set[str] = None, executor: Entity = None):
         super().__init__(name)
+        self.executor = executor if executor is not None else Entity(Selector('s'))
         self.consts = {}
         self.locals = []
         self.cb_name = {}

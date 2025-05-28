@@ -36,6 +36,8 @@ class Selector(EntityRef):
         return 'limit' in params and params['limit'] == '1'
 
     def resolve(self, scope, fmt=None):
+        if self is scope.executor.__metadata__:
+            return "@s"
         return make_selector(self.type, **self.resolve_params(scope))
 
 class SelectorArgs(Resolvable):

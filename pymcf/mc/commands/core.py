@@ -114,6 +114,8 @@ class NameRef(EntityRef):
         return True
 
     def resolve(self, scope, fmt=None):
+        if self is scope.executor.__metadata__:
+            return "@s"
         return self.name
 
 class WorldPos(Resolvable):
@@ -181,6 +183,8 @@ class GlobalEntity(EntityRef):
         return True
 
     def resolve(self, scope, fmt=None):
+        if self is scope.executor.__metadata__:
+            return "@s"
         return scope.global_entity(self.namespace)
 
 class _PosUtil(EntityRef):
@@ -189,6 +193,8 @@ class _PosUtil(EntityRef):
         return True
 
     def resolve(self, scope, fmt=None):
+        if self is scope.executor.__metadata__:
+            return "@s"
         return scope.pos_util_entity()
 
 PosUtil = _PosUtil()

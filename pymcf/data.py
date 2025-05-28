@@ -8,7 +8,7 @@ from pymcf.ast_ import Constructor, RtBaseVar, RtBaseIterator, Assign, Inplace, 
     FormattedData
 from pymcf.mcfunction import mcfunction
 from pymcf.mc.commands import Resolvable, ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NBTStorable, NbtRef, \
-    RefWrapper, TextScoreComponent, TextComponent, ScoreboardAdd
+    RefWrapper, TextScoreComponent, TextComponent, ScoreboardAdd, Selector, ComboSelectorArgs
 
 
 class RtVar(RtBaseVar, ABC):
@@ -131,7 +131,20 @@ class NumberLike(ABC):
         return self
 
 
+def selector_merge(base: Selector, other: Selector) -> Selector:
+    #TODO
+    return Selector(type='e', args=ComboSelectorArgs(base.args, other.args))
+
+
 class Entity(RefWrapper[EntityRef]):
+
+    __base_selector__ = Selector(type='e')
+
+    def __new__(cls, *args, _ref=None, **kwargs):
+        self = super().__new__(cls)
+        if _ref is not None:
+            self.ref = _ref
+        return self
 
     @overload
     def __init__(self, entity: Self): ...
@@ -150,8 +163,9 @@ class Entity(RefWrapper[EntityRef]):
     def __metadata__(self) -> EntityRef:
         return self.ref
 
-
-Name = NameRef
+    @classmethod
+    def foreach[E: Entity](cls: type[E]) -> E:
+        return cls.__new__(cls, _ref=cls.__base_selector__)
 
 
 class ScoreBoard(RefWrapper[ObjectiveRef]):
@@ -243,7 +257,7 @@ class Score(RtVar, RefWrapper[ScoreRef], NumberLike):
         Assign(target=self, value=value)
 
     def __repr__(self):
-        return f"Score({self.__metadata__.resolve(None, None)})"
+        return f"Score({self.target} {self.objective})"
 
     def resolve(self, scope, fmt=None):
         if fmt is None:
