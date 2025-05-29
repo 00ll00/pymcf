@@ -158,19 +158,13 @@ class Entity(RefWrapper[EntityRef]):
         return self.ref
 
     @classmethod
-    def foreach[E: Entity](cls: type[E], selector: Selector = None, / , **kwaargs) -> E:
+    def foreach[E: Entity](cls: type[E], selector: Selector = None, /, **kwargs) -> E:
         if selector is None:
-            selector = kwaargs
+            selector = kwargs
         return cls.__new__(cls, _ref=cls.__base_selector__.merge(selector))
 
-
-class Player(Entity):
-
-    __base_selector__ = AtA()
-
-    def __init__(self):
-        raise TypeError(f'Player 不能被生成，使用 foreach 获取实例。')
-
+    def __repr__(self):
+        return f"{self.__class__.__name__}@{self.__metadata__.__class__.__name__}({self.__metadata__.__dict__})"
 
 class ScoreBoard(RefWrapper[ObjectiveRef]):
 
@@ -199,6 +193,9 @@ class ScoreBoard(RefWrapper[ObjectiveRef]):
             self.ref = ObjectiveRef(name=name)
         else:
             raise TypeError()
+
+    def __repr__(self):
+        return f"ScoreBoard({self.__metadata__.objective})"
 
     @staticmethod
     def try_add_new_scb(name, criteria, display_name):
@@ -261,7 +258,7 @@ class Score(RtVar, RefWrapper[ScoreRef], NumberLike):
         Assign(target=self, value=value)
 
     def __repr__(self):
-        return f"Score({self.target} {self.objective})"
+        return f"Score({self.target!r}, {self.objective!r})"
 
     def resolve(self, scope, fmt=None):
         if fmt is None:

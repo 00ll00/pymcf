@@ -36,6 +36,15 @@ class GetValue(Command):
     def resolve(self, scope, fmt=None):
         return 'scoreboard players get %s' % self.ref.resolve(scope, None)
 
+class ResetValue(Command):
+
+    def __init__(self, scoreref):
+        assert isinstance(scoreref, ScoreRef)
+        self.ref = scoreref
+
+    def resolve(self, scope, fmt=None):
+        return 'scoreboard players reset %s' % self.ref.resolve(scope, None)
+
 class Operation(Command):
     def __init__(self, left, right):
         assert isinstance(left, ScoreRef)

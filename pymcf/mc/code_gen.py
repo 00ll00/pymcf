@@ -3,7 +3,8 @@ from functools import reduce
 from typing import SupportsInt, Self
 
 from .commands import Command, RawCommand, OpAssign, Execute, ExecuteChain, DataGet, \
-    SetConst, OpSub, NumRange, OpMul, OpAdd, OpDiv, OpMod, AddConst, RemConst, Function, NSName, ReturnRun
+    SetConst, OpSub, NumRange, OpMul, OpAdd, OpDiv, OpMod, AddConst, RemConst, Function, NSName, ReturnRun, GetValue, \
+    ResetValue, AtS
 from .scope import MCFScope
 from ..ast_ import operation, Raw, Assign, UnaryOp, Inplace, Compare, LtE, Gt, GtE, Eq, NotEq, Lt, UAdd, USub, Not, \
     Invert, And, Or, Add, Sub, Mult, Div, FloorDiv, Mod, RtBaseExc, Call
@@ -117,6 +118,8 @@ class Translator:
                                    .run(DataGet(value.__metadata__.target, value.__metadata__.path)))
                 elif isinstance(value, SupportsInt):
                     return SetConst(target.__metadata__, int(value))
+                elif value is None:
+                    return ResetValue(target.__metadata__)
                 else:
                     raise NotImplementedError
             elif isinstance(target, Nbt):
@@ -257,7 +260,18 @@ class Translator:
                                 .cond('if').score_range(left.__metadata__, NumRange(right, None)).finish())
                     case _:
                         raise NotImplementedError
-
+            elif right is None:
+                # == None 用于判断 score 是否存在
+                match cmp:
+                    case Eq():
+                        return (ExecuteChain().store('success').score(target.__metadata__)
+                                .run(GetValue(left.__metadata__)))
+                    case NotEq():
+                        raise NotImplementedError
+                    case _:
+                        raise ValueError("None 不能用于比较大小")
+            else:
+                raise NotImplementedError
 
         elif isinstance(op, Call):
             # call 涉及上下文切换
@@ -266,7 +280,7 @@ class Translator:
             if scope.executor is None or scope.executor == self.scope.executor:
                 return Function(op.func)
             else:
-                return ExecuteChain().as_entity(scope.executor.__metadata__).run(Function(op.func))
+                return ExecuteChain().as_entity(scope.executor.__metadata__).at_entity_pos(AtS()).rotated_as_entity(AtS()).run(Function(op.func))
 
 
         raise NotImplementedError

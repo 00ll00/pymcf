@@ -34,6 +34,12 @@ class MCFScope(Scope):
         self.locals.append(score)
         return score
 
+    def new_local_tag(self) -> str:
+        index = len(self.locals)
+        tag = f"$var_{index}"
+        self.locals.append(tag)
+        return tag
+
     @property
     def nsname(self):
         return f"{self.namespace}:{self.name}"

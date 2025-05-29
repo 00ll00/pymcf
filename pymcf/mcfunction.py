@@ -180,7 +180,11 @@ class mcfunction:
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        return MethodType(self, Executor(instance))
+        from pymcf.data import Entity
+        if issubclass(owner, Entity):
+            return MethodType(self, Executor(instance))
+        else:
+            return MethodType(self, instance)
 
     @staticmethod
     def inline(_func=None, /, **kwargs):
