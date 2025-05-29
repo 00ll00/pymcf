@@ -1,6 +1,4 @@
 from abc import abstractmethod, ABC
-from contextlib import contextmanager
-from contextvars import ContextVar
 from numbers import Real
 from typing import Self, overload, SupportsInt, Iterable
 
@@ -8,7 +6,8 @@ from pymcf.ast_ import Constructor, RtBaseVar, RtBaseIterator, Assign, Inplace, 
     FormattedData
 from pymcf.mcfunction import mcfunction
 from pymcf.mc.commands import Resolvable, ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NBTStorable, NbtRef, \
-    RefWrapper, TextScoreComponent, TextComponent, ScoreboardAdd, Selector, ComboSelectorArgs, SimpleSelectorArgs, AtE
+    RefWrapper, TextScoreComponent, TextComponent, ScoreboardAdd, AtE, \
+    AtA, Selector
 
 
 class RtVar(RtBaseVar, ABC):
@@ -159,8 +158,18 @@ class Entity(RefWrapper[EntityRef]):
         return self.ref
 
     @classmethod
-    def foreach[E: Entity](cls: type[E], selector=None) -> E:
+    def foreach[E: Entity](cls: type[E], selector: Selector = None, / , **kwaargs) -> E:
+        if selector is None:
+            selector = kwaargs
         return cls.__new__(cls, _ref=cls.__base_selector__.merge(selector))
+
+
+class Player(Entity):
+
+    __base_selector__ = AtA()
+
+    def __init__(self):
+        raise TypeError(f'Player 不能被生成，使用 foreach 获取实例。')
 
 
 class ScoreBoard(RefWrapper[ObjectiveRef]):

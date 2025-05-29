@@ -1,3 +1,4 @@
+from abc import ABC
 from typing import Literal, overload, Any, Self
 
 from .core import Resolvable, EntityRef
@@ -22,15 +23,8 @@ class NumRange(Resolvable):
         return range
 
 
-class SelectorArgs(Resolvable):
+class SelectorArgs(Resolvable, ABC):
     pass
-
-class SimpleSelectorArgs(SelectorArgs):
-    def __init__(self, args):
-        self.args = args
-
-    def resolve(self, scope, fmt=None):
-        return dict(self.args)
 
 class SelRange(SelectorArgs):
     def __init__(self, objective, min=None, max=None):
@@ -45,24 +39,6 @@ class SelRange(SelectorArgs):
 class SelEquals(SelRange):
     def __init__(self, objective, value):
         super().__init__(objective, value, value)
-
-class ComboSelectorArgs(SelectorArgs):
-
-    @staticmethod
-    def new(first, second):
-        if first is None: return second
-        if second is None: return first
-        return ComboSelectorArgs(first, second)
-
-    def __init__(self, first, second):
-        self.first = first
-        self.second = second
-
-    def resolve(self, scope, fmt=None):
-        sel = {}
-        sel.update(self.first.resolve(scope, None))
-        sel.update(self.second.resolve(scope, None))
-        return sel
 
 class SelNbt(SelectorArgs):
 
@@ -112,6 +88,13 @@ class SelNbt(SelectorArgs):
     def resolve(self, scope, fmt=None):
         return {'nbt': self.stringify_nbt(self.nbt_spec, scope)}
 
+class SelTags(SelectorArgs):
+
+    def __init__(self, tags: set[str]):
+        self.tags = tags
+
+    def resolve(self, scope, fmt=None):
+        return ','.join(f"tag={tag}" for tag in self.tags)
 
 class SelectorProto:
     advancements: Any = None
@@ -127,7 +110,7 @@ class SelectorProto:
     predicate: Any = None
     scores: list[SelRange] | SelRange = None
     sort: Literal["arbitrary", "furthest", "nearest", "random"] = None
-    tag: list[str] | str = None
+    tag: SelTags = None
     team: str = None
     type: str = None
     x: int = None
@@ -141,7 +124,6 @@ class Selector(EntityRef, SelectorProto):
     _NotAvailable = object()
 
     _kind: Literal['a', 'e', 'n', 'p', 'r', 's'] = None
-    _multi_key = {"nbt", "tag", "predicate", }
     _solid: dict = {}
     _soft: dict = {}
 
@@ -157,11 +139,11 @@ class Selector(EntityRef, SelectorProto):
             level: int = None,
             limit: int = None,
             name: str = None,
-            nbt: list[SelNbt] | SelNbt = None,
+            nbt: SelNbt = None,
             predicate=None,
             scores: list[SelRange] | SelRange = None,
             sort: Literal["arbitrary", "furthest", "nearest", "random"] = None,
-            tag: list[str] | str = None,
+            tag: SelTags | set[str] | str = None,
             team: str = None,
             type: str = None,
             x: int = None,
@@ -186,8 +168,15 @@ class Selector(EntityRef, SelectorProto):
                 raise KeyError()
 
         for k in kwargs:
-            if k in self._multi_key and not isinstance(kwargs[k], list):
-                kwargs[k] = [kwargs[k]]
+            if k == "tag" and not isinstance(kwargs[k], SelTags):
+                tags = SelTags(kwargs[k] if isinstance(kwargs[k], set) else {kwargs[k]})
+                if isinstance(self.tag, SelTags):
+                    tags |= self.tag.tags
+                kwargs[k] = tags
+            elif k == "nbt":
+                ...  # TODO
+            elif k == "predicate":
+                ...  # TODO
 
         self.__dict__.update(kwargs)
 
@@ -203,10 +192,7 @@ class Selector(EntityRef, SelectorProto):
         items = []
         for k, v in self.__dict__.items():
             if v is not None and v is not Selector._NotAvailable:
-                if k not in self._multi_key:
-                    v = [v]
-                for vv in v:
-                    items.append(f"{k}={vv.resolve(scope, None) if isinstance(vv, Resolvable) else repr(vv)}")
+                items.append(v.resolve(scope, None) if isinstance(v, Resolvable) else f"{k}={v}")
         if len(items) == 0:
             return res
         return f"{res}[{','.join(items)}]"
@@ -214,14 +200,14 @@ class Selector(EntityRef, SelectorProto):
     def copy(self):
         return type(self)(**self.__dict__)
 
-    def merge(self, other: Self | None):
+    def merge(self, other: dict | Self | None):
         """
         将一个新选择器的约束添加到此选择器，返回一个新的选择器
         """
         if other is None:
             return self
         res = self.copy()
-        res._update(other.__dict__)
+        res._update(other if isinstance(other, dict) else other.__dict__)
         return res
 
 
