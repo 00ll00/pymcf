@@ -260,6 +260,15 @@ class Score(RtVar, RefWrapper[ScoreRef], NumberLike):
     def __repr__(self):
         return f"Score({self.target!r}, {self.objective!r})"
 
+    def __format__(self, format_spec):
+        match format_spec:
+            case "":
+                return self
+            case "josn":
+                return TextScoreComponent(self.__metadata__)
+            case _:
+                raise SyntaxError(f"unsupported format specification: {format_spec}")
+
     def __bool_and__(self, other):
         res = Bool.__create_var__()
         Assign(res, self)

@@ -153,23 +153,24 @@ class FormattedData(Resolvable):
     def __init__(self, data: Resolvable, fmt: str | None = None, conversion: Literal['s', 'r', 'a'] = None):
         self.data = data
         self.fmt = fmt
-        self.conversion = conversion if conversion is not None else 's'
+        self.conversion = conversion
 
     def __repr__(self):
-        return f"${{{self.data!r}{f':{self.fmt}' if self.fmt is not None else ''}}}"
+        return f"${{{self.data!r}{f':{self.fmt}' if self.fmt is not None else ''}{f'!{self.conversion}' if self.conversion is not None else ''}}}"
 
     def resolve(self, scope):
-        resolved = self.data.resolve(scope)
+        data = self.data
         if self.fmt is not None:
-            resolved = format(resolved, self.fmt)
-        if self.conversion == 's':
-            return str(resolved)
+            data = data.__format__(self.fmt)  # 使用 __format__ 绕过 format 返回值必须是 str 的限制
+        if isinstance(data, Resolvable):
+            data = data.resolve(scope)
+        if self.conversion == 's' or self.conversion is None:
+            data = str(data)
         elif self.conversion == 'r':
-            return repr(resolved)
+            data = repr(data)
         elif self.conversion == 'a':
-            return ascii(resolved)
-        else:
-            raise ValueError()
+            data = ascii(data)
+        return data
 
 
 class Raw(operation):
