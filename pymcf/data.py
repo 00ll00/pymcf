@@ -158,7 +158,7 @@ class Entity(RefWrapper[EntityRef]):
         return self.ref
 
     @classmethod
-    def foreach[E: Entity](cls: type[E], selector: Selector = None, /, **kwargs) -> E:
+    def select[E: Entity](cls: type[E], selector: Selector = None, /, **kwargs) -> E:
         if selector is None:
             selector = kwargs
         return cls.__new__(cls, _ref=cls.__base_selector__.merge(selector))

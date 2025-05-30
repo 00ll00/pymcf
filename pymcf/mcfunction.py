@@ -145,9 +145,10 @@ class mcfunction:
         from .mc.scope import MCFScope
         executor = None
         if len(args) > 0 and isinstance(args[0], Executor):
-            assert not self._inline
-            executor = args[0].entity
-            args = (executor, *args[1:])
+            if not self._inline:
+                # TODO
+                executor = args[0].entity
+            args = (args[0].entity, *args[1:])
         if self._inline:
             with Constructor(name=self._basename, inline=self._inline, scope=Constructor.current_constr().scope) as constr:
                 self._ast_generator(*args, **kwargs)
