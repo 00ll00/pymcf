@@ -144,22 +144,24 @@ class control_flow(stmt, ABC):
 class Resolvable(metaclass=ABCMeta):
 
     @abstractmethod
-    def resolve(self, scope, fmt=None):
+    def resolve(self, scope):
         pass
 
 
 class FormattedData(Resolvable):
 
-    def __init__(self, data: Resolvable, fmt: str | None = None, conversion: Literal['s', 'r', 'a'] = 's'):
+    def __init__(self, data: Resolvable, fmt: str | None = None, conversion: Literal['s', 'r', 'a'] = None):
         self.data = data
         self.fmt = fmt
-        self.conversion = conversion
+        self.conversion = conversion if conversion is not None else 's'
 
     def __repr__(self):
         return f"${{{self.data!r}{f':{self.fmt}' if self.fmt is not None else ''}}}"
 
-    def resolve(self, scope, fmt=None):
-        resolved = self.data.resolve(scope, self.fmt)
+    def resolve(self, scope):
+        resolved = self.data.resolve(scope)
+        if self.fmt is not None:
+            resolved = format(resolved, self.fmt)
         if self.conversion == 's':
             return str(resolved)
         elif self.conversion == 'r':

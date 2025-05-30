@@ -13,9 +13,9 @@ class Scoreboard(Command):
         self.var = varref
         self.value = value
 
-    def resolve(self, scope, fmt=None):
+    def resolve(self, scope):
         return 'scoreboard players %s %s %d' % (
-            self.op, self.var.resolve(scope, None), self.value)
+            self.op, self.var.resolve(scope), self.value)
 
 class SetConst(Scoreboard):
     op = 'set'
@@ -33,8 +33,8 @@ class GetValue(Command):
         assert isinstance(scoreref, ScoreRef)
         self.ref = scoreref
 
-    def resolve(self, scope, fmt=None):
-        return 'scoreboard players get %s' % self.ref.resolve(scope, None)
+    def resolve(self, scope):
+        return 'scoreboard players get %s' % self.ref.resolve(scope)
 
 class ResetValue(Command):
 
@@ -42,8 +42,8 @@ class ResetValue(Command):
         assert isinstance(scoreref, ScoreRef)
         self.ref = scoreref
 
-    def resolve(self, scope, fmt=None):
-        return 'scoreboard players reset %s' % self.ref.resolve(scope, None)
+    def resolve(self, scope):
+        return 'scoreboard players reset %s' % self.ref.resolve(scope)
 
 class Operation(Command):
     def __init__(self, left, right):
@@ -52,9 +52,9 @@ class Operation(Command):
         self.left = left
         self.right = right
 
-    def resolve(self, scope, fmt=None):
+    def resolve(self, scope):
         return 'scoreboard players operation %s %s %s' % (
-            self.left.resolve(scope, None), self.op, self.right.resolve(scope, None))
+            self.left.resolve(scope), self.op, self.right.resolve(scope))
 
 class OpAssign(Operation): op = '='
 class OpAdd(Operation): op = '+='
@@ -72,7 +72,7 @@ class ObjectiveRef(Resolvable):
         assert type(name) == str
         self.objective = name
 
-    def resolve(self, scope, fmt=None):
+    def resolve(self, scope):
         return self.objective
 
 class ScoreboardAdd(Command):
@@ -86,9 +86,9 @@ class ScoreboardAdd(Command):
         self.criteria = criteria
         self.display_name = display_name
 
-    def resolve(self, scope, fmt=None):
+    def resolve(self, scope):
         from . import TextComponent
-        res = f"scoreboard objectives add {self.ref.resolve(scope, None)} {self.criteria}"
+        res = f"scoreboard objectives add {self.ref.resolve(scope)} {self.criteria}"
         if self.display_name is not None:
             if isinstance(self.display_name, str):
                 res += f" {self.display_name!r}"
@@ -104,7 +104,7 @@ class ScoreRef(Resolvable):
         self.target = target
         self.objective = objective
 
-    def resolve(self, scope, fmt=None):
+    def resolve(self, scope):
         return '%s %s' % (self.target.resolve(scope),
                           self.objective.resolve(scope))
 

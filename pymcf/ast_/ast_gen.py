@@ -1129,7 +1129,7 @@ class ASTRewriter(NodeTransformer):
 
         def handle_fmt_spec(data, fmt, conversion):
             if isinstance(data, Resolvable):
-                return FormattedData(data, fmt)
+                return FormattedData(data, fmt, chr(conversion) if conversion != -1 else None)
             else:
                 if fmt is not None:
                     data = format(data, fmt)

@@ -260,14 +260,6 @@ class Score(RtVar, RefWrapper[ScoreRef], NumberLike):
     def __repr__(self):
         return f"Score({self.target!r}, {self.objective!r})"
 
-    def resolve(self, scope, fmt=None):
-        if fmt is None:
-            return super().resolve(scope, fmt)
-        elif fmt == "json":
-            return TextScoreComponent(self.__metadata__).resolve_str(scope)
-        else:
-            raise ValueError(f"unknown score format {fmt!r}.")
-
     def __bool_and__(self, other):
         res = Bool.__create_var__()
         Assign(res, self)

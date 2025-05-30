@@ -12,7 +12,7 @@ class NumRange(Resolvable):
         self.min = min
         self.max = max
 
-    def resolve(self, scope, fmt=None):
+    def resolve(self, scope):
         range = ''
         if self.min is not None:
             range = '%d' % self.min
@@ -32,9 +32,9 @@ class SelRange(SelectorArgs):
         self.objective = objective
         self.range = NumRange(min, max)
 
-    def resolve(self, scope, fmt=None):
-        return {'scores': {self.objective.resolve(scope, None):
-                               self.range.resolve(scope, None)}}
+    def resolve(self, scope):
+        return {'scores': {self.objective.resolve(scope):
+                               self.range.resolve(scope)}}
 
 class SelEquals(SelRange):
     def __init__(self, objective, value):
@@ -82,10 +82,10 @@ class SelNbt(SelectorArgs):
         if type(node) == list:
             return '[%s]' % ','.join(map(lambda n:self.stringify_nbt(n, scope), node))
         if isinstance(node, Resolvable):
-            return node.resolve(scope, None)
+            return node.resolve(scope)
         assert False, type(node)
 
-    def resolve(self, scope, fmt=None):
+    def resolve(self, scope):
         return {'nbt': self.stringify_nbt(self.nbt_spec, scope)}
 
 class SelTags(SelectorArgs):
@@ -93,7 +93,7 @@ class SelTags(SelectorArgs):
     def __init__(self, tags: set[str]):
         self.tags = tags
 
-    def resolve(self, scope, fmt=None):
+    def resolve(self, scope):
         return ','.join(f"tag={tag}" for tag in self.tags)
 
 class SelectorProto:
@@ -185,14 +185,14 @@ class Selector(EntityRef, SelectorProto):
             return True
         return self.limit == 1
 
-    def resolve(self, scope, fmt=None):
+    def resolve(self, scope):
         if self is scope.executor.__metadata__:
             return "@s"
         res = '@' + self._kind
         items = []
         for k, v in self.__dict__.items():
             if v is not None and v is not Selector._NotAvailable:
-                items.append(v.resolve(scope, None) if isinstance(v, Resolvable) else f"{k}={v}")
+                items.append(v.resolve(scope) if isinstance(v, Resolvable) else f"{k}={v}")
         if len(items) == 0:
             return res
         return f"{res}[{','.join(items)}]"
