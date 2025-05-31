@@ -30,7 +30,7 @@ class MCFScope(Scope):
 
     def new_local_score(self) -> Score:
         index = len(self.locals)
-        score = Score(NameRef(f"$var_{index}"),  self.sys_scb)
+        score = Score(NameRef(f"$var_{hex(hash(hex(id(self))))[-6:]}_{index}"),  self.sys_scb)  # TODO 变量作用域区分
         self.locals.append(score)
         return score
 
