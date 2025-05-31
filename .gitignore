@@ -1,3 +1,5 @@
 /tmp/
 /.idea/
 **/__pycache__/
+/dist/
+/src/pymcf.egg-info/
