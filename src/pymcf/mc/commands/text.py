@@ -1,6 +1,8 @@
 import json
 from abc import abstractmethod
 
+from pymcf.mc.commands import Selector
+
 from .core import Command, EntityRef, Resolvable
 from .scoreboard import ScoreRef
 from .nbt import Path, NBTStorable
@@ -87,6 +89,13 @@ class TextScoreComponent(TextComponent):
         return {'score':
                 {'name': self.ref.target.resolve(scope),
                  'objective': self.ref.objective.resolve(scope)}}
+
+class TextSelectorCompoment(TextComponent):
+    def __init__(self, selector):
+        assert isinstance(selector, Selector)
+        self.selector = selector
+    def _resolve(self, scope):
+        return {'selector': self.selector.resolve(scope)}
 
 class TextClickAction:
 

@@ -280,10 +280,14 @@ class Translator:
                 # == None 用于判断 score 是否存在
                 match cmp:
                     case Eq():
+                        return [ExecuteChain().store('success').score(target.__metadata__)
+                                .run(GetValue(left.__metadata__)),
+                                ExecuteChain().store('success').score(target.__metadata__)
+                                .cond('if').score_range(target.__metadata__, NumRange(0, 0)).finish()
+                                ]
+                    case NotEq():
                         return (ExecuteChain().store('success').score(target.__metadata__)
                                 .run(GetValue(left.__metadata__)))
-                    case NotEq():
-                        raise NotImplementedError
                     case _:
                         raise ValueError("None 不能用于比较大小")
             else:
