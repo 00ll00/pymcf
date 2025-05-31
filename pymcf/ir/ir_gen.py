@@ -4,9 +4,9 @@ from collections import defaultdict
 from typing import Any, Callable, Generator
 
 from pymcf.config import Config
-from .codeblock import BasicBlock, MatchJump, JmpEq, code_block
+from .codeblock import BasicBlock, MatchJump, JmpEq, code_block, IrBlockAttr
 from pymcf.ast_ import operation, Constructor, Block, compiler_hint, If, For, Try, Call, RtBaseExc, \
-    RtStopIteration, RtContinue, RtBreak, Assign, Raise, While, RtBaseVar, Scope
+    RtStopIteration, RtContinue, RtBreak, Assign, Raise, While, RtBaseVar, Scope, With
 from ..ast_.runtime import RtReturn
 
 
@@ -65,6 +65,9 @@ class Expander(NodeVisitor):
             if isinstance(node, Try):
                 if len(node.blk_finally.flow) > 0:
                     return False
+            elif isinstance(node, With):
+                if len(node.blk_exit.flow) > 0:
+                    return False
         return True
 
     def enter_block(self, cb: BasicBlock=None, name: str = None) -> BasicBlock:
@@ -111,6 +114,8 @@ class Expander(NodeVisitor):
     def generic_visit(self, node: Any) -> Any:
         if isinstance(node, operation):
             self.current_block().add_op(node)
+        elif isinstance(node, IrBlockAttr):  # 设置块属性
+            self.current_block().attributes.update(node.attr)
 
     def visit_If(self, node: If):
         cb_last_out = self.exit_block()
@@ -374,6 +379,52 @@ class Expander(NodeVisitor):
             if self.inline_catch and self._try_match_jump:
                 cb_last.true = self._try_match_jump[-1]
 
+    def visit_With(self, node: With):
+        cb_last_out = self.exit_block()
+
+        cb_enter_in = self.enter_block(name="with_enter")
+        self.visit(node.blk_enter)
+        cb_enter_out = self.exit_block()
+
+        cb_body_in = self.enter_block(name="with_body")
+        self.visit(node.blk_body)
+        cb_body_out = self.exit_block()
+
+        cb_exit_in = self.enter_block(name="with_exit")
+        self.visit(node.blk_exit)
+        cb_exit_out = self.exit_block()
+
+        cb_next_in = self.enter_block(name="with_next")
+
+        cb_last_out.direct = cb_enter_in
+
+        if not self.inline_catch:
+
+            if node.blk_body.excs.might:
+                cb_catch = BasicBlock(name="with_catch")
+                cb_catch.direct = cb_body_in
+                cb_catch.cond = True
+                cb_catch.true = cb_exit_in
+            else:
+                cb_catch = cb_body_in
+                cb_body_out.direct = cb_exit_in
+
+            if node.blk_enter.excs.might:
+                cb_enter_out.cond = self.bf
+                cb_enter_out.false = cb_catch
+            else:
+                cb_enter_out.direct = cb_catch
+
+            if node.blk_exit.excs.might or node.blk_body.excs.might:
+                cb_exit_out.cond = self.bf
+                cb_exit_out.false = cb_next_in
+            else:
+                cb_exit_out.direct = cb_next_in
+        else:
+            cb_last_out.direct = cb_enter_in
+            cb_enter_out.direct = cb_body_in
+            cb_body_out.direct = cb_exit_in
+            cb_exit_out.direct = cb_next_in
 
 class CBSimplifier:
 
@@ -455,6 +506,10 @@ class EmptyCBRemover(CBSimplifier):
     """
     消除空块和简化跳转逻辑
     """
+    @staticmethod
+    def is_empty(block: BasicBlock):
+        return len(block.ops) == 0 and len(block.attributes) == 0
+
     def simplify_BasicBlock(self, cb: BasicBlock) -> code_block | None:
         if cb.true is cb.false and cb.direct is None:
             # 判断后跳转的目标为同一个，可以跳过判断
@@ -468,23 +523,23 @@ class EmptyCBRemover(CBSimplifier):
             cb.true = cb.false = None
             self._mark_simplified()
 
-        if cb.cond is None and isinstance(cb.direct, BasicBlock) and len(cb.direct.ops) == 0:
+        if cb.cond is None and isinstance(cb.direct, BasicBlock) and self.is_empty(cb.direct):
             # 当前块直接跳转空块且无条件跳转，将空块的跳转方式提前
             cb.cond = cb.direct.cond
             cb.false = cb.direct.false
             cb.true = cb.direct.true
             cb.direct = cb.direct.direct
             self._mark_simplified()
-        if len(cb.ops) == 0 and cb.cond is None:
+        if self.is_empty(cb) and cb.cond is None:
             # 不应存在全空的环路
             self._mark_simplified()
             return cb.direct
         if cb.cond is not None:
             # 跳过相同条件的空块
-            if isinstance(cb.true, BasicBlock) and cb.true.cond is cb.cond and len(cb.true.ops) == 0 and cb.true.direct is None:
+            if isinstance(cb.true, BasicBlock) and cb.true.cond is cb.cond and self.is_empty(cb.true) and cb.true.direct is None:
                 cb.true = cb.true.true
                 self._mark_simplified()
-            if isinstance(cb.false, BasicBlock) and cb.false.cond is cb.cond and len(cb.false.ops) == 0 and cb.false.direct is None:
+            if isinstance(cb.false, BasicBlock) and cb.false.cond is cb.cond and self.is_empty(cb.false) and cb.false.direct is None:
                 cb.false = cb.false.false
                 self._mark_simplified()
         return cb
@@ -508,7 +563,7 @@ class CBInliner(CBSimplifier):
         return super().simplify()
 
     def simplify_BasicBlock(self, cb: BasicBlock) -> code_block | None:
-        if cb.cond is None and cb.direct is not None:
+        if cb.cond is None and isinstance(cb.direct, BasicBlock) and len(cb.direct.attributes) == 0:
             if (self.inline_thresh >= 0 and self._ref_num[cb.direct] == 1) or len(cb.direct.ops) <= self.inline_thresh:
                 # cb.direct 不会是 cb
                 cb.cond = cb.direct.cond

@@ -5,7 +5,7 @@ from dominate.tags import *
 from dominate.util import raw
 
 from pymcf.ast_ import NodeVisitor, Block, operation, compiler_hint, If, Scope, Raise, AST, \
-    For, While, Try, Inplace, Call
+    For, While, Try, Inplace, Call, With
 from .reprs import repr_operation, repr_compiler_hint
 
 
@@ -111,6 +111,13 @@ class _ScopeDumper(NodeVisitor):
 
     def visit_Call(self, node: Call):
         div(repr(node.func), cls="call")
+
+    def visit_With(self, node: With):
+        with table():
+            with tr(), td():
+                div(repr(node.ctx), cls="with cf")
+            with tr(), td():
+                self.visit(node.blk_body)
 
 
 def dump_context(scope: Scope) -> str:

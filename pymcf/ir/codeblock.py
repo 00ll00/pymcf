@@ -6,7 +6,9 @@ from pymcf.ast_ import operation, compiler_hint
 
 
 class code_block(ast.AST):
-    ...
+    def __init__(self, name: str):
+        self.name = name
+        self.attributes = {}
 
 class BasicBlock(code_block):
     """
@@ -19,15 +21,13 @@ class BasicBlock(code_block):
     _fields = ("ops", "direct", "cond", "false", "true")
     _attributes = ("name", "attributes", )
     def __init__(self, name: str):
-        self.name = name
+        super().__init__(name)
         self.ops: list[operation | compiler_hint] = []
         self.cond: Any = None  # 判断条件
 
         self.direct: code_block | None = None  # 位于 ops 之后，cond 判断之前无执行
         self.false: code_block | None = None  # 在 direct 之后若 cond 判断为假则执行
         self.true: code_block | None = None  # 在 direct 之后若 cond 判断为真则执行
-
-        self.attributes = {}
 
     def add_op(self, op):
         self.ops.append(op)
@@ -65,7 +65,14 @@ class MatchJump(code_block):
     _fields = ("flag", "cases", "inactive")
     _attributes = ("name", "attributes")
     def __init__(self, flag: Any, cases: list[jmpop], inactive: Any = 0, name: str = None):
-        self.name = name
+        super().__init__(name)
         self.flag = flag
         self.cases = cases
         self.inactive = inactive  # 用于指示分支完成后的值，应避免被各分支条件响应
+
+
+class IrBlockAttr(compiler_hint):
+    _attributes = ("attr", )
+    def __init__(self, attr: dict, **kwargs):
+        self.attr = attr
+        super().__init__(**kwargs)

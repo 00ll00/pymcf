@@ -73,7 +73,7 @@ class stmt(AST):
     def excs(self) -> ExcSet:
         ...
 
-    def __init__(self, *_, _offline: bool = None, **__):
+    def __init__(self, *, _offline: bool = None, **__):
         super().__init__()
         if not _offline:
             from .constructor import Constructor
@@ -188,37 +188,37 @@ class Assign(operation):
     _fields = ("target", "value")
     _reads = ("value",)
     _writes = ("target",)
-    def __init__(self, target, value, *args, **kwargs):
+    def __init__(self, target, value, **kwargs):
         self.target = target
         self.value = value
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
 
 class UnaryOp(operation):
     _fields = ("op", "target", "value")
     _reads = ("value",)
     _writes = ("target",)
-    def __init__(self, op: unaryop, target, value, *args, **kwargs):
+    def __init__(self, op: unaryop, target, value, **kwargs):
         self.op = op
         self.target = target
         self.value = value
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
     @staticmethod
-    def UAdd(target, value, *args, **kwargs):
-        return UnaryOp(UAdd(), target, value, *args, **kwargs)
+    def UAdd(target, value, **kwargs):
+        return UnaryOp(UAdd(), target, value, **kwargs)
 
     @staticmethod
-    def USub(target, value, *args, **kwargs):
-        return UnaryOp(USub(), target, value, *args, **kwargs)
+    def USub(target, value, **kwargs):
+        return UnaryOp(USub(), target, value, **kwargs)
 
     @staticmethod
-    def Not(target, value, *args, **kwargs):
-        return UnaryOp(Not(), target, value, *args, **kwargs)
+    def Not(target, value, **kwargs):
+        return UnaryOp(Not(), target, value, **kwargs)
 
     @staticmethod
-    def Invert(target, value, *args, **kwargs):
-        return UnaryOp(Invert(), target, value, *args, **kwargs)
+    def Invert(target, value, **kwargs):
+        return UnaryOp(Invert(), target, value, **kwargs)
 
 
 class Inplace(operation):
@@ -228,71 +228,71 @@ class Inplace(operation):
     _fields = ("op", "target", "value")
     _reads = ("target", "value")
     _writes = ("target",)
-    def __init__(self, op: operator | boolop, target, value, *args, **kwargs):
+    def __init__(self, op: operator | boolop, target, value, **kwargs):
         self.op = op
         self.target = target
         self.value = value
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
     @staticmethod
-    def And(target, value, *args, **kwargs):
-        return Inplace(And(), target, value, *args, **kwargs)
+    def And(target, value, **kwargs):
+        return Inplace(And(), target, value, **kwargs)
 
     @staticmethod
-    def Or(target, value, *args, **kwargs):
-        return Inplace(Or(), target, value, *args, **kwargs)
+    def Or(target, value, **kwargs):
+        return Inplace(Or(), target, value, **kwargs)
 
     @staticmethod
-    def Add(target, value, *args, **kwargs):
-        return Inplace(Add(), target, value, *args, **kwargs)
+    def Add(target, value, **kwargs):
+        return Inplace(Add(), target, value, **kwargs)
 
     @staticmethod
-    def Sub(target, value, *args, **kwargs):
-        return Inplace(Sub(), target, value, *args, **kwargs)
+    def Sub(target, value, **kwargs):
+        return Inplace(Sub(), target, value, **kwargs)
 
     @staticmethod
-    def Mult(target, value, *args, **kwargs):
-        return Inplace(Mult(), target, value, *args, **kwargs)
+    def Mult(target, value, **kwargs):
+        return Inplace(Mult(), target, value, **kwargs)
 
     @staticmethod
-    def Div(target, value, *args, **kwargs):
-        return Inplace(Div(), target, value, *args, **kwargs)
+    def Div(target, value, **kwargs):
+        return Inplace(Div(), target, value, **kwargs)
 
     @staticmethod
-    def FloorDiv(target, value, *args, **kwargs):
-        return Inplace(FloorDiv(), target, value, *args, **kwargs)
+    def FloorDiv(target, value, **kwargs):
+        return Inplace(FloorDiv(), target, value, **kwargs)
 
     @staticmethod
-    def Mod(target, value, *args, **kwargs):
-        return Inplace(Mod(), target, value, *args, **kwargs)
+    def Mod(target, value, **kwargs):
+        return Inplace(Mod(), target, value, **kwargs)
 
     @staticmethod
-    def Pow(target, value, *args, **kwargs):
-        return Inplace(Pow(), target, value, *args, **kwargs)
+    def Pow(target, value, **kwargs):
+        return Inplace(Pow(), target, value, **kwargs)
 
     @staticmethod
-    def LShift(target, value, *args, **kwargs):
-        return Inplace(LShift(), target, value, *args, **kwargs)
+    def LShift(target, value, **kwargs):
+        return Inplace(LShift(), target, value, **kwargs)
 
     @staticmethod
-    def RShift(target, value, *args, **kwargs):
-        return Inplace(RShift(), target, value, *args, **kwargs)
+    def RShift(target, value, **kwargs):
+        return Inplace(RShift(), target, value, **kwargs)
 
     @staticmethod
-    def BitOr(target, value, *args, **kwargs):
-        return Inplace(BitOr(), target, value, *args, **kwargs)
+    def BitOr(target, value, **kwargs):
+        return Inplace(BitOr(), target, value, **kwargs)
 
     @staticmethod
-    def BitXor(target, value, *args, **kwargs):
-        return Inplace(BitXor(), target, value, *args, **kwargs)
+    def BitXor(target, value, **kwargs):
+        return Inplace(BitXor(), target, value, **kwargs)
 
     @staticmethod
-    def BitAnd(target, value, *args, **kwargs):
-        return Inplace(BitAnd(), target, value, *args, **kwargs)
+    def BitAnd(target, value, **kwargs):
+        return Inplace(BitAnd(), target, value, **kwargs)
 
     @staticmethod
-    def MatMult(target, value, *args, **kwargs):
-        return Inplace(MatMult(), target, value, *args, **kwargs)
+    def MatMult(target, value, **kwargs):
+        return Inplace(MatMult(), target, value, **kwargs)
 
 
 class cmpop(ast.cmpop):
@@ -329,61 +329,61 @@ class Compare(operation):
     _fields = ("op", "target", "left", "right")
     _reads = ("left", "right")
     _writes = ("target",)
-    def __init__(self, op: cmpop, target, left, right, *args, **kwargs):
+    def __init__(self, op: cmpop, target, left, right, **kwargs):
         self.op = op
         self.target = target
         self.left = left
         self.right = right
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
     @staticmethod
-    def Eq(target, left, right, *args, **kwargs):
-        return Compare(Eq(), target, left, right, *args, **kwargs)
+    def Eq(target, left, right, **kwargs):
+        return Compare(Eq(), target, left, right, **kwargs)
 
     @staticmethod
-    def NotEq(target, left, right, *args, **kwargs):
-        return Compare(NotEq(), target, left, right, *args, **kwargs)
+    def NotEq(target, left, right, **kwargs):
+        return Compare(NotEq(), target, left, right, **kwargs)
 
     @staticmethod
-    def Lt(target, left, right, *args, **kwargs):
-        return Compare(Lt(), target, left, right, *args, **kwargs)
+    def Lt(target, left, right, **kwargs):
+        return Compare(Lt(), target, left, right, **kwargs)
 
     @staticmethod
-    def LtE(target, left, right, *args, **kwargs):
-        return Compare(LtE(), target, left, right, *args, **kwargs)
+    def LtE(target, left, right, **kwargs):
+        return Compare(LtE(), target, left, right, **kwargs)
 
     @staticmethod
-    def Gt(target, left, right, *args, **kwargs):
-        return Compare(Gt(), target, left, right, *args, **kwargs)
+    def Gt(target, left, right, **kwargs):
+        return Compare(Gt(), target, left, right, **kwargs)
 
     @staticmethod
-    def GtE(target, left, right, *args, **kwargs):
-        return Compare(GtE(), target, left, right, *args, **kwargs)
+    def GtE(target, left, right, **kwargs):
+        return Compare(GtE(), target, left, right, **kwargs)
 
     # @staticmethod
-    # def Is(target, left, right, *args, **kwargs):
-    #     return Compare(Is(), target, left, right, *args, **kwargs)
+    # def Is(target, left, right, **kwargs):
+    #     return Compare(Is(), target, left, right, **kwargs)
     #
     # @staticmethod
-    # def IsNot(target, left, right, *args, **kwargs):
-    #     return Compare(IsNot(), target, left, right, *args, **kwargs)
+    # def IsNot(target, left, right, **kwargs):
+    #     return Compare(IsNot(), target, left, right, **kwargs)
     #
     # @staticmethod
-    # def In(target, left, right, *args, **kwargs):
-    #     return Compare(In(), target, left, right, *args, **kwargs)
+    # def In(target, left, right, **kwargs):
+    #     return Compare(In(), target, left, right, **kwargs)
     #
     # @staticmethod
-    # def NotIn(target, left, right, *args, **kwargs):
-    #     return Compare(NotIn(), target, left, right, *args, **kwargs)
+    # def NotIn(target, left, right, **kwargs):
+    #     return Compare(NotIn(), target, left, right, **kwargs)
 
 
 class If(control_flow):
     _fields = ("condition", "blk_body", "blk_else")
-    def __init__(self, condition: Any, blk_body: Block, blk_else: Block, *args, **kwargs):
+    def __init__(self, condition: Any, blk_body: Block, blk_else: Block, **kwargs):
         self.condition = condition
         self.blk_body = blk_body
         self.blk_else = blk_else
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
     @cached_property
     def excs(self) -> ExcSet:
@@ -392,12 +392,12 @@ class If(control_flow):
 
 class For(control_flow):
     _fields = ("iterator", "blk_iter", "blk_body", "blk_else")
-    def __init__(self, iterator: Any, blk_iter: Block, blk_body: Block, blk_else: Block, *args, **kwargs):
+    def __init__(self, iterator: Any, blk_iter: Block, blk_body: Block, blk_else: Block, **kwargs):
         self.iterator = iterator
         self.blk_iter = blk_iter
         self.blk_body = blk_body
         self.blk_else = blk_else
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
     @cached_property
     def excs(self) -> ExcSet:
@@ -410,12 +410,12 @@ class For(control_flow):
 
 class While(control_flow):
     _fields = ("condition", "blk_cond", "blk_body", "blk_else")
-    def __init__(self, condition: Any, blk_cond: Block, blk_body: Block, blk_else: Block, *args, **kwargs):
+    def __init__(self, condition: Any, blk_cond: Block, blk_body: Block, blk_else: Block, **kwargs):
         self.condition = condition
         self.blk_cond = blk_cond
         self.blk_body = blk_body
         self.blk_else = blk_else
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
     @cached_property
     def excs(self) -> ExcSet:
@@ -431,9 +431,9 @@ class While(control_flow):
 
 class Call(control_flow):
     _fields = ("func",)
-    def __init__(self, func: Any, *args, **kwargs):
+    def __init__(self, func: Any, **kwargs):
         self.func = func
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
     @cached_property
     def excs(self):
@@ -457,12 +457,12 @@ class ExcHandle(AST):
 
 class Try(control_flow):
     _fields = ("blk_try", "excepts", "blk_else", "blk_finally")
-    def __init__(self, blk_try: Block, excepts: list[ExcHandle], blk_else: Block, blk_finally: Block, *args, **kwargs):
+    def __init__(self, blk_try: Block, excepts: list[ExcHandle], blk_else: Block, blk_finally: Block, **kwargs):
         self.blk_try = blk_try
         self.excepts = excepts
         self.blk_else = blk_else
         self.blk_finally = blk_finally
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
     @cached_property
     def excs(self) -> ExcSet:
@@ -495,11 +495,33 @@ class Raise(control_flow):
     exc 是异常实例。
     """
     _fields = ("exc",)
-    def __init__(self, exc: RtBaseExc, *args, **kwargs):
+    def __init__(self, exc: RtBaseExc, **kwargs):
         assert isinstance(exc, RtBaseExc)
         self.exc = exc
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
     @property
     def excs(self) -> ExcSet:
         return ExcSet(self.exc)
+
+
+class With(control_flow):
+    _fields = ("ctx", "blk_enter", "blk_body", "blk_exit")
+    def __init__(self, ctx, blk_enter: Block,  blk_body: Block, blk_exit: Block, **kwargs):
+        self.ctx = ctx
+        self.blk_body = blk_body
+        self.blk_enter = blk_enter
+        self.blk_exit = blk_exit
+        super().__init__(**kwargs)
+
+    @cached_property
+    def excs(self) -> ExcSet:
+        if self.blk_enter.excs.always:
+            return self.blk_enter.excs
+        if self.blk_exit.excs.always:
+            return self.blk_exit.excs
+        return ExcSet(
+            self.blk_body.excs.types |
+            self.blk_enter.excs.types |
+            self.blk_exit.excs.types
+        )

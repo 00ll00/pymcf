@@ -2,7 +2,7 @@ import sys
 from ast import *
 import inspect
 from types import FunctionType
-from typing import Any
+from typing import Any, Union
 
 from . import Constructor, Block, FormattedData, Resolvable
 from . import syntactic
@@ -881,6 +881,163 @@ class ASTRewriter(NodeTransformer):
                                 Raise(
                                     exc=Name(id=name_cf_exc, ctx=Load()))])])])
         return new_node
+
+    class WithHandler(ControlFlowHandler):
+        CF_ENTER = 0
+        CF_WITH = 1
+        CF_EXIT = 2
+        CF_RAISE = 3
+        def __init__(self, ctx):
+            super().__init__()
+            self.ctx = ctx
+
+        def control_flow(self):
+            if isinstance(self.ctx, RtCtxManager):
+                with enter_block() as blk_enter:
+                    yield self.CF_ENTER, None
+                    if self._last_exc is not None:
+                        if isinstance(self._last_exc, RtBaseExc):
+                            self._last_exc.__record__()
+                            # __enter__ 抛出异常，不需要执行后续内容
+                            syntactic.With(self.ctx, blk_enter, Block(), Block())
+                            return
+                        elif not is_rt_exception(self._last_exc):
+                            yield self.CF_RAISE, self._last_exc
+
+                with enter_block() as blk_body:
+                    yield self.CF_WITH, None
+                    if self._last_exc is not None:
+                        if isinstance(self._last_exc, RtBaseExc):
+                            self._last_exc.__record__()
+                        else:
+                            yield self.CF_RAISE, self._last_exc
+                with enter_block() as blk_exit:
+                    if blk_body.excs.might:
+                        yield self.CF_EXIT, (Union[*blk_exit.excs.types], NotImplemented, NotImplemented)
+                    else:
+                        yield self.CF_EXIT, (None, None, None)
+                    if self._last_exc is not None:
+                        if isinstance(self._last_exc, RtBaseExc):
+                            self._last_exc.__record__()
+                        else:
+                            yield self.CF_RAISE, self._last_exc
+                syntactic.With(self.ctx, blk_enter, blk_body, blk_exit)
+            else:
+                yield self.CF_ENTER, None
+                if self._last_exc is not None:
+                    yield self.CF_RAISE, self._last_exc
+                yield self.CF_WITH, None
+                if self._last_exc is not None:
+                    yield self.CF_EXIT, (type(self._last_exc), self._last_exc, self._last_exc.__traceback__)
+                else:
+                    yield self.CF_EXIT, (None, None, None)
+                if self._last_exc is not None:
+                    yield self.CF_RAISE, self._last_exc
+
+    def visit_With(self, node):
+        """
+        with ctx as obj:
+            {body}
+
+        =====>
+
+        for cf, exc in (handler := WithHandler(ctx_var := ctx)):
+            match cf:
+                case ENTER:
+                    with handler.exc_handler():
+                        obj = ctx_var.__enter__()
+                case WITH:
+                    with handler.exc_handler():
+                        {body}
+                case EXIT:
+                    with handler.exc_handler():
+                        ctx_var.__exit__(*exc)  # exc_type, exc_value, exc_traceback
+                case RAISE:
+                    raise exc
+        """
+        node = self.generic_visit(node)
+
+        body = node.body
+
+        for item in reversed(node.items):
+
+            name_cf_var = self.new_name()
+            name_cf_exc = self.new_name()
+            name_ctx_var = self.new_name()
+            name_handler = self.new_name()
+
+            body = [For(
+                target=Tuple(
+                    elts=[
+                        Name(id=name_cf_var, ctx=Store()),
+                        Name(id=name_cf_exc, ctx=Store())],
+                    ctx=Store()),
+                iter=NamedExpr(
+                    target=Name(id=name_handler, ctx=Store()),
+                    value=self.add_call(self.WithHandler, [NamedExpr(
+                                target=Name(id=name_ctx_var, ctx=Store()),
+                                value=item.context_expr)])),
+                body=[
+                    Match(
+                        subject=Name(id=name_cf_var, ctx=Load()),
+                        cases=[
+                            match_case(
+                                pattern=MatchValue(value=Constant(value=self.WithHandler.CF_ENTER)),
+                                body=[
+                                    With(
+                                        items=[
+                                            withitem(
+                                                context_expr=Call(
+                                                    func=Attribute(
+                                                        value=Name(id=name_handler, ctx=Load()),
+                                                        attr='exc_handler',
+                                                        ctx=Load())))],
+                                        body=[
+                                            Assign(
+                                                targets=[
+                                                    item.optional_vars if item.optional_vars else Name(id="#dummy", ctx=Store())],
+                                                value=Call(
+                                                    func=Attribute(
+                                                        value=Name(id=name_ctx_var, ctx=Load()),
+                                                        attr='__enter__',
+                                                        ctx=Load())))])]),
+                            match_case(
+                                pattern=MatchValue(value=Constant(value=self.WithHandler.CF_WITH)),
+                                body=[
+                                    With(
+                                        items=[
+                                            withitem(
+                                                context_expr=Call(
+                                                    func=Attribute(
+                                                        value=Name(id=name_handler, ctx=Load()),
+                                                        attr='exc_handler',
+                                                        ctx=Load())))],
+                                        body=body)]),
+                            match_case(
+                                pattern=MatchValue(value=Constant(value=self.WithHandler.CF_EXIT)),
+                                body=[
+                                    With(
+                                        items=[
+                                            withitem(
+                                                context_expr=Call(
+                                                    func=Attribute(
+                                                        value=Name(id=name_handler, ctx=Load()),
+                                                        attr='exc_handler',
+                                                        ctx=Load())))],
+                                        body=[
+                                            Expr(
+                                                value=Call(
+                                                    func=Attribute(
+                                                        value=Name(id=name_ctx_var, ctx=Load()),
+                                                        attr='__exit__',
+                                                        ctx=Load()),
+                                                    args=[Starred(value=Name(id=name_cf_exc, ctx=Load()), ctx=Load()),]))])]),
+                            match_case(
+                                pattern=MatchValue(value=Constant(value=self.WithHandler.CF_RAISE)),
+                                body=[
+                                    Raise(
+                                        exc=Name(id=name_cf_exc, ctx=Load()))])])])]
+        return body[0]
 
     @staticmethod
     def handle_ifexp(condition, br_if, br_else):

@@ -3,7 +3,9 @@ from contextvars import ContextVar
 from types import FunctionType, MethodType
 from typing import Self
 
-from pymcf.ast_ import Constructor, reform_func, Call, Scope
+from pymcf.ast_ import Constructor, reform_func, Call, Scope, compiler_hint, Resolvable
+from pymcf.ast_.runtime import RtCtxManager
+from pymcf.ir.codeblock import IrBlockAttr
 
 
 class CompileTimeError(BaseException):
@@ -206,3 +208,14 @@ class mcfunction:
         if tags is None:
             tags = {}
         return mcfunction(_func, inline=False, tags={*tags, "tick"}, entrance=True, **kwargs)
+
+
+class execute(RtCtxManager):
+    def __init__(self, *conv: str | Resolvable):
+        self.conv = conv
+    def __enter__(self):
+        IrBlockAttr({"execute": self.conv})
+    def __exit__(self, exc_type, exc_value, traceback):
+        pass
+    def __repr__(self):
+        return f"execute({self.conv!r})"

@@ -112,6 +112,16 @@ div{
     font-weight: bold;
 }
 
+.with::before{
+    content: "with ";
+    font-weight: bold;
+}
+
+.with::after{
+    content: ":";
+    font-weight: bold;
+}
+
 .block{
     outline: 0;
 }

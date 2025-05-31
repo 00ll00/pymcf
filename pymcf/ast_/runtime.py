@@ -246,3 +246,12 @@ class RtIterable[V: RtBaseVar](Iterable[V], ABC):
     @abstractmethod
     def __iter__(self) -> RtBaseIterator[V]:
         ...
+
+
+class RtCtxManager(ABC):
+
+    @abstractmethod
+    def __enter__(self): ...
+
+    @abstractmethod
+    def __exit__(self, exc_type, exc_value, traceback): ...

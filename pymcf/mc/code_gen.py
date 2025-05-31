@@ -102,6 +102,22 @@ class Translator:
     def __init__(self, scope: MCFScope):
         self.scope = scope
 
+    @staticmethod
+    def call_cb(cb: code_block, chain: ExecuteChain = None) -> Command:
+        exe = cb.attributes.get("execute")
+        if exe is not None:
+            assert isinstance(exe, tuple)
+            if chain is not None:
+                chain.add(*exe)
+                return chain.run(Function(cb))
+            else:
+                return ExecuteChain().add(*exe).run(Function(cb))
+        else:
+            if chain is not None:
+                return chain.run(Function(cb))
+            else:
+                return Function(cb)
+
     def translate_op(self, op: operation) -> Command | list[Command]:
         if isinstance(op, Raw):
             return RawCommand(op.code)
@@ -296,15 +312,15 @@ class Translator:
                 else:
                     cmds.append(cmd)
         if cb.direct is not None:
-            cmds.append(Function(cb.direct))
+            cmds.append(self.call_cb(cb.direct))
         if cb.cond is not None:
             assert isinstance(cb.cond, Score)
             if cb.false is not None:
                 cmds.append(ExecuteChain().cond('if').score_range(cb.cond.__metadata__, NumRange(0, 0))
-                                    .run(ReturnRun(Function(cb.false))))
+                                    .run(ReturnRun(self.call_cb(cb.false))))
             if cb.true is not None:
                 cmds.append(ExecuteChain().cond('unless').score_range(cb.cond.__metadata__, NumRange(0, 0))
-                                    .run(Function(cb.true)))
+                                    .run(self.call_cb(cb.true)))
         return MCF(path, cmds, self.scope)
 
     def gen_MachJump(self, cb: MatchJump):
@@ -342,7 +358,7 @@ class Translator:
             chain = ExecuteChain()
             for vmin, vmax in r.valid_ranges():
                 chain = chain.cond('unless' if unless else 'if').score_range(cb.flag.__metadata__, NumRange(vmin, vmax))
-            cmds.append(chain.run(ReturnRun(Function(case.target))))
+            cmds.append(chain.run(ReturnRun(self.call_cb(case.target))))
         return MCF(path, cmds, self.scope)
 
     def translate(self, cb: code_block) -> MCF:
