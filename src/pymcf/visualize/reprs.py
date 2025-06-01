@@ -1,6 +1,9 @@
 from html import escape as html_escape
 
 from graphviz import escape as gv_escape
+from pymcf.mc.commands import NameRef, UUIDRef
+
+from pymcf.data import Score
 
 from pymcf.ast_ import *
 from pymcf.ir.codeblock import jmpop, JmpEq, JmpNotEq
@@ -8,6 +11,17 @@ from pymcf.ir.codeblock import jmpop, JmpEq, JmpNotEq
 
 def escape(s):
     return gv_escape(html_escape(str(s)))
+
+
+def repr_value(value):
+    if isinstance(value, Score):
+        target = value.target
+        objective = value.objective
+        if isinstance(target.__metadata__, NameRef):
+            return f"Score({target.__metadata__.name!r}, {objective.__metadata__.objective!r})"
+        if isinstance(target.__metadata__, UUIDRef):
+            return f"Score({target.__metadata__.uuid!r}, {objective.__metadata__.objective!r})"
+    return repr(value)
 
 
 def repr_unaryop(op: unaryop) -> str:
@@ -85,13 +99,13 @@ def repr_operation(op: operation) -> str:
         case Raw():
             return repr(' '.join(str(part) for part in op.code))
         case Assign():
-            return f"{op.target!r} = {op.value!r}"
+            return f"{repr_value(op.target)} = {repr_value(op.value)}"
         case UnaryOp():
-            return f"{op.target!r} = {repr_operator(op.op)}{op.value!r}"
+            return f"{repr_value(op.target)} = {repr_operator(op.op)}{repr_value(op.value)}"
         case Inplace():
-            return f"{op.target!r} = {op.target!r} {repr_operator(op.op)} {op.value!r}"
+            return f"{repr_value(op.target)} = {repr_value(op.target)} {repr_operator(op.op)} {repr_value(op.value)}"
         case Compare():
-            return f"{op.target!r} = {op.left!r} {repr_operator(op.op)} {op.right!r}"
+            return f"{repr_value(op.target)} = {repr_value(op.left)} {repr_operator(op.op)} {repr_value(op.right)}"
         case _:
             raise NotImplementedError
 
@@ -99,9 +113,9 @@ def repr_operation(op: operation) -> str:
 def repr_jmpop(op: jmpop) -> str:
     match op:
         case JmpEq():
-            return f"$ == {op.value!r}"
+            return f"$ == {repr_value(op.value)}"
         case JmpNotEq():
-            return f"$ != {op.value!r}"
+            return f"$ != {repr_value(op.value)}"
         case _:
             raise NotImplementedError
 

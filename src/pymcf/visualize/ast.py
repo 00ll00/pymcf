@@ -3,6 +3,7 @@ from typing import Any
 
 from dominate.tags import *
 from dominate.util import raw
+from pymcf.visualize.reprs import repr_value
 
 from pymcf.ast_ import NodeVisitor, Block, operation, compiler_hint, If, Scope, Raise, AST, \
     For, While, Try, Inplace, Call, With
@@ -59,7 +60,7 @@ class _ScopeDumper(NodeVisitor):
     def visit_If(self, node: If):
         with table():
             with tr(), td():
-                div(repr(node.condition), cls="if_cond cf")
+                div(repr_value(node.condition), cls="if_cond cf")
             with tr(), td():
                 self.visit(node.blk_body)
             with tr(), td():
@@ -70,7 +71,7 @@ class _ScopeDumper(NodeVisitor):
     def visit_For(self, node: For):
         with table():
             with tr(), td():
-                div(repr(node.iterator), cls="for_iter cf")
+                div(repr_value(node.iterator), cls="for_iter cf")
             with tr(), td():
                 self.visit(node.blk_body)
             with tr(), td():
@@ -81,7 +82,7 @@ class _ScopeDumper(NodeVisitor):
     def visit_While(self, node: While):
         with table():
             with tr(), td():
-                div(repr(node.condition), cls="while_cond cf")
+                div(repr_value(node.condition), cls="while_cond cf")
             with tr(), td():
                 self.visit(node.blk_body)
             with tr(), td():
@@ -97,7 +98,7 @@ class _ScopeDumper(NodeVisitor):
                 self.visit(node.blk_try)
             for handler in node.excepts:
                 with tr(), td():
-                    div(repr(handler.eg), cls="except cf")
+                    div(repr_value(handler.eg), cls="except cf")
                 with tr(), td():
                     self.visit(handler.blk_handle)
             with tr(), td():
@@ -110,12 +111,12 @@ class _ScopeDumper(NodeVisitor):
                 self.visit(node.blk_finally)
 
     def visit_Call(self, node: Call):
-        div(repr(node.func), cls="call")
+        div(repr_value(node.func), cls="call")
 
     def visit_With(self, node: With):
         with table():
             with tr(), td():
-                div(repr(node.ctx), cls="with cf")
+                div(repr_value(node.ctx), cls="with cf")
             with tr(), td():
                 self.visit(node.blk_body)
 

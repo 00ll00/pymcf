@@ -5,7 +5,7 @@ import graphviz as gv
 from pymcf.ast_ import operation, control_flow, Call, Inplace, UnaryOp, Compare, compiler_hint
 from pymcf.ir import BasicBlock, MatchJump
 from pymcf.ir.codeblock import jmpop
-from pymcf.visualize.reprs import repr_operation, repr_jmpop, escape, repr_compiler_hint
+from pymcf.visualize.reprs import repr_operation, repr_jmpop, escape, repr_compiler_hint, repr_value
 
 
 class _GraphVizDumper(ast.NodeVisitor):
@@ -64,7 +64,7 @@ class _GraphVizDumper(ast.NodeVisitor):
                         <tr><td bgcolor="gray95">{f"""<table border="0" cellborder="0" cellspacing="2" cellpadding="0">
                             {'\n'.join(f'<tr><td align="right">{i + 1}.</td>{self.repr_node(op)}</tr>' for i, op in enumerate(node.ops))}
                         </table>""" if node.ops else ""}</td></tr>
-                        <tr><td{' bgcolor="#ffffcc"' if end else ''}>{escape(node.cond)}</td></tr>
+                        <tr><td{' bgcolor="#ffffcc"' if end else ''}>{escape(repr_value(node.cond))}</td></tr>
                     </table>
                     >""",
             shape="plain",
@@ -101,7 +101,7 @@ class _GraphVizDumper(ast.NodeVisitor):
                 <tr><td bgcolor="#ffeeff">{f"""<table border="0" cellborder="0" cellspacing="0" >
                     {'\n'.join(f'<tr><td align="left">[{i+1}]</td>{self.repr_node(case)}</tr>' for i, case in enumerate(node.cases))}
                 </table>""" if node.cases else ""}</td></tr>
-                <tr><td>{escape(node.flag)}</td></tr>
+                <tr><td>{escape(repr_value(node.flag))}</td></tr>
             </table>
             >""",
             shape="plain",

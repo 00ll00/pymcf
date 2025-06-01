@@ -231,6 +231,8 @@ class Score(RtVar, RefWrapper[ScoreRef], NumberLike):
         ...
 
     def __init__(self, *args):
+        self.target: Entity
+        self.objective: ScoreBoard
         match len(args):
             case 0 | 1:
                 ref = self._new_local_ref()

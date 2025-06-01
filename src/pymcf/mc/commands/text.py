@@ -50,6 +50,7 @@ class TextComponentHolder(TextComponent):
                 text.update(extra[0])
             else:
                 text['extra'] = extra
+                text['text'] = ""
         return text
 
     def _resolve_style(self, key, value, scope):
