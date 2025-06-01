@@ -90,9 +90,10 @@ class ASTRewriter(NodeTransformer):
     """
     python 3.13
     """
-    def __init__(self, wrapper_name: str):
+    def __init__(self, wrapper_name: str, remove_decorator: bool):
         assert sys.version_info.major == 3 and sys.version_info.minor == 13
         self._wrapper_name = wrapper_name
+        self._remove_decorator = remove_decorator
         self._name_id = 0
         self._values = {}
         self._literal_expr_checker = LiteralExprChecker()
@@ -149,6 +150,8 @@ class ASTRewriter(NodeTransformer):
             return self.ExcHandler(self)
 
     def rewrite[F: FunctionDef | AsyncFunctionDef] (self, func_def: F)-> AST:
+        if self._remove_decorator:
+            func_def.decorator_list = []
         node: F = self.generic_visit(func_def)
 
         name_exc = self.new_name()
@@ -1339,7 +1342,7 @@ class ASTRewriter(NodeTransformer):
         return super().generic_visit(node)
 
 
-def reform_func(func: FunctionType, wrapper_name: str = "$wrapper") -> FunctionType:
+def reform_func(func: FunctionType, wrapper_name: str = "$wrapper", remove_decorator: bool = True) -> FunctionType:
     """
     将 python 函数改造为 ast 生成器
 
@@ -1363,7 +1366,7 @@ def reform_func(func: FunctionType, wrapper_name: str = "$wrapper") -> FunctionT
         node = node.body[0]
 
     node = increment_lineno(node, start_line - 1)
-    rewriter = ASTRewriter(wrapper_name=wrapper_name)
+    rewriter = ASTRewriter(wrapper_name=wrapper_name, remove_decorator=remove_decorator)
     node = rewriter.rewrite(node)
     node = fix_missing_locations(node)
 

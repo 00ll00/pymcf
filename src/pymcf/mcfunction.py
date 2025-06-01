@@ -14,12 +14,6 @@ class CompileTimeError(BaseException):
     """
 
 
-_generating: ContextVar[bool] = ContextVar('_generating', default=False)
-"""
-是否已经在生成过程中
-"""
-
-
 type _CtArg = (
     bool |
     int | float | complex | str | None |
@@ -83,8 +77,6 @@ class mcfunction:
     def __new__(cls, _func=None, /, **kwargs):
 
         def wrap(func):
-            if _generating.get():
-                return func  # 如果是在构建中，直接返回原函数避免套娃
             if not inspect.isfunction(func):
                 raise TypeError(f"{func!r} 不是一个函数。")
             try:
@@ -116,11 +108,8 @@ class mcfunction:
 
         self._origin_func = _func
         self._signature = inspect.signature(_func)
-        _generating.set(True)
-        try:
-            self._ast_generator = reform_func(_func, wrapper_name="$wrapper")
-        finally:
-            _generating.set(False)
+
+        self._ast_generator = reform_func(_func, wrapper_name="$wrapper")
 
         self._arg_scope: dict[FuncArgs, Scope] = {}
 
