@@ -205,6 +205,6 @@ class execute(RtCtxManager):
     def __enter__(self):
         IrBlockAttr({"execute": self.conv})
     def __exit__(self, exc_type, exc_value, traceback):
-        pass
+        pass  # TODO 异常处理内联后可能让函数处于不正确的上下文
     def __repr__(self):
         return f"execute({self.conv!r})"
