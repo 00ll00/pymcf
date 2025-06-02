@@ -2,7 +2,7 @@ import sys
 from ast import *
 import inspect
 from types import FunctionType
-from typing import Any, Union
+from typing import Any, Union, Mapping
 
 from . import Constructor, Block, FormattedData, Resolvable
 from . import syntactic
@@ -90,12 +90,14 @@ class ASTRewriter(NodeTransformer):
     """
     python 3.13
     """
-    def __init__(self, wrapper_name: str, remove_decorator: bool):
+    def __init__(self, wrapper_name: str, remove_decorator: bool, nonlocals: Mapping[str, Any]):
         assert sys.version_info.major == 3 and sys.version_info.minor == 13
         self._wrapper_name = wrapper_name
         self._remove_decorator = remove_decorator
+        self._values: dict[str, Any] = dict(nonlocals)
         self._name_id = 0
-        self._values = {}
+        while f"$var_{self._name_id}" in self._values:
+            self._name_id += 1
         self._literal_expr_checker = LiteralExprChecker()
 
     def add_call(self, func, args: list[expr]) -> expr:
@@ -1365,8 +1367,10 @@ def reform_func(func: FunctionType, wrapper_name: str = "$wrapper", remove_decor
         node = parse(code, mode='exec')
         node = node.body[0]
 
+
+
     node = increment_lineno(node, start_line - 1)
-    rewriter = ASTRewriter(wrapper_name=wrapper_name, remove_decorator=remove_decorator)
+    rewriter = ASTRewriter(wrapper_name=wrapper_name, remove_decorator=remove_decorator, nonlocals=inspect.getclosurevars(func).nonlocals)
     node = rewriter.rewrite(node)
     node = fix_missing_locations(node)
 
