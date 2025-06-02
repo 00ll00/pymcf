@@ -1,4 +1,5 @@
 import sys
+import types
 from ast import *
 import inspect
 from types import FunctionType
@@ -85,16 +86,17 @@ class LiteralExprChecker(NodeVisitor):
         else:
             self._is_literal = False
 
+CellEmpty = object()
 
 class ASTRewriter(NodeTransformer):
     """
     python 3.13
     """
-    def __init__(self, wrapper_name: str, remove_decorator: bool, nonlocals: Mapping[str, Any]):
+    def __init__(self, wrapper_name: str, remove_decorator: bool, co_freevars: tuple[str, ...]):
         assert sys.version_info.major == 3 and sys.version_info.minor == 13
         self._wrapper_name = wrapper_name
         self._remove_decorator = remove_decorator
-        self._values: dict[str, Any] = dict(nonlocals)
+        self._values: dict[str, Any] = {n: CellEmpty for n in co_freevars}  # 使用 CellEmpty 占位，将 co_freevars 中的变量名称处理为 nonlocal
         self._name_id = 0
         while f"$var_{self._name_id}" in self._values:
             self._name_id += 1
@@ -123,8 +125,8 @@ class ASTRewriter(NodeTransformer):
             ctx=Load(),
         )
 
-    def get_glb(self):
-        return {k  + '_glb': v for k, v in self._values.items()}
+    def get_nonlocals(self):
+        return self._values.copy()
 
     class ControlFlowHandler:
 
@@ -194,7 +196,7 @@ class ASTRewriter(NodeTransformer):
                 0,
                 Assign(
                     targets=[Name(id=k, ctx=Store())],
-                    value=Name(id=k + '_glb', ctx=Load()),
+                    value=Constant(value=None),  # 用 None 占位，让函数生成 nonlocal values
                 )
             )
 
@@ -1344,7 +1346,7 @@ class ASTRewriter(NodeTransformer):
         return super().generic_visit(node)
 
 
-def reform_func(func: FunctionType, wrapper_name: str = "$wrapper", remove_decorator: bool = True) -> FunctionType:
+def reform_func(func: types.FunctionType, wrapper_name: str = "$wrapper", remove_decorator: bool = True) -> types.FunctionType:
     """
     将 python 函数改造为 ast 生成器
 
@@ -1367,23 +1369,27 @@ def reform_func(func: FunctionType, wrapper_name: str = "$wrapper", remove_decor
         node = parse(code, mode='exec')
         node = node.body[0]
 
-
-
     node = increment_lineno(node, start_line - 1)
-    rewriter = ASTRewriter(wrapper_name=wrapper_name, remove_decorator=remove_decorator, nonlocals=inspect.getclosurevars(func).nonlocals)
+    code = func.__code__
+    rewriter = ASTRewriter(wrapper_name=wrapper_name, remove_decorator=remove_decorator, co_freevars=code.co_freevars)
     node = rewriter.rewrite(node)
     node = fix_missing_locations(node)
 
     glb = func.__globals__
-    glb_ext = rewriter.get_glb()
-    glb.update(glb_ext)
     exec(compile(node, inspect.getfile(func), 'exec'), glb)
     wrapper = glb[wrapper_name]
-    new_func = wrapper()
-
     del glb[wrapper_name]
-    for k in glb_ext:
-        del glb[k]
+    new_func: types.FunctionType = wrapper()
 
-    return new_func
+    nonlocals = rewriter.get_nonlocals()
+    new_code = new_func.__code__
+    new_closure = []
+    for i, n in enumerate(new_code.co_freevars):
+        if n in code.co_freevars:
+            new_closure.append(func.__closure__[code.co_freevars.index(n)])
+        else:
+            assert nonlocals[n] is not CellEmpty
+            new_closure.append(types.CellType(nonlocals[n]))
+
+    return types.FunctionType(new_code, func.__globals__, func.__name__, func.__defaults__, tuple(new_closure))
 
