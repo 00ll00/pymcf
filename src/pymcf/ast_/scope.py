@@ -8,7 +8,7 @@ class Scope:
 
     _all: list[Self] = []
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, set_throws=None):
         Scope._all.append(self)
 
         self.name = name
@@ -19,7 +19,7 @@ class Scope:
         self._root_block = Block()
         self._block_stack = [self._root_block]
 
-        self._excs = None
+        self._excs = None if set_throws is None else ExcSet(set_throws)
         self._finished = False
 
     def __repr__(self):
@@ -47,7 +47,12 @@ class Scope:
 
     @property
     def excs(self) -> ExcSet:
-        assert self.finished
+        assert self._excs is not None
+        return self._excs
+
+    @property
+    def excs_or_none(self) -> ExcSet | None:
+        # 当 scope 未完成且未指定抛出异常类型时会返回 None
         return self._excs
 
     @property
@@ -60,7 +65,8 @@ class Scope:
 
         if self._root_block.excs.types & {RtContinue, RtBreak}:
             raise SyntaxError(f"函数 {self.name} 中出现脱离循环的运行期循环控制语句")  # TODO 提供具体的代码定位
-        self._excs = self._root_block.excs
+        if self._excs is None:
+            self._excs = self._root_block.excs
 
         self._finished = True
 

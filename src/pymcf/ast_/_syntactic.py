@@ -439,10 +439,9 @@ class Call(control_flow):
     def excs(self):
         from .constructor import Scope
         if isinstance(self.func, Scope):
-            if self.func.finished:
+            if self.func.excs_or_none is not None:
                 return self.func.excs
             else:
-                # TODO 函数存在循环调用时获取函数真实异常集
                 return ExcSet.ANY
         else:
             raise NotImplementedError

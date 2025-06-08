@@ -121,7 +121,8 @@ class Constructor:
         return self._finished
     @property
     def return_value(self) -> Any:
-        assert self.finished
+        if not self.finished:
+            return NoValue  # TODO
         return self._return_value
 
 _current_constr: ContextVar[Constructor | None] = ContextVar("_current_constr", default=None)

@@ -1,9 +1,11 @@
+import functools
 import inspect
+from collections import defaultdict
 from contextvars import ContextVar
 from types import FunctionType, MethodType
-from typing import Self
+from typing import Self, overload, Iterable
 
-from pymcf.ast_ import Constructor, reform_func, Call, Scope, compiler_hint, Resolvable
+from pymcf.ast_ import Constructor, reform_func, Call, Scope, compiler_hint, Resolvable, RtBaseVar, RtBaseExc
 from pymcf.ast_.runtime import RtCtxManager
 from pymcf.ir.codeblock import IrBlockAttr
 
@@ -26,24 +28,32 @@ type _CtArg = (
 
 class FuncArgs:
     def __init__(self, args: dict[str, _CtArg]) -> None:
-        self.args = args
+        self.ct_args = {}
+        self.rt_args = {}
+        for k, v in args.items():
+            if isinstance(v, RtBaseVar):
+                self.rt_args[k] = v
+            else:
+                self.ct_args[k] = v
 
     def __eq__(self, other: Self) -> bool:
         # TODO
         # with set_eq_identifier(True):
-        return self.args == other.args
-        # return False
+        if self.ct_args != other.ct_args:
+            return False
+        if len(self.rt_args) != len(other.rt_args):
+            return False
+        for k, v in self.rt_args.items():
+            if k not in other.rt_args:
+                return False
+            if type(v) != type(other.rt_args[k]):
+                return False
+        return True
 
-    def __hash__(self) -> int:
-        # TODO
-        h = 0
-        for k, v in self.args.items():
-            h ^= hash(k)
-            try:
-                h ^= hash(v)
-            except TypeError:
-                ...
-        return h
+    def __assign__(self, other: Self):
+        assert self == other
+        for k, v in other.rt_args.items():
+            v.__assign__(self.rt_args[k])
 
 
 def get_valid_name(func_name: str) -> str:
@@ -60,6 +70,8 @@ class Executor:
     """
     def __init__(self, entity):
         self.entity = entity
+
+_mcfunction_registry = defaultdict(functools.partial(defaultdict, dict))
 
 # noinspection PyPep8Naming
 class mcfunction:
@@ -92,15 +104,22 @@ class mcfunction:
         if _func is None:
             return wrap
         else:
-            return wrap(_func)
+            wrapped = _mcfunction_registry[_func.__module__][_func.__qualname__].get(_func.__code__.co_firstlineno)
+            if wrapped is None:
+                wrapped = wrap(_func)
+                _mcfunction_registry[_func.__module__][_func.__qualname__][_func.__code__.co_firstlineno] = wrapped
+            return wrapped
 
-    def __init__(self,_func: FunctionType, /, * ,
+    def __init__(self,_func: FunctionType=None, /, * ,  # _func 默认 None 仅用于避免编辑器提示缺少参数
                  tags: set[str] = None,
                  entrance: bool = False,
                  inline: bool = False,
                  func_name: str = None,
+                 throws: Iterable[type[RtBaseExc]] = None,
                  **kwargs,
                  ):
+        assert _func is not None
+
         self.__name__ = _func.__name__
         self.__doc__ = _func.__doc__
         self.__module__ = _func.__module__
@@ -111,11 +130,13 @@ class mcfunction:
 
         self._ast_generator = reform_func(_func, wrapper_name="$wrapper")
 
-        self._arg_scope: dict[FuncArgs, Scope] = {}
+        self._arg_scope: list[tuple[FuncArgs, Scope | Constructor]] = []
 
         self._tags = tags if tags is not None else set()
         self._entrance = entrance
         self._inline = inline
+
+        self._throws = throws  # TODO 指定的异常集和真实异常集的冲突检查
 
         if func_name is None:
             basename = _func.__qualname__.lower()
@@ -146,18 +167,24 @@ class mcfunction:
             constr.finish()
             return constr.return_value
         else:
+            last_constr = Constructor.current_constr()
+
             func_arg = FuncArgs(self._signature.bind(*args, **kwargs).arguments)
-            if func_arg in self._arg_scope:
-                return self._arg_scope[func_arg].return_value
+            for args, scope_or_constr in self._arg_scope:
+                if args == func_arg:
+                    args.__assign__(func_arg)
+                    scope = scope_or_constr if isinstance(scope_or_constr, Scope) else scope_or_constr.scope
+                    last_constr.record_statement(Call(scope, _offline=True))
+                    return scope_or_constr.return_value
 
             if self._entrance and len(self._arg_scope) == 0:
                 ext = ""
             else:
                 ext = "-" + str(len(self._arg_scope))
 
-            last_constr = Constructor.current_constr()
             func_name = f"{self._basename}{ext}"
-            with Constructor(name=func_name, inline=self._inline, scope=MCFScope(name=func_name, executor=executor, tags=self._tags)) as constr:
+            with Constructor(name=func_name, inline=self._inline, scope=MCFScope(name=func_name, executor=executor, tags=self._tags, set_throws=self._throws)) as constr:
+                self._arg_scope.append((func_arg, constr))
                 self._ast_generator(*args, **kwargs)
             constr.finish()
 
@@ -165,7 +192,10 @@ class mcfunction:
                 assert last_constr is not None
                 last_constr.record_statement(Call(constr.scope, _offline=True))
 
-            self._arg_scope[func_arg] = constr.scope
+            for i, (args, _) in enumerate(self._arg_scope):
+                if args is func_arg:
+                    break
+            self._arg_scope[i] = (func_arg, constr.scope)
 
             return constr.return_value
 
