@@ -3,7 +3,7 @@ from html import escape as html_escape
 from graphviz import escape as gv_escape
 from pymcf.mc.commands import NameRef, UUIDRef
 
-from pymcf.data import Score
+from pymcf.data import Score, Entity
 
 from pymcf.ast_ import *
 from pymcf.ir.codeblock import jmpop, JmpEq, JmpNotEq
@@ -21,6 +21,11 @@ def repr_value(value):
             return f"Score({target.__metadata__.name!r}, {objective.__metadata__.objective!r})"
         if isinstance(target.__metadata__, UUIDRef):
             return f"Score({target.__metadata__.uuid!r}, {objective.__metadata__.objective!r})"
+    if isinstance(value, FormattedData):
+        return repr_value(value.data)
+    if isinstance(value, Entity):
+        if isinstance(value.__metadata__, UUIDRef):
+            return str(value.__metadata__.uuid)
     return repr(value)
 
 
@@ -97,7 +102,7 @@ def repr_operator(op: operator | boolop | cmpop) -> str:
 def repr_operation(op: operation) -> str:
     match op:
         case Raw():
-            return repr(' '.join(str(part) for part in op.code))
+            return ' '.join(part if isinstance(part, str) else f"${repr_value(part)}" for part in op.code)
         case Assign():
             return f"{repr_value(op.target)} = {repr_value(op.value)}"
         case UnaryOp():

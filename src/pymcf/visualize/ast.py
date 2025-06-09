@@ -6,7 +6,7 @@ from dominate.util import raw
 from pymcf.visualize.reprs import repr_value
 
 from pymcf.ast_ import NodeVisitor, Block, operation, compiler_hint, If, Scope, Raise, AST, \
-    For, While, Try, Inplace, Call, With
+    For, While, Try, Inplace, Call, With, UnaryOp, Compare
 from .reprs import repr_operation, repr_compiler_hint
 
 
@@ -27,7 +27,10 @@ class _ScopeDumper(NodeVisitor):
     def visit(self, node: AST):
         if isinstance(node, operation):
             with div(cls="operation"):
-                b(node.__class__.__name__)
+                name = node.__class__.__name__
+                if isinstance(node, Inplace | UnaryOp | Compare):
+                    name += f'.{node.op.__class__.__name__}'
+                b(name)
                 span(repr_operation(node))
         elif isinstance(node, compiler_hint):
             with div(cls="compiler_hint"):
