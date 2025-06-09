@@ -171,7 +171,7 @@ class Selector(EntityRef, SelectorProto):
             if k == "tag" and not isinstance(kwargs[k], SelTags):
                 tags = SelTags(kwargs[k] if isinstance(kwargs[k], set) else {kwargs[k]})
                 if isinstance(self.tag, SelTags):
-                    tags |= self.tag.tags
+                    tags.tags |= self.tag.tags
                 kwargs[k] = tags
             elif k == "nbt":
                 ...  # TODO
