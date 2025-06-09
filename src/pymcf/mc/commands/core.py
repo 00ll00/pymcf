@@ -115,9 +115,7 @@ class NameRef(EntityRef):
         return True
 
     def resolve(self, scope):
-        if self is scope.executor.__metadata__:
-            return "@s"
-        return self.name
+        return scope.resolve_entity(self) or self.name
 
 class UUIDRef(EntityRef):
 
@@ -128,9 +126,7 @@ class UUIDRef(EntityRef):
         return True
 
     def resolve(self, scope):
-        if self is scope.executor.__metadata__:
-            return "@s"
-        return str(self.uuid)
+        return scope.resolve_entity(self) or str(self.uuid)
 
     def get_int_array(self) -> str:
         return f"[I;{','.join(str(int.from_bytes(self.uuid.bytes[4*i: 4*(i+1)])) for i in range(4))}]"
@@ -200,9 +196,7 @@ class GlobalEntity(EntityRef):
         return True
 
     def resolve(self, scope):
-        if self is scope.executor.__metadata__:
-            return "@s"
-        return scope.global_entity(self.namespace)
+        return scope.resolve_entity(self) or scope.global_entity(self.namespace)
 
 class _PosUtil(EntityRef):
 
@@ -210,9 +204,7 @@ class _PosUtil(EntityRef):
         return True
 
     def resolve(self, scope):
-        if self is scope.executor.__metadata__:
-            return "@s"
-        return scope.pos_util_entity()
+        return scope.resolve_entity(self) or scope.pos_util_entity()
 
 PosUtil = _PosUtil()
 

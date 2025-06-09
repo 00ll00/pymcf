@@ -300,7 +300,7 @@ class Translator:
             if scope.executor is None or scope.executor == self.scope.executor:
                 return Function(op.func)
             else:
-                return ExecuteChain().as_entity(scope.executor.__metadata__).at_entity_pos(AtS()).rotated_as_entity(AtS()).run(Function(op.func))
+                return ExecuteChain().as_entity(scope.executor.__metadata__).at_entity_pos(AtS()).run(Function(op.func))
 
 
         raise NotImplementedError

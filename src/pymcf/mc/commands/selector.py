@@ -186,8 +186,9 @@ class Selector(EntityRef, SelectorProto):
         return self.limit == 1
 
     def resolve(self, scope):
-        if self is scope.executor.__metadata__:
-            return "@s"
+        res = scope.resolve_entity(self)
+        if res is not None:
+            return res
         res = '@' + self._kind
         items = []
         for k, v in self.__dict__.items():

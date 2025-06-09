@@ -1,5 +1,7 @@
 from functools import cached_property
 
+from pymcf.mc.commands import EntityRef
+
 from .commands import NameRef, AtS
 from ..ast_ import Assign
 from ..ast_.constructor import Scope
@@ -10,7 +12,7 @@ class MCFScope(Scope):
 
     def __init__(self, name: str, tags: set[str] = None, executor: Entity = None, set_throws=None):
         super().__init__(name, set_throws)
-        self.executor = executor if executor is not None else Entity(AtS())
+        self.executor = executor
         self.consts = {}
         self.locals = []
         self.cb_name = {}
@@ -53,3 +55,8 @@ class MCFScope(Scope):
     def sub_nsname(self, cb) -> str:
         name = self.sub_name(cb)
         return f"{self.namespace}:{name}"
+
+    def resolve_entity(self, entity: EntityRef) -> str | None:
+        if self.executor is not None and self.executor.__metadata__ == entity:
+            return '@s'
+        return None
