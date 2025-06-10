@@ -3,7 +3,7 @@ import inspect
 from collections import defaultdict
 from contextvars import ContextVar
 from types import FunctionType, MethodType
-from typing import Self, overload, Iterable
+from typing import Self, overload, Iterable, Any
 
 from pymcf.ast_ import Constructor, reform_func, Call, Scope, compiler_hint, Resolvable, RtBaseVar, RtBaseExc
 from pymcf.ast_.runtime import RtCtxManager
@@ -32,7 +32,7 @@ class FuncArgs:
         self.rt_args = {}
         for k, v in args.items():
             if isinstance(v, RtBaseVar):
-                self.rt_args[k] = v
+                self.rt_args[k] = v.__create_var__()
             else:
                 self.ct_args[k] = v
 
@@ -55,6 +55,8 @@ class FuncArgs:
         for k, v in other.rt_args.items():
             v.__assign__(self.rt_args[k])
 
+    def get_args(self) -> dict[str, Any]:
+        return {**self.rt_args, **self.ct_args}
 
 def get_valid_name(func_name: str) -> str:
     return (func_name
@@ -161,18 +163,20 @@ class mcfunction:
                 # TODO
                 executor = args[0].entity
             args = (args[0].entity, *args[1:])
+        bound_arg = self._signature.bind(*args, **kwargs)
+        bound_arg.apply_defaults()
         if self._inline:
             with Constructor(name=self._basename, inline=self._inline, scope=Constructor.current_constr().scope) as constr:
-                self._ast_generator(*args, **kwargs)
+                self._ast_generator(*bound_arg.args, **bound_arg.kwargs)
             constr.finish()
             return constr.return_value
         else:
             last_constr = Constructor.current_constr()
 
-            func_arg = FuncArgs(self._signature.bind(*args, **kwargs).arguments)
-            for args, scope_or_constr in self._arg_scope:
-                if args == func_arg:
-                    args.__assign__(func_arg)
+            func_arg = FuncArgs(bound_arg.arguments)
+            for done_arg, scope_or_constr in self._arg_scope:
+                if done_arg == func_arg:
+                    done_arg.__assign__(func_arg)
                     scope = scope_or_constr if isinstance(scope_or_constr, Scope) else scope_or_constr.scope
                     last_constr.record_statement(Call(scope, _offline=True))
                     return scope_or_constr.return_value
@@ -185,7 +189,8 @@ class mcfunction:
             func_name = f"{self._basename}{ext}"
             with Constructor(name=func_name, inline=self._inline, scope=MCFScope(name=func_name, executor=executor, tags=self._tags, set_throws=self._throws)) as constr:
                 self._arg_scope.append((func_arg, constr))
-                self._ast_generator(*args, **kwargs)
+                bound_arg_ = self._signature.bind(**func_arg.get_args())
+                self._ast_generator(*bound_arg_.args, **bound_arg_.kwargs)
             constr.finish()
 
             if not self._entrance and not self._inline:
