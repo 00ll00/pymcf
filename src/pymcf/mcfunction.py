@@ -32,7 +32,7 @@ class FuncArgs:
         self.rt_args = {}
         for k, v in args.items():
             if isinstance(v, RtBaseVar):
-                self.rt_args[k] = v.__create_var__()
+                self.rt_args[k] = v
             else:
                 self.ct_args[k] = v
 
@@ -57,6 +57,11 @@ class FuncArgs:
 
     def get_args(self) -> dict[str, Any]:
         return {**self.rt_args, **self.ct_args}
+
+    def __create_var__(self) -> Self:
+        args = self.ct_args.copy()
+        args.update({k: v.__create_var__() for k, v in self.rt_args.items()})
+        return FuncArgs(args)
 
 def get_valid_name(func_name: str) -> str:
     return (func_name
@@ -174,9 +179,9 @@ class mcfunction:
             last_constr = Constructor.current_constr()
 
             func_arg = FuncArgs(bound_arg.arguments)
-            for done_arg, scope_or_constr in self._arg_scope:
-                if done_arg == func_arg:
-                    done_arg.__assign__(func_arg)
+            for func_param, scope_or_constr in self._arg_scope:
+                if func_param == func_arg:
+                    func_param.__assign__(func_arg)
                     scope = scope_or_constr if isinstance(scope_or_constr, Scope) else scope_or_constr.scope
                     last_constr.record_statement(Call(scope, _offline=True))
                     return scope_or_constr.return_value
@@ -188,7 +193,9 @@ class mcfunction:
 
             func_name = f"{self._basename}{ext}"
             with Constructor(name=func_name, inline=self._inline, scope=MCFScope(name=func_name, executor=executor, tags=self._tags, set_throws=self._throws)) as constr:
-                self._arg_scope.append((func_arg, constr))
+                func_param = func_arg.__create_var__()
+                self._arg_scope.append((func_param, constr))
+                func_param.__assign__(func_arg)
                 bound_arg_ = self._signature.bind(**func_arg.get_args())
                 self._ast_generator(*bound_arg_.args, **bound_arg_.kwargs)
             constr.finish()
