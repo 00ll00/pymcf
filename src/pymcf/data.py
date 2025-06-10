@@ -3,7 +3,7 @@ from numbers import Real
 from typing import Self, overload, SupportsInt, Iterable
 
 from pymcf.ast_ import Constructor, RtBaseVar, RtBaseIterator, Assign, Inplace, RtStopIteration, Compare, Raw, \
-    FormattedData
+    FormattedData, UnaryOp
 from pymcf.mcfunction import mcfunction
 from pymcf.mc.commands import Resolvable, ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NBTStorable, NbtRef, \
     RefWrapper, TextScoreComponent, TextComponent, ScoreboardAdd, AtE, \
@@ -130,6 +130,31 @@ class NumberLike(ABC):
         return self
 
 
+class BoolLike(ABC):
+
+    @classmethod
+    @abstractmethod
+    def __create_var__(cls):
+        ...
+
+    def __bool_and__(self, other):
+        res = Bool.__create_var__()
+        res.__assign__(self)
+        Inplace.And(res, other)
+        return res
+
+    def __bool_or__(self, other):
+        res = Bool.__create_var__()
+        res.__assign__(self)
+        Inplace.Or(res, other)
+        return res
+
+    def __bool_not__(self):
+        res = Bool.__create_var__()
+        UnaryOp.Not(res, self)
+        return res
+
+
 class Entity(RefWrapper[EntityRef]):
 
     __base_selector__ = AtE()
@@ -216,7 +241,7 @@ class ScoreBoard(RefWrapper[ObjectiveRef]):
 type ScoreInitializer = NumberLike | SupportsInt | ScoreRef | None
 
 
-class Score(RtVar, RefWrapper[ScoreRef], NumberLike):
+class Score(RtVar, RefWrapper[ScoreRef], NumberLike, BoolLike):
 
     @property
     def __metadata__(self) -> ScoreRef:
