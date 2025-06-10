@@ -52,8 +52,8 @@ class FuncArgs:
 
     def __assign__(self, other: Self):
         assert self == other
-        for k, v in other.rt_args.items():
-            v.__assign__(self.rt_args[k])
+        for k, v in self.rt_args.items():
+            v.__assign__(other.rt_args[k])
 
     def get_args(self) -> dict[str, Any]:
         return {**self.rt_args, **self.ct_args}
