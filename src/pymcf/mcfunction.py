@@ -102,7 +102,12 @@ class mcfunction:
                 inspect.getsource(func)
             except OSError:
                 raise ValueError(f"无法获取函数 {func.__module__}.{func.__qualname__} 的源代码。")
-            self = object.__new__(cls)
+
+            self = _mcfunction_registry[func.__module__][func.__qualname__].get(func.__code__.co_firstlineno)
+            if self is None:
+                self = object.__new__(cls)
+                _mcfunction_registry[func.__module__][func.__qualname__][func.__code__.co_firstlineno] = self
+
             if _func is None:
                 # 说明返回的是 wrapper，需要手动 init
                 self.__init__(func, **kwargs)
@@ -111,11 +116,7 @@ class mcfunction:
         if _func is None:
             return wrap
         else:
-            wrapped = _mcfunction_registry[_func.__module__][_func.__qualname__].get(_func.__code__.co_firstlineno)
-            if wrapped is None:
-                wrapped = wrap(_func)
-                _mcfunction_registry[_func.__module__][_func.__qualname__][_func.__code__.co_firstlineno] = wrapped
-            return wrapped
+            return wrap(_func)
 
     def __init__(self,_func: FunctionType=None, /, * ,  # _func 默认 None 仅用于避免编辑器提示缺少参数
                  tags: set[str] = None,
@@ -126,6 +127,11 @@ class mcfunction:
                  **kwargs,
                  ):
         assert _func is not None
+
+        # 避免重复 init
+        if "__init_flag" in self.__dict__:
+            return
+        self.__dict__["__init_flag"] = True
 
         self.__name__ = _func.__name__
         self.__doc__ = _func.__doc__
@@ -168,7 +174,7 @@ class mcfunction:
                 # TODO
                 executor = args[0].entity
             args = (args[0].entity, *args[1:])
-        bound_arg = self._signature.bind(*args, **kwargs)
+        bound_arg = self._signature.bind(*args, **kwargs)  # TODO nonlocal 是否应当作为参数进行记录
         bound_arg.apply_defaults()
         if self._inline:
             with Constructor(name=self._basename, inline=self._inline, scope=Constructor.current_constr().scope) as constr:
