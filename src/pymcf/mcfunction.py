@@ -183,7 +183,10 @@ class mcfunction:
                 if func_param == func_arg:
                     func_param.__assign__(func_arg)
                     scope = scope_or_constr if isinstance(scope_or_constr, Scope) else scope_or_constr.scope
-                    last_constr.record_statement(Call(scope, _offline=True))
+                    if last_constr is not None:
+                        last_constr.record_statement(Call(scope, _offline=True))
+                    else:
+                        assert self._entrance
                     return scope_or_constr.return_value
 
             if self._entrance and len(self._arg_scope) == 0:
@@ -200,9 +203,10 @@ class mcfunction:
                 self._ast_generator(*bound_arg_.args, **bound_arg_.kwargs)
             constr.finish()
 
-            if not self._entrance and not self._inline:
-                assert last_constr is not None
+            if last_constr is not None:
                 last_constr.record_statement(Call(constr.scope, _offline=True))
+            else:
+                assert self._entrance
 
             for i, (args, _) in enumerate(self._arg_scope):
                 if args is func_arg:
