@@ -218,6 +218,12 @@ class RtBaseVar(ABC):
         """
         return NotImplemented
 
+    def __bool_not__(self):
+        """
+        覆盖此方法以重写 not 运算
+        """
+        return NotImplemented
+
     @abstractmethod
     def __assign__(self, value):
         """

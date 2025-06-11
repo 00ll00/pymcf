@@ -130,12 +130,7 @@ class NumberLike(ABC):
         return self
 
 
-class BoolLike(ABC):
-
-    @classmethod
-    @abstractmethod
-    def __create_var__(cls):
-        ...
+class BoolLike:
 
     def __bool_and__(self, other):
         res = Bool.__create_var__()
@@ -241,7 +236,7 @@ class ScoreBoard(RefWrapper[ObjectiveRef]):
 type ScoreInitializer = NumberLike | SupportsInt | ScoreRef | None
 
 
-class Score(RtVar, RefWrapper[ScoreRef], NumberLike, BoolLike):
+class Score(BoolLike, RtVar, RefWrapper[ScoreRef], NumberLike):
 
     @property
     def __metadata__(self) -> ScoreRef:

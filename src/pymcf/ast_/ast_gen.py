@@ -1142,6 +1142,17 @@ class ASTRewriter(NodeTransformer):
                 r = r or v
         return r
 
+    @staticmethod
+    def handle_not(value):
+        if isinstance(value, RtBaseVar):
+            if hasattr(value, "__bool_not__"):
+                tmp = value.__bool_not__()
+                if tmp is not NotImplemented:
+                    return tmp
+            raise TypeError(f"unsupported operand type for 'not': {value.__class__.__name__!r}")
+        else:
+            return not value
+
     def visit_BoolOp(self, node):
         """
         a <op> b <op> ...
@@ -1160,6 +1171,17 @@ class ASTRewriter(NodeTransformer):
             case _:
                 raise
         return self.add_call(handler, node.values)
+
+    def visit_UnaryOp(self, node):
+        """
+        实现 not 运算重载
+        """
+        node = self.generic_visit(node)
+
+        if isinstance(node.op, Not):
+            return self.add_call(self.handle_not, [node.operand])
+        else:
+            return node
 
     def assign_handler(self, target, value):
         if isinstance(target, RtBaseVar):

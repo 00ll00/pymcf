@@ -95,6 +95,8 @@ def repr_operator(op: operator | boolop | cmpop) -> str:
             return "in"
         case NotIn():
             return "not in"
+        case Not():
+            return "not"
         case _:
             raise NotImplementedError
 
@@ -106,7 +108,7 @@ def repr_operation(op: operation) -> str:
         case Assign():
             return f"{repr_value(op.target)} = {repr_value(op.value)}"
         case UnaryOp():
-            return f"{repr_value(op.target)} = {repr_operator(op.op)}{repr_value(op.value)}"
+            return f"{repr_value(op.target)} = {repr_operator(op.op)} {repr_value(op.value)}"
         case Inplace():
             return f"{repr_value(op.target)} = {repr_value(op.target)} {repr_operator(op.op)} {repr_value(op.value)}"
         case Compare():
