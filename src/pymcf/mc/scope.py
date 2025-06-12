@@ -26,7 +26,7 @@ class MCFScope(Scope):
         if const not in self.consts:
             self.consts[const] = Score(NameRef(f"$const_{const}"),  self.sys_scb)
             from pymcf.project import Project
-            with Project.instance().scb_init_constr:
+            with Project.instance().scb_init_constr:  # TODO 消除冗余的常量赋值
                 Assign(self.consts[const], const)
         return self.consts[const]
 

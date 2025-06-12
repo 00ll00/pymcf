@@ -381,7 +381,7 @@ class Expander(NodeVisitor):
             if self.inline_catch and self._try_match_jump:
                 cb_last.true = self._try_match_jump[-1]
 
-    def visit_With(self, node: With):
+    def visit_With(self, node: With):  # TODO 禁止 with 块之后的内容内联到 with 内
         cb_last_out = self.exit_block()
 
         cb_enter_in = self.enter_block(name="with_enter")
