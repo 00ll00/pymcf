@@ -187,9 +187,9 @@ class mcfunction:
             func_arg = FuncArgs(bound_arg.arguments)
             for func_param, scope_or_constr in self._arg_scope:
                 if func_param == func_arg:
-                    func_param.__assign__(func_arg)
-                    scope = scope_or_constr if isinstance(scope_or_constr, Scope) else scope_or_constr.scope
                     if last_constr is not None:
+                        func_param.__assign__(func_arg)
+                        scope = scope_or_constr if isinstance(scope_or_constr, Scope) else scope_or_constr.scope
                         last_constr.record_statement(Call(scope, _offline=True))
                     else:
                         assert self._entrance
@@ -204,12 +204,12 @@ class mcfunction:
             with Constructor(name=func_name, inline=self._inline, scope=MCFScope(name=func_name, executor=executor, tags=self._tags, set_throws=self._throws)) as constr:
                 func_param = func_arg.__create_var__()
                 self._arg_scope.append((func_param, constr))
-                func_param.__assign__(func_arg)
-                bound_arg_ = self._signature.bind(**func_arg.get_args())
+                bound_arg_ = self._signature.bind(**func_param.get_args())
                 self._ast_generator(*bound_arg_.args, **bound_arg_.kwargs)
             constr.finish()
 
             if last_constr is not None:
+                func_param.__assign__(func_arg)
                 last_constr.record_statement(Call(constr.scope, _offline=True))
             else:
                 assert self._entrance
