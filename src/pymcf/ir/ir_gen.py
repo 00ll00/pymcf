@@ -116,6 +116,8 @@ class Expander(NodeVisitor):
             self.current_block().add_op(node)
         elif isinstance(node, IrBlockAttr):  # 设置块属性
             self.current_block().attributes.update(node.attr)
+        elif isinstance(node, compiler_hint):
+            self.current_block().add_op(node)
 
     def visit_If(self, node: If):
         cb_last_out = self.exit_block()

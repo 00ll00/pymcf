@@ -39,6 +39,7 @@ class _GraphVizDumper(ast.NodeVisitor):
 
     @staticmethod
     def repr_node(op):
+        color = "black"
         if isinstance(op, operation):
             r = repr_operation(op)
         elif isinstance(op, jmpop):
@@ -47,10 +48,11 @@ class _GraphVizDumper(ast.NodeVisitor):
             r = f"{op.func!r}()"
         elif isinstance(op, compiler_hint):
             r = repr_compiler_hint(op)
+            color = "#bb00bb"
         class_name = op.__class__.__name__
         if isinstance(op, Inplace | UnaryOp | Compare):
             class_name += f'.{op.op.__class__.__name__}'
-        return f"""<td align="left"><b>{escape(class_name)}</b>  </td><td align="left">{escape(r)}</td>"""
+        return f"""<td align="left"><b><font color="{color}">{escape(class_name)}</font></b>  </td><td align="left">{escape(r)}</td>"""
 
     def visit_BasicBlock(self, node: BasicBlock):
         self.generic_visit(node)
