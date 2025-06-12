@@ -217,7 +217,7 @@ class mcfunction:
             for i, (args, _) in enumerate(self._arg_scope):
                 if args is func_arg:
                     break
-            self._arg_scope[i] = (func_arg, constr.scope)
+            self._arg_scope[i] = (func_param, constr.scope)
 
             return constr.return_value
 
