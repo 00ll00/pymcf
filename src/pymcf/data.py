@@ -1,4 +1,5 @@
-from abc import abstractmethod, ABC
+import functools
+from abc import abstractmethod, ABC, ABCMeta
 from numbers import Real
 from typing import Self, overload, SupportsInt, Iterable
 
@@ -8,6 +9,23 @@ from pymcf.mcfunction import mcfunction
 from pymcf.mc.commands import Resolvable, ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NBTStorable, NbtRef, \
     RefWrapper, TextScoreComponent, TextComponent, ScoreboardAdd, AtE, \
     AtA, Selector
+
+
+class maybe_classmethod:
+
+    def __init__(self, func):
+        self.func = func
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            @functools.wraps(self.func)
+            def wrapper(*args, **kwargs):
+                return self.func(owner, *args, **kwargs)
+        else:
+            @functools.wraps(self.func)
+            def wrapper(*args, **kwargs):
+                return self.func(instance, *args, **kwargs)
+        return wrapper
 
 
 class RtVar(RtBaseVar, ABC):
@@ -178,10 +196,27 @@ class Entity(RefWrapper[EntityRef]):
         return self.ref
 
     @classmethod
+    @overload
     def select[E: Entity](cls: type[E], selector: Selector = None, /, **kwargs) -> E:
+        ...
+
+    @overload
+    def select[E: Entity](self: E, selector: Selector = None, /, **kwargs) -> E:
+        ...
+
+    @maybe_classmethod
+    def select(self_or_cls, selector: Selector = None, /, **kwargs):
+        if isinstance(self_or_cls, type):
+            base = self_or_cls.__base_selector__
+            cls = self_or_cls
+        else:
+            assert isinstance(self_or_cls.ref, Selector)
+            base = self_or_cls.ref
+            cls = type(self_or_cls)
         if selector is None:
-            selector = kwargs
-        return cls.__new__(cls, _ref=cls.__base_selector__.merge(selector))
+            return cls.__new__(cls, _ref=base.merge(kwargs))
+        else:
+            return cls.__new__(cls, _ref=selector.merge(base))
 
     def __repr__(self):
         return f"{self.__class__.__name__}@{self.__metadata__.__class__.__name__}({self.__metadata__.__dict__})"
