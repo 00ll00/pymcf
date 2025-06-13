@@ -1100,9 +1100,12 @@ class ASTRewriter(NodeTransformer):
                         body=node.orelse)])
 
     @staticmethod
-    def handle_and(*values):
-        r = values[0]
-        for v in values[1:]:
+    def handle_and(*lambdas: types.LambdaType):  # TODO 短路逻辑
+        r = lambdas[0]()
+        for vexp in lambdas[1:]:
+            if not isinstance(r, RtBaseVar) and not bool(r):
+                return r
+            v = vexp()
             if isinstance(r, RtBaseVar) or isinstance(v, RtBaseVar):
                 if hasattr(r, "__bool_and__"):
                     try:
@@ -1122,9 +1125,12 @@ class ASTRewriter(NodeTransformer):
         return r
 
     @staticmethod
-    def handle_or(*values):
-        r = values[0]
-        for v in values[1:]:
+    def handle_or(*lambdas: types.LambdaType):  # TODO 短路逻辑
+        r = lambdas[0]()
+        for vexp in lambdas[1:]:
+            if not isinstance(r, RtBaseVar) and bool(r):
+                return r
+            v = vexp()
             if isinstance(r, RtBaseVar) or isinstance(v, RtBaseVar):
                 if hasattr(r, "__bool_or__"):
                     tmp = r.__bool_or__(v)
@@ -1159,7 +1165,7 @@ class ASTRewriter(NodeTransformer):
 
         =====>
 
-        handler(a, b, ...)
+        handler(lambda: a, lambda: b, ...)
         """
         node = self.generic_visit(node)
 
@@ -1170,7 +1176,7 @@ class ASTRewriter(NodeTransformer):
                 handler = self.handle_or
             case _:
                 raise
-        return self.add_call(handler, node.values)
+        return self.add_call(handler, [Lambda(args=arguments(), body=v) for v in node.values])
 
     def visit_UnaryOp(self, node):
         """
