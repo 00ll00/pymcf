@@ -52,6 +52,19 @@ class ReturnRun(Command):
     def resolve(self, scope):
         return f"return run {self.cmd.resolve(scope)}"
 
+class ReturnValue(Command):
+    def __init__(self, value: int):
+        assert isinstance(value, int)
+        self.value = value
+
+    def resolve(self, scope):
+        return f"return {self.value}"
+
+class ReturnFail(Command):
+
+    def resolve(self, scope):
+        return "return fail"
+
 class FunctionTag(Command):
 
     def __init__(self, tag_name):

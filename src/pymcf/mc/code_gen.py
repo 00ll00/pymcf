@@ -4,7 +4,7 @@ from typing import SupportsInt, Self
 
 from .commands import Command, RawCommand, OpAssign, Execute, ExecuteChain, DataGet, \
     SetConst, OpSub, NumRange, OpMul, OpAdd, OpDiv, OpMod, AddConst, RemConst, Function, NSName, ReturnRun, GetValue, \
-    ResetValue, AtS
+    ResetValue, AtS, ReturnValue
 from .scope import MCFScope
 from ..ast_ import operation, Raw, Assign, UnaryOp, Inplace, Compare, LtE, Gt, GtE, Eq, NotEq, Lt, UAdd, USub, Not, \
     Invert, And, Or, Add, Sub, Mult, Div, FloorDiv, Mod, RtBaseExc, Call
@@ -318,13 +318,19 @@ class Translator:
         if cb.direct is not None:
             cmds.append(self.call_cb(cb.direct))
         if cb.cond is not None:
-            assert isinstance(cb.cond, Score)
-            if cb.false is not None:
-                cmds.append(ExecuteChain().cond('if').score_range(cb.cond.__metadata__, NumRange(0, 0))
-                                    .run(ReturnRun(self.call_cb(cb.false))))
-            if cb.true is not None:
-                cmds.append(ExecuteChain().cond('unless').score_range(cb.cond.__metadata__, NumRange(0, 0))
-                                    .run(self.call_cb(cb.true)))
+            if isinstance(cb.cond, Score):
+                if cb.false is not None:
+                    cmds.append(ExecuteChain().cond('if').score_range(cb.cond.__metadata__, NumRange(0, 0))
+                                        .run(ReturnRun(self.call_cb(cb.false))))
+                if cb.true is not None:
+                    cmds.append(ExecuteChain().cond('unless').score_range(cb.cond.__metadata__, NumRange(0, 0))
+                                        .run(self.call_cb(cb.true)))
+            else:
+                assert isinstance(cb.cond, bool)
+                if cb.cond:
+                    cmds.append(self.call_cb(cb.true))
+                else:
+                    cmds.append(self.call_cb(cb.false))
         return MCF(path, cmds, self.scope)
 
     def gen_MachJump(self, cb: MatchJump):
@@ -362,7 +368,7 @@ class Translator:
             chain = ExecuteChain()
             for vmin, vmax in r.valid_ranges():
                 chain = chain.cond('unless' if unless else 'if').score_range(cb.flag.__metadata__, NumRange(vmin, vmax))
-            cmds.append(chain.run(ReturnRun(self.call_cb(case.target))))
+            cmds.append(chain.run(ReturnRun(self.call_cb(case.target)) if case.target is not None else ReturnValue(0)))
         return MCF(path, cmds, self.scope)
 
     def translate(self, cb: code_block) -> MCF:

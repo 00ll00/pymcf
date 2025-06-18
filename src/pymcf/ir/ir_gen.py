@@ -56,6 +56,12 @@ class Expander(NodeVisitor):
     def set_flag_op(self, flag: Any) -> operation:
         return Assign(self.bf, flag, _offline=True)
 
+    def clear_flag(self, blk_next: code_block) -> BasicBlock:
+        blk = BasicBlock(name="clear_bf")
+        blk.add_op(self.clear_flag_op())
+        blk.direct = blk_next
+        return blk
+
     def add_op(self, op: operation | compiler_hint):
         self.current_block().ops.append(op)
 
@@ -66,7 +72,7 @@ class Expander(NodeVisitor):
                 if len(node.blk_finally.flow) > 0:
                     return False
             elif isinstance(node, With):
-                if len(node.blk_exit.flow) > 0:
+                # if len(node.blk_exit.flow) > 0:  # TODO with 影响的判断
                     return False
         return True
 
@@ -168,7 +174,6 @@ class Expander(NodeVisitor):
         cb_body_in = self.enter_block(name="for_body")
         self.push_exc_handler((RtContinue,), cb_iter_in)
         self.push_exc_handler((RtBreak,), cb_next_in)
-        # self.add_op(self.clear_flag_op()) #  进入 body 时清空 bf  TODO bf 的清理方式
         self.visit(node.blk_body)
         self.pop_exc_handler()
         self.pop_exc_handler()
@@ -189,7 +194,7 @@ class Expander(NodeVisitor):
             else:
                 cb_catch_iter.cond = self.bf  # TODO iter 中是否需要允许抛出 RtStopIteration 以外的异常
                 cb_catch_iter.false = cb_body
-                cb_catch_iter.true = cb_else_in  # TODO 清理异常标志
+                cb_catch_iter.true = self.clear_flag(cb_else_in)  # TODO 清理异常标志
         else:
             cb_last_out.direct = cb_iter_in
             cb_iter_out.direct = cb_body
@@ -197,14 +202,14 @@ class Expander(NodeVisitor):
         if not self.inline_catch and node.blk_body.excs.might:
             cb_jump = MatchJump(self.bf, [
                 # JmpEq(RtStopIteration, cb_else_in),  # TODO for 的 iterator 是否只允许抛出 RtStopIteration
-                JmpEq(RtContinue, cb_iter_in),
-                JmpEq(RtBreak, cb_next_in),
+                JmpEq(RtContinue, self.clear_flag(cb_iter_in)),
+                JmpEq(RtBreak, self.clear_flag(cb_next_in)),
             ], inactive=0, name="for_jump")
 
             cb_catch_body.direct = cb_body_in
             cb_catch_body.cond = self.bf
             cb_catch_body.false = cb_iter
-            cb_catch_body.true = cb_jump
+            cb_catch_body.true = self.clear_flag(cb_jump)
         else:
             cb_body_out.direct = cb_iter
 
@@ -241,8 +246,8 @@ class Expander(NodeVisitor):
             cb_test = BasicBlock(name="while_test")
             cb_catch = BasicBlock(name="while_catch")
             cb_jump = MatchJump(self.bf, [
-                JmpEq(RtContinue, cb_test),
-                JmpEq(RtBreak, cb_next_in),
+                JmpEq(RtContinue, self.clear_flag(cb_test)),
+                JmpEq(RtBreak, self.clear_flag(cb_next_in)),
             ], inactive=0, name="while_jump")
 
             cb_test.cond = node.condition
@@ -297,7 +302,6 @@ class Expander(NodeVisitor):
                     captures.add(e)
 
             cb_exc_in = self.enter_block(name="try_except")
-            # cb_exc_in.add_op(self.clear_flag_op())  # TODO
             self.visit(exc_handler.blk_handle)
             cb_exc_out = self.exit_block()
             cb_exc_out.direct = cb_finally_in
@@ -308,7 +312,7 @@ class Expander(NodeVisitor):
         cb_else_out = self.exit_block()
 
         cb_jump = MatchJump(self.bf, [
-            JmpEq(eg, cb_exc_in) for cb_exc_in, eg, captures in cb_excepts if len(captures) > 0
+            JmpEq(eg, self.clear_flag(cb_exc_in)) for cb_exc_in, eg, captures in cb_excepts if len(captures) > 0
         ], inactive=0, name="try_jump")
 
         if self.inline_catch:
@@ -398,35 +402,28 @@ class Expander(NodeVisitor):
 
         cb_next_in = self.enter_block(name="with_next")
 
-        cb_last_out.direct = cb_enter_in
+        # with_enter, with_body, with_exit 需要独立安排到一条分支线，避免 wtih 上下文环境在内联后影响后续块
+        cb_isolated = BasicBlock(name="with_isolated")
+        cb_catch = BasicBlock(name="with_catch")
 
-        if not self.inline_catch:
+        assert not self.inline_catch
 
-            if node.blk_body.excs.might:
-                cb_catch = BasicBlock(name="with_catch")
-                cb_catch.direct = cb_body_in
-                cb_catch.cond = True
-                cb_catch.true = cb_exit_in
-            else:
-                cb_catch = cb_body_in
-                cb_body_out.direct = cb_exit_in
+        cb_last_out.direct = cb_isolated
+        cb_isolated.direct = cb_enter_in
 
-            if node.blk_enter.excs.might:
-                cb_enter_out.cond = self.bf
-                cb_enter_out.false = cb_catch
-            else:
-                cb_enter_out.direct = cb_catch
-
-            if node.blk_exit.excs.might or node.blk_body.excs.might:
-                cb_exit_out.cond = self.bf
-                cb_exit_out.false = cb_next_in
-            else:
-                cb_exit_out.direct = cb_next_in
+        if node.blk_enter.excs.might:
+            cb_enter_out.cond = self.bf
+            cb_enter_out.false = cb_catch
         else:
-            cb_last_out.direct = cb_enter_in
-            cb_enter_out.direct = cb_body_in
-            cb_body_out.direct = cb_exit_in
-            cb_exit_out.direct = cb_next_in
+            cb_enter_out.direct = cb_catch
+
+        cb_catch.direct = cb_body_in
+        cb_catch.cond = True  # TODO 实际为两个 direct，是否需要改变 direct 数量
+        cb_catch.true = cb_exit_in
+
+        cb_isolated.cond = self.bf
+        cb_isolated.false = cb_next_in
+
 
 class CBSimplifier:
 
@@ -547,10 +544,10 @@ class EmptyCBRemover(CBSimplifier):
         return cb
 
     def simplify_MatchJump(self, cb: MatchJump) -> code_block | None:
+        # target 为 None 的 case 不能删除，需要保留其匹配截断的逻辑
         if len(cb.cases) == 0:
             self._mark_simplified()
             return None
-        # 无跳转目标的case暂时不能删除，可能存在flag清除的作用
         return cb
 
 

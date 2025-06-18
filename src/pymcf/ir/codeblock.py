@@ -35,8 +35,8 @@ class BasicBlock(code_block):
 
 class jmpop(ast.AST):
     _fields = ("target", )
-    # 均要具有 target 字段指向跳转的 bloc
-    def __init__(self, target: code_block):
+    # 均要具有 target 字段指向跳转的 block，target 为 None 表示匹配成功时仅中断匹配流程而没有进一步动作
+    def __init__(self, target: code_block | None):
         self.target = target
 
 
@@ -68,7 +68,7 @@ class MatchJump(code_block):
         super().__init__(name)
         self.flag = flag
         self.cases = cases
-        self.inactive = inactive  # 用于指示分支完成后的值，应避免被各分支条件响应
+        self.inactive = inactive  # 用于指示分支完成后的值，应避免被各分支条件响应  TODO 好像没什么用
 
 
 class IrBlockAttr(compiler_hint):
