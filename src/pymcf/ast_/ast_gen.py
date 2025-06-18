@@ -1103,8 +1103,12 @@ class ASTRewriter(NodeTransformer):
     def handle_and(*lambdas: types.LambdaType):  # TODO 短路逻辑
         r = lambdas[0]()
         for vexp in lambdas[1:]:
-            if not isinstance(r, RtBaseVar) and not bool(r):
-                return r
+            if not isinstance(r, RtBaseVar):
+                if r:
+                    return r  # r 编译期为真，则使用 v 替换 r
+                else:
+                    r = vexp()
+                    continue  # r 编译期为假，直接返回 r
             v = vexp()
             if isinstance(r, RtBaseVar) or isinstance(v, RtBaseVar):
                 if hasattr(r, "__bool_and__"):
@@ -1128,8 +1132,12 @@ class ASTRewriter(NodeTransformer):
     def handle_or(*lambdas: types.LambdaType):  # TODO 短路逻辑
         r = lambdas[0]()
         for vexp in lambdas[1:]:
-            if not isinstance(r, RtBaseVar) and bool(r):
-                return r
+            if not isinstance(r, RtBaseVar):
+                if r:
+                    return r  # r 编译期为真，直接返回 r
+                else:
+                    r = vexp()
+                    continue  # r 编译期为假，则使用 v 替换 r
             v = vexp()
             if isinstance(r, RtBaseVar) or isinstance(v, RtBaseVar):
                 if hasattr(r, "__bool_or__"):
