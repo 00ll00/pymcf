@@ -1105,10 +1105,10 @@ class ASTRewriter(NodeTransformer):
         for vexp in lambdas[1:]:
             if not isinstance(r, RtBaseVar):
                 if r:
-                    return r  # r 编译期为真，则使用 v 替换 r
+                    r = vexp()  # r 编译期为真，则使用 v 替换 r
+                    continue
                 else:
-                    r = vexp()
-                    continue  # r 编译期为假，直接返回 r
+                    return r  # r 编译期为假，直接返回 r
             v = vexp()
             if isinstance(r, RtBaseVar) or isinstance(v, RtBaseVar):
                 if hasattr(r, "__bool_and__"):
