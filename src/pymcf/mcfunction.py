@@ -25,11 +25,15 @@ type _CtArg = (
 允许作为参数传入 mcfunction 的编译期量
 """
 
+type _AT = _CtArg | RtBaseVar
+
 
 class FuncArgs:
-    def __init__(self, args: dict[str, _CtArg]) -> None:
+    def __init__(self, args: dict[str, _AT], nonlocals: dict[str, _AT]) -> None:
+        assert len(set(args.keys()) & set(nonlocals.keys())) == 0  # 参数和 nonlocal 不应该具有相同变量名
         self.ct_args = {}
         self.rt_args = {}
+        self.nonlocals = nonlocals  # nonlocals 不参与赋值，只影响 FuncArgs 的相等性判断
         for k, v in args.items():
             if isinstance(v, RtBaseVar):
                 self.rt_args[k] = v
@@ -39,14 +43,24 @@ class FuncArgs:
     def __eq__(self, other: Self) -> bool:
         # TODO
         # with set_eq_identifier(True):
+        # 编译期参数直接判断是否相等
         if self.ct_args != other.ct_args:
             return False
+        # 运行期参数判断类型是否相同
         if len(self.rt_args) != len(other.rt_args):
             return False
         for k, v in self.rt_args.items():
             if k not in other.rt_args:
                 return False
             if type(v) != type(other.rt_args[k]):
+                return False
+        # nonlocals 判断是否是相同对象
+        if len(self.nonlocals) != len(other.nonlocals):
+            return False
+        for k, v in self.nonlocals.items():
+            if k not in other.nonlocals:
+                return False
+            if v is not other.nonlocals[k]:
                 return False
         return True
 
@@ -61,7 +75,7 @@ class FuncArgs:
     def __create_var__(self) -> Self:
         args = self.ct_args.copy()
         args.update({k: v.__create_var__() for k, v in self.rt_args.items()})
-        return FuncArgs(args)
+        return FuncArgs(args, self.nonlocals)
 
 def get_valid_name(func_name: str) -> str:
     return (func_name
@@ -103,14 +117,14 @@ class mcfunction:
             except OSError:
                 raise ValueError(f"无法获取函数 {func.__module__}.{func.__qualname__} 的源代码。")
 
-            self = _mcfunction_registry[func.__module__][func.__qualname__].get(func.__code__.co_firstlineno)
-            if self is None:
-                self = object.__new__(cls)
-                _mcfunction_registry[func.__module__][func.__qualname__][func.__code__.co_firstlineno] = self
+            last = _mcfunction_registry[func.__module__][func.__qualname__].get(func.__code__.co_firstlineno)
+
+            self = object.__new__(cls)
+            _mcfunction_registry[func.__module__][func.__qualname__][func.__code__.co_firstlineno] = self
 
             if _func is None:
                 # 说明返回的是 wrapper，需要手动 init
-                self.__init__(func, **kwargs)
+                self.__init__(func, _arg_scope=last._arg_scope if last is not None else [], **kwargs)
             return self
 
         if _func is None:
@@ -124,6 +138,7 @@ class mcfunction:
                  inline: bool = False,
                  func_name: str = None,
                  throws: Iterable[type[RtBaseExc]] = None,
+                 _arg_scope = None,  # 继承之前的实例的构建结果
                  **kwargs,
                  ):
         assert _func is not None
@@ -140,10 +155,17 @@ class mcfunction:
 
         self._origin_func = _func
         self._signature = inspect.signature(_func)
+        self._nonlocals = {}
+        for var, cell in zip(_func.__code__.co_freevars, _func.__closure__ or []):
+            try:
+                value = cell.cell_contents
+                self._nonlocals[var] = value
+            except ValueError:
+                pass
 
         self._ast_generator = reform_func(_func, wrapper_name="$wrapper")
 
-        self._arg_scope: list[tuple[FuncArgs, Scope | Constructor]] = []
+        self._arg_scope: list[tuple[FuncArgs, Scope | Constructor]] = [] if _arg_scope is None else _arg_scope
 
         self._tags = tags if tags is not None else set()
         self._entrance = entrance
@@ -184,7 +206,7 @@ class mcfunction:
         else:
             last_constr = Constructor.current_constr()
 
-            func_arg = FuncArgs(bound_arg.arguments)
+            func_arg = FuncArgs(bound_arg.arguments, self._nonlocals)
             for func_param, scope_or_constr in self._arg_scope:
                 if func_param == func_arg:
                     if last_constr is not None:
