@@ -19,7 +19,7 @@ class IrCfg(Config):
     若启用，在条满足时会将异常产生后的逻辑重定位到其应当被捕获的块，进而省略标志判断的流程。内联不影响异常栈的构建。
     """
 
-    ir_inline_thresh: int = 32
+    ir_inline_threshold: int = 32
     """
     允许内联的块的操作数阈值。单引用无条件跳转块只有在值小于 0 时禁用内联。
     """
@@ -555,7 +555,7 @@ class CBInliner(CBSimplifier):
 
     def __init__(self, root: code_block, inline_thresh: int):
         super().__init__(root)
-        self.inline_thresh = inline_thresh
+        self.inline_threshold = inline_thresh
 
     def simplify(self):
         self._count_ref()
@@ -563,7 +563,7 @@ class CBInliner(CBSimplifier):
 
     def simplify_BasicBlock(self, cb: BasicBlock) -> code_block | None:
         if cb.cond is None and isinstance(cb.direct, BasicBlock) and len(cb.direct.attributes) == 0:
-            if (self.inline_thresh >= 0 and self._ref_num[cb.direct] == 1) or len(cb.direct.ops) <= self.inline_thresh:
+            if (self.inline_threshold >= 0 and self._ref_num[cb.direct] == 1) or len(cb.direct.ops) <= self.inline_threshold:
                 # cb.direct 不会是 cb
                 cb.cond = cb.direct.cond
                 cb.false = cb.direct.false
@@ -591,7 +591,7 @@ class Compiler:
                 break
 
         for _ in range(self.config.ir_simplify):
-            inliner = CBInliner(cb, self.config.ir_inline_thresh)
+            inliner = CBInliner(cb, self.config.ir_inline_threshold)
             cb = inliner.simplify()
             if not inliner.simplified:
                 break
