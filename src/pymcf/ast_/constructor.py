@@ -111,7 +111,7 @@ class Constructor:
             self._return_value = self._raw_return_values[0]
 
         if not self.inline:
-            self.scope.returns = self._return_value
+            self.scope._return_value = self._return_value
             self.scope.finish()
 
         self._finished = True
