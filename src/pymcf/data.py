@@ -147,6 +147,17 @@ class NumberLike(ABC):
         Inplace.Mod(self, other)
         return self
 
+    def __pos__(self):
+        res = self.__create_var__()
+        res.__assign__(self)
+        return res
+
+    def __neg__(self):
+        res = self.__create_var__()
+        res.__assign__(0)
+        res.__isub__(self)
+        return res
+
 
 class BoolLike:
 
