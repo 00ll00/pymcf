@@ -4,7 +4,6 @@ from .nbt import *
 from .scoreboard import *
 from .selector import *
 from .text import *
-from ..scope import MCFScope
 
 
 class Cmd(Command):
@@ -35,6 +34,7 @@ class Function(Command):
 
     def resolve(self, scope):
         from pymcf.ir import code_block
+        from ..scope import MCFScope
         if isinstance(self.token, code_block):
             # 是 code_block 时一定是当前 scope 内的 code_block
             return 'function %s' % scope.sub_nsname(self.token)
@@ -159,7 +159,7 @@ class Kill(Command):
 class ReplaceItem(Command):
 
     def __init__(self, ref, slot, item, amount=None):
-        assert isinstance(ref, NBTStorable)
+        assert isinstance(ref, NbtStorable)
         self.ref = ref
         self.slot = slot
         self.item = item

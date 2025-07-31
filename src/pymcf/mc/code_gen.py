@@ -4,14 +4,21 @@ from typing import SupportsInt, Self
 
 from .commands import Command, RawCommand, OpAssign, Execute, ExecuteChain, DataGet, \
     SetConst, OpSub, NumRange, OpMul, OpAdd, OpDiv, OpMod, AddConst, RemConst, Function, NSName, ReturnRun, GetValue, \
-    ResetValue, AtS, ReturnValue
+    ResetValue, AtS, ReturnValue, EntityReference, DataModifyFrom, DataModifyValue, DataRemove
 from .scope import MCFScope
-from ..ast_ import operation, Raw, Assign, UnaryOp, Inplace, Compare, LtE, Gt, GtE, Eq, NotEq, Lt, UAdd, USub, Not, \
+from ..ast_ import compiler_hint, operation, Raw, Assign, UnaryOp, Inplace, Compare, LtE, Gt, GtE, Eq, NotEq, Lt, UAdd, USub, Not, \
     Invert, And, Or, Add, Sub, Mult, Div, FloorDiv, Mod, RtBaseExc, Call
 from ..ast_.runtime import _RtBaseExcMeta
-from ..data import Score, Nbt
+from ..data import Score, Nbt, NbtData
 from ..ir import BasicBlock, MatchJump, code_block
 from ..ir.codeblock import JmpEq, JmpNotEq
+
+
+class NbtNumberScale(compiler_hint):
+    _attributes = ('scale',)
+    def __init__(self, scale=None, **__):
+        self.scale = scale  # None for reset
+        super().__init__(**__)
 
 
 class MultiRange:
@@ -101,6 +108,11 @@ class Translator:
 
     def __init__(self, scope: MCFScope):
         self.scope = scope
+        self.scales = [1]  # 由相关的 compiler_hint 修改，控制 nbt 读取 / 写入时的 scale
+
+    @property
+    def scale(self):
+        return self.scales[-1] if self.scales else 1
 
     @staticmethod
     def call_cb(cb: code_block, chain: ExecuteChain = None) -> Command:
@@ -131,7 +143,7 @@ class Translator:
                     return OpAssign(target.__metadata__, value.__metadata__)
                 elif isinstance(value, Nbt):
                     return (ExecuteChain().store('result').score(target.__metadata__)
-                                   .run(DataGet(value.__metadata__.target, value.__metadata__.path)))
+                                   .run(DataGet(value.__metadata__.target, value.__metadata__.path, scale=self.scale)))
                 elif isinstance(value, SupportsInt):
                     return SetConst(target.__metadata__, int(value))
                 elif value is None:
@@ -139,7 +151,32 @@ class Translator:
                 else:
                     raise NotImplementedError
             elif isinstance(target, Nbt):
-                raise NotImplementedError
+                if isinstance(value, Score):
+                    from ..data import NbtByte, NbtShort, NbtInt, NbtLong, NbtFloat, NbtDouble
+                    if target.shema is NbtByte:
+                        typ = "byte"
+                    elif target.shema is NbtShort:
+                        typ = "short"
+                    elif target.shema is NbtInt:
+                        typ = "int"
+                    elif target.shema is NbtLong:
+                        typ = "long"
+                    elif target.shema is NbtFloat:
+                        typ = "float"
+                    elif target.shema is NbtDouble:
+                        typ = "double"
+                    else:
+                        raise TypeError(f"target nbt is defined as '{target.shema}', which could not assign a number {value}")
+
+                    return ExecuteChain().store('result').nbt(target.__metadata__.target, target.__metadata__.path, typ, scale=self.scale).run(GetValue(value.__metadata__))
+                elif isinstance(value, Nbt):
+                    return DataModifyFrom(target.__metadata__.target, target.__metadata__.path, "set", value.__metadata__.target, value.__metadata__.path)
+                elif isinstance(value, NbtData):
+                    return DataModifyValue(target.__metadata__.target, target.__metadata__.path, "set", value)
+                elif value is None:
+                    return DataRemove(target.__metadata__.target, target.__metadata__.path)
+                else:
+                    raise NotImplementedError
             else:
                 raise NotImplementedError
 
@@ -305,6 +342,14 @@ class Translator:
 
         raise NotImplementedError
 
+    def handle_compiler_hint(self, hint: compiler_hint):
+        
+        if isinstance(hint, NbtNumberScale):
+            if hint.scale is None:
+                self.scales.pop()
+            else:
+                self.scales.append(hint.scale)
+
     def gen_BasicBlcok(self, cb: BasicBlock) -> MCF:
         path = self.scope.sub_name(cb)
         cmds = []
@@ -315,6 +360,8 @@ class Translator:
                     cmds.extend(cmd)
                 else:
                     cmds.append(cmd)
+            elif isinstance(op, compiler_hint):
+                self.handle_compiler_hint(op)
         if cb.direct is not None:
             cmds.append(self.call_cb(cb.direct))
         if cb.cond is not None:

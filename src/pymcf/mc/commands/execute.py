@@ -1,7 +1,7 @@
 from typing import Literal
 
 from .core import Command, Resolvable, EntityRef, SimpleResolve, WorldPos
-from .nbt import NBTStorable
+from .nbt import NbtStorable
 from .scoreboard import ScoreRef
 from .selector import NumRange
 
@@ -123,7 +123,7 @@ class ExecuteChain:
             return self.add('blocks', begin, end, dest, type)
 
         def data(self, dataref, path):
-            assert isinstance(dataref, NBTStorable)
+            assert isinstance(dataref, NbtStorable)
             return self.add('data', dataref, path)
 
     def store(self, store_type: Literal['result', 'success']):
@@ -145,7 +145,7 @@ class ExecuteChain:
             return self.add('score', scoreref)
 
         def nbt(self, storeref, path, data_type, scale=1):
-            assert isinstance(storeref, NBTStorable)
+            assert isinstance(storeref, NbtStorable)
             return self.add(storeref, path, data_type, scale)
 
         def bossbar(self, bar, attr):

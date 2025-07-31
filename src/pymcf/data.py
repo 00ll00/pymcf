@@ -1,14 +1,15 @@
 import functools
-from abc import abstractmethod, ABC, ABCMeta
+from abc import abstractmethod, ABC
 from numbers import Real
 from typing import Self, overload, SupportsInt, Iterable
 
 from pymcf.ast_ import Constructor, RtBaseVar, RtBaseIterator, Assign, Inplace, RtStopIteration, Compare, Raw, \
-    FormattedData, UnaryOp
-from pymcf.mcfunction import mcfunction
-from pymcf.mc.commands import Resolvable, ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NBTStorable, NbtRef, \
+    UnaryOp
+from pymcf.mc.commands import ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NbtStorable, NbtRef, \
     RefWrapper, TextScoreComponent, TextComponent, ScoreboardAdd, AtE, \
-    AtA, Selector
+    Selector, Storage, TextNBTComponent
+from pymcf.mcfunction import mcfunction
+from .nbtlib import *
 
 
 class maybe_classmethod:
@@ -332,7 +333,7 @@ class Score(BoolLike, RtVar, RefWrapper[ScoreRef], NumberLike):
         match format_spec:
             case "":
                 return self
-            case "josn":
+            case "json":
                 return TextScoreComponent(self.__metadata__)
             case _:
                 raise SyntaxError(f"unsupported format specification: {format_spec}")
@@ -372,9 +373,73 @@ class Score(BoolLike, RtVar, RefWrapper[ScoreRef], NumberLike):
 
 Bool = Score
 
+type _T_NbtData = type[NbtData | NbtCompoundSchema]
 
-class Nbt(RefWrapper[NbtRef]):
-    ...
+class Nbt(RtVar, RefWrapper[NbtRef]):
+
+    @property
+    def __metadata__(self) -> NbtRef:
+        return NbtRef(self.target, self.path)
+
+    @overload
+    def __init__(self, data: NbtData | None = None, shema: _T_NbtData = None):
+        ...
+
+    @overload
+    def __init__(self, target: NbtStorable | EntityRef | Entity | str, path: NbtPath | str, data: NbtData | None = None, shema: _T_NbtData = None):
+        ...
+
+    def __init__(self, *args, shema: _T_NbtData = None):
+        self.shema: _T_NbtData = shema
+        match len(args):
+            case 0 | 1:
+                ref = self._new_local_ref()
+                self.target = ref.target
+                self.path = ref.path
+                if len(args) == 1:
+                    Assign(self, args[0])
+            case 2 | 3:
+                target = args[0]
+                path = args[1]
+                if isinstance(target, NbtStorable):
+                    self.target = target
+                elif isinstance(target, EntityRef):
+                    self.target = target.ref
+                elif isinstance(target, Entity):
+                    self.target = target.__metadata__.ref
+                else:
+                    self.target = Storage(str(target))
+                self.path = path if isinstance(path, NbtPath) else NbtPath(path)
+                if len(args) == 3:
+                    Assign(self, args[2])
+            case _:
+                raise TypeError()
+
+    @classmethod
+    def __create_var__(cls) -> Self:
+        return Nbt()
+
+    def __assign__(self, value):
+        Assign(target=self, value=value)
+
+    def __repr__(self):
+        return f"Nbt({self.target!r}, {self.path!r})"
+
+    def __format__(self, format_spec):
+        match format_spec:
+            case "":
+                return self
+            case "json":
+                return TextNBTComponent(self.__metadata__)
+            case _:
+                raise SyntaxError(f"unsupported format specification: {format_spec}")
+
+    @staticmethod
+    def _new_local_ref() -> NbtRef:
+        return Constructor.current_constr().scope.new_local_nbt()
+
+    def __eq__(self, other):
+        raise NotImplementedError()
 
 
 class RtIterator[V: RtVar](RtVar, RtBaseIterator[V], ABC):

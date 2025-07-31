@@ -1,11 +1,12 @@
 from functools import cached_property
+from operator import index
 
-from pymcf.mc.commands import EntityRef
+from pymcf.mc.commands import EntityRef, NbtPath, Storage
 
 from .commands import NameRef, AtS
 from ..ast_ import Assign
 from ..ast_.constructor import Scope
-from ..data import ScoreBoard, Score, Entity
+from ..data import ScoreBoard, Score, Entity, Nbt
 
 
 class MCFScope(Scope):
@@ -22,6 +23,11 @@ class MCFScope(Scope):
     def sys_scb(self) -> ScoreBoard:
         return ScoreBoard("__sys__")
 
+    @cached_property
+    def sys_storage(self) -> Storage:
+        from ..project import Project
+        return Storage(f"{Project.instance().name.lower()}:__sys__")  # TODO self.namespace 为什么是 None
+
     def get_const_score(self, const: int) -> Score:
         if const not in self.consts:
             self.consts[const] = Score(NameRef(f"$const_{const}"),  self.sys_scb)
@@ -30,17 +36,19 @@ class MCFScope(Scope):
                 Assign(self.consts[const], const)
         return self.consts[const]
 
-    def new_local_score(self) -> Score:
+    def next_local_var_name(self) -> str:
         index = len(self.locals)
-        score = Score(NameRef(f"$var_{hex(hash(hex(id(self))))[-6:]}_{index}"),  self.sys_scb)  # TODO 变量作用域区分
+        return f"{hex(hash(self.name))[-8:]}_{index}"  # TODO 变量作用域区分
+
+    def new_local_score(self) -> Score:
+        score = Score(NameRef("$var_" + self.next_local_var_name()),  self.sys_scb)
         self.locals.append(score)
         return score
 
-    def new_local_tag(self) -> str:
-        index = len(self.locals)
-        tag = f"$var_{index}"
-        self.locals.append(tag)
-        return tag
+    def new_local_nbt(self) -> Nbt:
+        nbt = Nbt(self.sys_storage, NbtPath('vars') + NbtPath(self.next_local_var_name()))
+        self.locals.append(nbt)
+        return nbt
 
     @property
     def nsname(self):

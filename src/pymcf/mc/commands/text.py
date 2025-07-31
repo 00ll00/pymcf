@@ -5,7 +5,8 @@ from pymcf.mc.commands import Selector
 
 from .core import Command, EntityRef, Resolvable
 from .scoreboard import ScoreRef
-from .nbt import Path, NBTStorable
+from .nbt import NbtPath, NbtStorable, NbtRef
+
 
 class Tellraw(Command):
 
@@ -69,15 +70,15 @@ class TextStringComponent(TextComponent):
 
 class TextNBTComponent(TextComponent):
 
-    def __init__(self, storage, path):
-        assert isinstance(storage, NBTStorable)
-        assert isinstance(path, Path)
-        self.storage = storage
-        self.path = path
+    def __init__(self, ref: NbtRef):
+        assert isinstance(ref.target, NbtStorable)
+        assert isinstance(ref.path, NbtPath)
+        self.target = ref.target
+        self.path = ref.path
 
     def _resolve(self, scope):
         obj = {'nbt': self.path.resolve(scope)}
-        obj.update(self.storage.as_text(scope))
+        obj.update(self.target.as_text(scope))
         return obj
 
 class TextScoreComponent(TextComponent):

@@ -11,7 +11,7 @@ class Player(Entity):
     __base_selector__ = AtA()
 
     def __init__(self):
-        raise TypeError(f'Player 不能被生成，使用 foreach 获取实例。')
+        raise TypeError(f'Player 不能被生成，使用 select 获取实例。')
 
 
 class _SummonableMeta(ABCMeta):
@@ -29,6 +29,9 @@ class _Summonable(Entity, metaclass=_SummonableMeta):
 
     @classmethod
     def summon(cls, pos=None, data=None, *, as_var=False) -> Self | None:
+        if data is None:
+            data = {}
+        # TODO summon 是否应当定义在这里
         Raw(Summon(cls.__entity_type__, pos, data))
         if as_var:
             return cls.__new__(cls, _ref=cls.__base_selector__.merge(
