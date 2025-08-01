@@ -34,6 +34,9 @@ class Project:
     _project = None
 
     def __init__(self, name, description=None, **config):
+        if Project._project is not None:
+            raise ValueError("Project already initialized")
+
         Project._project = self
         self.name = name
         self.description = description or name
