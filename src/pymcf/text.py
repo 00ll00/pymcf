@@ -1,8 +1,8 @@
 from typing import Any
 
-from pymcf.data import Score, Entity
+from pymcf.data import Score, Nbt, Entity
 from pymcf.mc.commands import TextComponent, TextScoreComponent, TextComponentHolder, TextStringComponent, \
-    TextSelectorCompoment
+    TextSelectorCompoment, TextNBTComponent
 
 
 def text_component(data: Any, /, **style) -> TextComponent:
@@ -10,6 +10,8 @@ def text_component(data: Any, /, **style) -> TextComponent:
         comp = data
     elif isinstance(data, Score):
         comp = TextScoreComponent(data.__metadata__)
+    elif isinstance(data, Nbt):
+        comp = TextNBTComponent(data.__metadata__)
     elif isinstance(data, Entity):
         comp = TextSelectorCompoment(data.__metadata__)
     elif isinstance(data, list | tuple):

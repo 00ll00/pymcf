@@ -19,7 +19,7 @@ from pymcf.mcfunction import mcfunction
 class ProjectCfg(Config):
     prj_tmp_dir: Path = Path("./.pymcf_tmp")
     prj_install_dir: Path = Path("./pymcf_out")
-    prj_pack_format: int = 71
+    prj_pack_format: int = 81
 
     tag_func_load: str = "load"
     tag_func_tick: str = "tick"
@@ -59,6 +59,10 @@ class Project:
     @staticmethod
     def add_module(name):
         importlib.import_module(name)
+
+    @property
+    def config(self) -> Config:
+        return Project.instance()._config
 
     def build(self):
         if self._config.ir_bf is None:
