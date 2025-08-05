@@ -51,10 +51,20 @@ class Project:
         )
 
         self.const_rec: dict[int, "Score"] = {}
+        self.resources: list[tuple[Path, Any]] = []
 
     @staticmethod
     def instance() -> "Project":
         return Project._project
+
+    @staticmethod
+    def add_resource(path: Path | str, data: str | bytes):
+        """
+        添加一个资源文件
+        :param path: 数据包内相对路径
+        :param data: 数据
+        """
+        Project._project.resources.append((Path(path), data))
 
     @staticmethod
     def add_module(name):
@@ -86,6 +96,18 @@ class Project:
         exceptions.confirm()
 
         pack_dir_path = self._config.prj_tmp_dir / "datapack"
+
+        for path, data in self.resources:
+            path = pack_dir_path / path
+            if not path.resolve().is_relative_to(pack_dir_path.resolve()):
+                raise PermissionError(f"bad resource path: {path}")
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+            with path.open("wb") as f:
+                if isinstance(data, str):
+                    f.write(data.encode("utf-8"))
+                else:
+                    f.write(data)
 
         def build_scope(scope: MCFScope):
             assert scope.finished
