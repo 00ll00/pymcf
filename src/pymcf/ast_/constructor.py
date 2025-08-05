@@ -5,7 +5,7 @@ from typing import Optional, Any
 
 from .runtime import RtBaseVar, RtReturn
 from .scope import Scope
-from .syntactic import Block, stmt, Assign, Raise, Try, ExcHandle
+from .syntactic import Block, stmt, Raise, Try, ExcHandle
 
 NoValue = object()
 CtValue = object()
@@ -80,19 +80,19 @@ class Constructor:
             if self._return_type is NoValue:  # 未提供返回值类型
                 if isinstance(value, RtBaseVar):
                     self._return_value = value.__create_var__()
-                    Assign(self._return_value, value)
+                    self._return_value.__assign__(value)
                 else:
                     self._return_value = CtValue
             else:
                 assert issubclass(self._return_type, RtBaseVar)
                 self._return_value = self._return_type.__create_var__()
-                Assign(self._return_value, value)
+                self._return_value.__assign__(value)
         else:
             if self._return_value is CtValue:
                 if isinstance(value, RtBaseVar) or value != self._raw_return_values[0]:
                     raise TypeError(f"函数存在多个不同的编译期返回值，但未提供运行期返回值数据类型。")
             else:
-                Assign(self._return_value, value)
+                self._return_value.__assign__(value)
 
     def finish(self):
         """
