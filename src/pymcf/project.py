@@ -67,8 +67,10 @@ class Project:
         Project._project.resources.append((Path(path), data))
 
     @staticmethod
-    def add_module(name):
-        importlib.import_module(name)
+    def add_module(path: str, name: str | None = None):
+        mod = importlib.import_module(path)
+        if name is not None:
+            mod.__name__ = name
 
     @property
     def config(self) -> Config:

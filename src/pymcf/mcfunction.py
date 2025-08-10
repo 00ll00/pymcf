@@ -136,6 +136,7 @@ class mcfunction:
                  tags: set[str] = None,
                  entrance: bool = False,
                  inline: bool = False,
+                 macro: bool = False,
                  func_name: str = None,
                  throws: Iterable[type[RtBaseExc]] = None,
                  _arg_scope = None,  # 继承之前的实例的构建结果
@@ -170,6 +171,7 @@ class mcfunction:
         self._tags = tags if tags is not None else set()
         self._entrance = entrance
         self._inline = inline
+        self._macro = macro
 
         self._throws = throws  # TODO 指定的异常集和真实异常集的冲突检查
 
@@ -223,7 +225,7 @@ class mcfunction:
                 ext = "-" + str(len(self._arg_scope))
 
             func_name = f"{self._basename}{ext}"
-            with Constructor(name=func_name, inline=self._inline, scope=MCFScope(name=func_name, executor=executor, tags=self._tags, set_throws=self._throws)) as constr:
+            with Constructor(name=func_name, inline=self._inline, scope=MCFScope(name=func_name, executor=executor, tags=self._tags, set_throws=self._throws, macro=self._macro)) as constr:
                 func_param = func_arg.__create_var__()
                 self._arg_scope.append((func_param, constr))
                 bound_arg_ = self._signature.bind(**func_param.get_args())
@@ -259,6 +261,10 @@ class mcfunction:
     @staticmethod
     def manual(_func=None, /, *, tags: set[str] = None, **kwargs):
         return mcfunction(_func, inline=False, tags=tags, entrance=True, **kwargs)
+
+    @staticmethod
+    def macro(_func=None, /, **kwargs):
+        return mcfunction(_func, tags=None, entrance=False, macro=True, **kwargs)
 
     @staticmethod
     def load(_func=None, /, *, tags: set[str] = None, **kwargs):

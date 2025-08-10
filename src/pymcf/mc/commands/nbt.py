@@ -1,5 +1,6 @@
 from abc import abstractmethod
 
+import nbtlib
 from nbtlib import serialize_tag
 
 from ...nbtlib import _NbtPath, NbtData
@@ -69,6 +70,18 @@ class NbtRef(Resolvable):
     def resolve(self, scope):
         return f"{self.target.resolve(scope)} {self.path.resolve(scope)}"
 
+
+class MacroRef(NbtRef):
+
+    def __init__(self, target: NbtStorable, path: NbtPath):
+        assert isinstance(target, Storage)  # TODO 确保是 namespace:__sys__
+        assert isinstance(path, NbtPath)  # TODO 确保其位于 var 路径下
+        assert isinstance(tuple(path)[-1], nbtlib.NamedKey)
+        self.var_name = tuple(path)[-1].key
+        super().__init__(target, path)
+
+    def resolve(self, scope):
+        return f"$({self.var_name})"
 
 # class GlobalNBT(NBTStorable):
 #

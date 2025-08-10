@@ -35,11 +35,19 @@ class Function(Command):
     def resolve(self, scope):
         from pymcf.ir import code_block
         from ..scope import MCFScope
+        from ...data import NbtPath
         if isinstance(self.token, code_block):
             # 是 code_block 时一定是当前 scope 内的 code_block
-            return 'function %s' % scope.sub_nsname(self.token)
+            if scope.macro:
+                # 若此 scope 允许宏函数则需要让每个块都传入宏参数，todo 按 块是否包含宏命令决定是否传入参数
+                return f'function {scope.sub_nsname(self.token)} with {scope.sys_storage.resolve(scope)} vars'  # vars 硬编码自 MCFScope
+            else:
+                return f'function {scope.sub_nsname(self.token)}'
         elif isinstance(self.token, MCFScope):
-            return 'function %s' % self.token.nsname
+            if self.token.macro:
+                return f'function {self.token.nsname} with {self.token.sys_storage.resolve(self.token)} vars'  # vars 硬编码自 MCFScope
+            else:
+                return f'function {self.token.nsname}'
         else:
             raise NotImplementedError
 

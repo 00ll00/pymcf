@@ -7,7 +7,7 @@ from pymcf.ast_ import Constructor, RtBaseVar, RtBaseIterator, Assign, Inplace, 
     UnaryOp
 from pymcf.mc.commands import ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NbtStorable, NbtRef, \
     RefWrapper, TextScoreComponent, TextComponent, ScoreboardAdd, AtE, \
-    Selector, Storage, TextNBTComponent
+    Selector, Storage, TextNBTComponent, MacroRef
 from pymcf.mcfunction import mcfunction
 from .nbtlib import *
 
@@ -306,12 +306,12 @@ class Score(BoolLike, RtVar, RefWrapper[ScoreRef], NumberLike):
                 self.target = Entity(ref.target)
                 self.objective = ScoreBoard(ref.objective)
                 if len(args) == 1:
-                    Assign(self, args[0])
+                    self.__assign__(args[0])
             case 2 | 3:
                 self.target = Entity(args[0]) if not isinstance(args[0], str) else Entity(NameRef(args[0]))
                 self.objective = ScoreBoard(args[1])
                 if len(args) == 3:
-                    Assign(self, args[2])
+                    self.__assign__(args[2])
             case _:
                 raise TypeError()
 
@@ -382,11 +382,11 @@ class Nbt(RtVar, RefWrapper[NbtRef]):
         return NbtRef(self.target, self.path)
 
     @overload
-    def __init__(self, data: NbtData | None = None, shema: _T_NbtData = None):
+    def __init__(self, data: NbtData | None = None, *, shema: _T_NbtData = None):
         ...
 
     @overload
-    def __init__(self, target: NbtStorable | EntityRef | Entity | str, path: NbtPath | str, data: NbtData | None = None, shema: _T_NbtData = None):
+    def __init__(self, target: NbtStorable | EntityRef | Entity | str, path: NbtPath | str, data: NbtData | None = None, *, shema: _T_NbtData = None):
         ...
 
     def __init__(self, *args, shema: _T_NbtData = None):
@@ -397,7 +397,7 @@ class Nbt(RtVar, RefWrapper[NbtRef]):
                 self.target = ref.target
                 self.path = ref.path
                 if len(args) == 1:
-                    Assign(self, args[0])
+                    self.__assign__(args[0])
             case 2 | 3:
                 target = args[0]
                 path = args[1]
@@ -411,7 +411,7 @@ class Nbt(RtVar, RefWrapper[NbtRef]):
                     self.target = Storage(str(target))
                 self.path = path if isinstance(path, NbtPath) else NbtPath(path)
                 if len(args) == 3:
-                    Assign(self, args[2])
+                    self.__assign__(args[2])
             case _:
                 raise TypeError()
 
@@ -440,6 +440,44 @@ class Nbt(RtVar, RefWrapper[NbtRef]):
 
     def __eq__(self, other):
         raise NotImplementedError()
+
+
+class Macro(Nbt, RefWrapper[MacroRef]):
+
+    @property
+    def __metadata__(self) -> MacroRef:
+        return MacroRef(self.target, self.path)
+
+    @overload
+    def __init__(self, data: NbtData | None = None, *, shema: _T_NbtData = None):
+        ...
+
+    def __init__(self, *args, shema: _T_NbtData = None):
+        match len(args):
+            case 0 | 1:
+                ref = self._new_local_ref()
+                self.target = ref.target
+                self.path = ref.path
+                if len(args) == 1:
+                    self.__assign__(args[0])
+            case _:
+                raise TypeError()
+
+    @classmethod
+    def __create_var__(cls) -> Self:
+        return Macro()
+
+    def __repr__(self):
+        return f"Macro({self.target!r}, {self.path!r})"
+
+    def __format__(self, format_spec):
+        match format_spec:
+            case "":
+                return self
+            case "json":
+                return TextNBTComponent(self.__metadata__)
+            case _:
+                raise SyntaxError(f"unsupported format specification: {format_spec}")
 
 
 class RtIterator[V: RtVar](RtVar, RtBaseIterator[V], ABC):

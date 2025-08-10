@@ -1,5 +1,5 @@
 from functools import cached_property
-from operator import index
+from hashlib import md5
 
 from pymcf.mc.commands import EntityRef, NbtPath, Storage
 
@@ -11,13 +11,17 @@ from ..data import ScoreBoard, Score, Entity, Nbt
 
 class MCFScope(Scope):
 
-    def __init__(self, name: str, tags: set[str] = None, executor: Entity = None, set_throws=None):
+    def __init__(self, name: str, tags: set[str] = None, executor: Entity = None, set_throws=None, macro: bool = False):
         super().__init__(name, set_throws)
+
+        self.local_namespace = md5(self.name.encode()).hexdigest()[:8]
+
         self.executor = executor
         self.consts = {}
         self.locals = []
         self.cb_name = {}
         self.tags = tags or set()
+        self.macro = macro
 
     @cached_property
     def sys_scb(self) -> ScoreBoard:
@@ -38,7 +42,7 @@ class MCFScope(Scope):
 
     def next_local_var_name(self) -> str:
         index = len(self.locals)
-        return f"{hex(hash(self.name))[-8:]}_{index}"  # TODO 变量作用域区分
+        return f"{self.local_namespace}_{index}"  # TODO 变量作用域区分
 
     def new_local_score(self) -> Score:
         score = Score(NameRef("$var_" + self.next_local_var_name()),  self.sys_scb)
