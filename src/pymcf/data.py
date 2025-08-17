@@ -290,12 +290,9 @@ class Score(BoolLike, RtVar, RefWrapper[ScoreRef], NumberLike):
         return ScoreRef(self.target.__metadata__, self.objective.__metadata__)
 
     @overload
-    def __init__(self, number: ScoreInitializer = None):
-        ...
-
+    def __init__(self, number: ScoreInitializer = None): ...
     @overload
-    def __init__(self, target: Entity | EntityRef | str, objective: ScoreBoard | ObjectiveRef | str, number: NumberLike | Real = None):
-        ...
+    def __init__(self, target: Entity | EntityRef | str, objective: ScoreBoard | ObjectiveRef | str, number: NumberLike | Real = None): ...
 
     def __init__(self, *args):
         self.target: Entity
@@ -373,7 +370,7 @@ class Score(BoolLike, RtVar, RefWrapper[ScoreRef], NumberLike):
 
 Bool = Score
 
-type _T_NbtData = type[NbtData | NbtCompoundSchema]
+type _T_NbtShema = type[NbtData | NbtCompoundSchema]
 
 class Nbt(RtVar, RefWrapper[NbtRef]):
 
@@ -382,15 +379,12 @@ class Nbt(RtVar, RefWrapper[NbtRef]):
         return NbtRef(self.target, self.path)
 
     @overload
-    def __init__(self, data: NbtData | None = None, *, shema: _T_NbtData = None):
-        ...
-
+    def __init__(self, data: NbtData | None = None, *, shema: _T_NbtShema = None): ...
     @overload
-    def __init__(self, target: NbtStorable | EntityRef | Entity | str, path: NbtPath | str, data: NbtData | None = None, *, shema: _T_NbtData = None):
-        ...
+    def __init__(self, target: NbtStorable | EntityRef | Entity | str, path: NbtPath | str, data: NbtData | None = None, *, shema: _T_NbtShema = None): ...
 
-    def __init__(self, *args, shema: _T_NbtData = None):
-        self.shema: _T_NbtData = shema
+    def __init__(self, *args, shema: _T_NbtShema = None):
+        self.shema: _T_NbtShema = shema
         match len(args):
             case 0 | 1:
                 ref = self._new_local_ref()
@@ -449,10 +443,10 @@ class Macro(Nbt, RefWrapper[MacroRef]):
         return MacroRef(self.target, self.path)
 
     @overload
-    def __init__(self, data: NbtData | None = None, *, shema: _T_NbtData = None):
+    def __init__(self, data: NbtData | None = None, *, shema: _T_NbtShema = None):
         ...
 
-    def __init__(self, *args, shema: _T_NbtData = None):
+    def __init__(self, *args, shema: _T_NbtShema = None):
         match len(args):
             case 0 | 1:
                 ref = self._new_local_ref()

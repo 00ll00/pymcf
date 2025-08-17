@@ -54,6 +54,11 @@ class MCFScope(Scope):
         self.locals.append(nbt)
         return nbt
 
+    def new_local_entity_tag(self) -> str:
+        tag = f"{self.namespace}.var_{self.next_local_var_name()}"
+        self.locals.append(tag)  # TODO 应当将实体对象作为 local 变量进行添加，而不是 tag
+        return tag
+
     @property
     def nsname(self):
         return f"{self.namespace}:{self.name}"
