@@ -369,7 +369,11 @@ class Translator:
                 if cb.false is not None:
                     cmds.append(ExecuteChain().cond('if').score_range(cb.cond.__metadata__, NumRange(0, 0))
                                         .run(ReturnRun(self.call_cb(cb.false))))
-                if cb.true is not None:
+                    if cb.true is not None:
+                        # false 和 true 分支同时存在时，由于先判断的分支带有 return，后判断的分支可以不用再次检查条件
+                        cmds.append(self.call_cb(cb.true))
+                elif cb.true is not None:
+                    # false 分支不存在而 true 存在，需要检查条件是否满足
                     cmds.append(ExecuteChain().cond('unless').score_range(cb.cond.__metadata__, NumRange(0, 0))
                                         .run(self.call_cb(cb.true)))
             else:
