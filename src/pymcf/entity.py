@@ -2,10 +2,11 @@ from abc import ABC, ABCMeta
 from typing import Self
 
 from pymcf.mcfunction import mcfunction
-from pymcf.nbtlib import NbtCompound
+from pymcf.nbtlib import NbtCompound, NbtString
+from pymcf.project import Project
 
 from .ast_ import Raw, Constructor
-from .data import Entity
+from .data import Entity, NbtList
 from .mc.commands import AtA, AtE, Summon, WorldPos, Selector
 
 
@@ -14,13 +15,21 @@ class Player(Entity):
     __base_selector__ = AtA()
 
 
+def get_cls_tag(cls, namespace: str = None) -> str:
+    if namespace is None:
+        namespace = Project.instance().name
+    return  f'{namespace}.{cls.__module__}.{cls.__name__}'
+
+
 class _SummonableMeta(ABCMeta):
 
     def __new__(mcls, name, bases, attrs, entity_type=None, **kwargs):
         cls = super().__new__(mcls, name, bases, attrs)
-        if entity_type is not None:
+        if entity_type is not None:  # 定义了实体类型的类以类型作为基础选择器
             cls.__base_selector__ = AtE(type=entity_type)
             cls.__entity_type__ = entity_type
+        elif bases[0] is not Entity:  # 排除 _Summonable
+            cls.__base_selector__ = AtE(tag=get_cls_tag(cls))
         return cls
 
 
@@ -38,19 +47,35 @@ class _Summonable(Entity, metaclass=_SummonableMeta):
 
     @classmethod
     @mcfunction.inline
-    def summon(cls, _pos: str = "~ ~ ~", _nbt: NbtCompound = None):
+    def summon(cls, _pos: str = "~ ~ ~", _tag: str | set[str] = None, _nbt: NbtCompound = None):
         _scope = Constructor.current_constr().scope
         _var_tag = _scope.new_local_entity_tag()
-        self = super().__new__(cls, _ref=cls.__base_selector__.merge(Selector(tag=_var_tag, limit=1)))
+        self = cls.select(tag=_var_tag, limit=1)
 
         if _nbt is None:
             _nbt = NbtCompound()
 
-        _tags = _nbt.find("Tags", NbtList())
-        assert isinstance(_tags, NbtList)
-        _tags.append(_var_tag)
+        if _tag is None:
+            _tag = set()
+        elif isinstance(_tag, str):
+            _tag = {_tag}
+        _tag.add(_var_tag)
 
-        _nbt["Tags"] = _tags
+        # 收集类型 tag
+        for _base in cls.mro():
+            if issubclass(_base, _Summonable) and "__base_selector__" in _base.__dict__:
+                _selector = _base.__base_selector__
+                if _selector.tag is not None:
+                    for _t in _selector.tag.tags:
+                        _tag.add(_t)
+
+        _nbt_tags = _nbt.find("Tags", NbtList[NbtString]())
+        assert isinstance(_nbt_tags, NbtList[NbtString])
+
+        for _t in _tag:
+            _nbt_tags.append(_t)
+
+        _nbt["Tags"] = _nbt_tags
 
         f'tag @e[tag={_var_tag}] remove {_var_tag}'
         f'summon {cls.__entity_type__} {_pos} {_nbt}'

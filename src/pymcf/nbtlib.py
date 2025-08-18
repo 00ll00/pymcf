@@ -5,7 +5,7 @@ Wrapper of nbtlib
 from nbtlib import Byte as _Byte, ByteArray as _ByteArray, Short as _Short, Int as _Int, \
     IntArray as _IntArray, \
     Long as _Long, LongArray as _LongArray, Float as _Float, Double as _Double, Compound as _Compound, \
-    List as _List, Array as _Array, String as _String, Base as _Base
+    List as _List, Array as _Array, String as _String, Base as _Base, End as _End
 
 from nbtlib import Path as _NbtPath
 
@@ -40,7 +40,17 @@ class NbtDouble(_Double, _NbtResolvable):
 class NbtCompound(_Compound, _NbtResolvable):
     pass
 class NbtList(_List, _NbtResolvable):
-    pass
+    def __class_getitem__(cls, item):
+        if item is _End:
+            return NbtList
+        try:
+            return cls.variants[item]
+        except KeyError:
+            variant = type(
+                f"NbtList[{item.__name__}]", (NbtList,), {"__slots__": (), "subtype": item}
+            )
+            cls.variants[item] = variant
+            return variant
 class NbtArray(_Array, _NbtResolvable):
     pass
 class NbtString(_String, _NbtResolvable):
