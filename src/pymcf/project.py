@@ -147,6 +147,9 @@ class Project:
                 continue  # 未构建完成
             build_scope(s)
 
+        with self.scb_init_constr:
+            self._config.ir_bf.__assign__(0)
+
         self.scb_init_constr.finish()
         build_scope(self.scb_init_constr.scope)
 
