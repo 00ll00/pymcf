@@ -1,5 +1,5 @@
 from abc import ABC, ABCMeta
-from typing import Self
+from typing import Self, overload
 
 from pymcf.mcfunction import mcfunction
 from pymcf.nbtlib import NbtCompound, NbtString
@@ -46,18 +46,21 @@ class _Summonable(Entity, metaclass=_SummonableMeta):
     __entity_type__: str
 
     @classmethod
+    @overload
+    def summon(cls, *args, _pos = "~ ~ ~", _tag: str | set[str] = None, _nbt: NbtCompound = None, **kwargs) -> Self: ...
+
+    @classmethod
     @mcfunction.inline
-    def summon(cls, _pos: str = "~ ~ ~", _tag: str | set[str] = None, _nbt: NbtCompound = None):
+    def summon(cls, *args, **kwargs) -> Self:
+        _pos = kwargs.get("_pos", "~ ~ ~")
+        _tag = kwargs.get("_tag", set())
+        _nbt = kwargs.get("_nbt", NbtCompound())
+
         _scope = Constructor.current_constr().scope
         _var_tag = _scope.new_local_entity_tag()
         self = cls.select(tag=_var_tag, limit=1)
 
-        if _nbt is None:
-            _nbt = NbtCompound()
-
-        if _tag is None:
-            _tag = set()
-        elif isinstance(_tag, str):
+        if isinstance(_tag, str):
             _tag = {_tag}
         _tag.add(_var_tag)
 
@@ -80,13 +83,15 @@ class _Summonable(Entity, metaclass=_SummonableMeta):
         f'tag @e[tag={_var_tag}] remove {_var_tag}'
         f'summon {cls.__entity_type__} {_pos} {_nbt}'
 
-        self.init()
+        self.init(*args, **kwargs)
 
         return self
 
     def init(self, *args, **kwargs):
         """
-        完成实体初始化。
+        summon 调用后会自动调用此函数完成实体初始化。
+
+        传入此函数的参数与传入 summon 的相同。
         """
 
 

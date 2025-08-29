@@ -6,7 +6,7 @@ from typing import Self, overload, SupportsInt, Iterable
 from pymcf.ast_ import Constructor, RtBaseVar, RtBaseIterator, Assign, Inplace, RtStopIteration, Compare, Raw, \
     UnaryOp
 from pymcf.mc.commands import ScoreRef, EntityRef, ObjectiveRef, NameRef, NbtPath, NbtStorable, NbtRef, \
-    RefWrapper, TextScoreComponent, TextComponent, ScoreboardAdd, AtE, \
+    RefWrapper, TextScoreComponent, TextComponent, ScoreboardAdd, AtE, AtS, EntityReference, \
     Selector, Storage, TextNBTComponent, MacroRef
 from pymcf.mcfunction import mcfunction
 from .nbtlib import *
@@ -312,6 +312,13 @@ class Score(BoolLike, RtVar, RefWrapper[ScoreRef], NumberLike):
             case _:
                 raise TypeError()
 
+    def __get__(self, instance, owner):
+        # 当 ref 为 AtS() 时从 Entity 实例获取 Score 将使用 Entity 实例替换 ref
+        if isinstance(instance, Entity):
+            if self.target.__metadata__ == AtS():
+                return Score(instance, self.objective)
+        return self
+
     @staticmethod
     def _new_local_ref() -> ScoreRef:
         return Constructor.current_constr().scope.new_local_score()
@@ -408,6 +415,13 @@ class Nbt(RtVar, RefWrapper[NbtRef]):
                     self.__assign__(args[2])
             case _:
                 raise TypeError()
+
+    def __get__(self, instance, owner):
+        # 当 ref 为 AtS() 时从 Entity 实例获取 Nbt 将使用 Entity 实例替换 ref
+        if isinstance(instance, Entity):
+            if isinstance(self.target, EntityReference) and self.target.target == AtS():
+                return Nbt(instance, self.path, shema=self.shema)
+        return self
 
     @classmethod
     def __create_var__(cls) -> Self:

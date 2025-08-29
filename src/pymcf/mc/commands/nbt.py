@@ -29,7 +29,7 @@ class EntityReference(NbtStorable):
         self.target = target
 
     def resolve(self, scope):
-        assert self.target.is_single_entity(scope)
+        # assert self.target.is_single_entity(scope)  # TODO
         return 'entity %s' % self.target.resolve(scope)
 
     def as_text(self, scope):

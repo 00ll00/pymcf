@@ -211,6 +211,9 @@ class Selector(EntityRef, SelectorProto):
         res._update(other if isinstance(other, dict) else other.__dict__)
         return res
 
+    def __eq__(self, other):
+        return type(self) == type(other) and self.__dict__ == other.__dict__
+
 
 class AtA(Selector):
     _kind = 'a'

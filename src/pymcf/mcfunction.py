@@ -149,10 +149,7 @@ class mcfunction:
             return
         self.__dict__["__init_flag"] = True
 
-        self.__name__ = _func.__name__
-        self.__doc__ = _func.__doc__
-        self.__module__ = _func.__module__
-        self.__qualname__ = _func.__qualname__
+        functools.update_wrapper(self, _func)
 
         self._origin_func = _func
         self._signature = inspect.signature(_func)
